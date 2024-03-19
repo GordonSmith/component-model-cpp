@@ -28,10 +28,11 @@ jobs:
           key: ${{ github.workflow }}-cpm-modules-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake') }}
 
       - name: configure
-        run: cmake -G Ninja -S . -B ./build -DENABLE_TEST_COVERAGE=1 -DCMAKE_BUILD_TYPE=Debug
+        run: |
+          cmake -G Ninja -S . -B build -DENABLE_TEST_COVERAGE=1 -DCMAKE_BUILD_TYPE=Debug
 
       - name: build
-        run: cmake --build ./build --parallel
+        run: cmake --build build --parallel
 
       - name: test
         working-directory: build/test
