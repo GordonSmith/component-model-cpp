@@ -1,0 +1,21 @@
+{
+	"name": "C/C++ WASM",
+	"image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+	"remoteEnv": {
+		"PATH": "${containerEnv:PATH}:/usr/local/lib/wasi-sdk-20.0/bin"
+	},
+	"features": {
+		"devwasm.azurecr.io/dev-wasm/dev-wasm-feature/wasmtime-wasi:0.0.14": {
+			"version": "20"
+		}
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-vscode.cpptools-extension-pack",
+				"dtsvet.vscode-wasm"
+			]
+		}
+	},
+	"postCreateCommand": "sudo apt update && sudo apt install -y cmake wget && rm -rf build/*.wasm && wget https://github.com/bytecodealliance/wasmtime/releases/download/v15.0.1/wasi_snapshot_preview1.reactor.wasm && mv wasi_snapshot_preview1.reactor.wasm ./build"
+}

@@ -27,14 +27,6 @@ T load_int(const CallContext &cx, uint32_t ptr, uint8_t)
 
 using HostStringTuple = std::tuple<const char * /*s*/, std::string /*encoding*/, size_t /*byte length*/>;
 
-HostStringTuple load_string_from_range(const CallContext &cx, uint32_t ptr, uint32_t tagged_code_units);
-HostStringTuple load_string(const CallContext &cx, uint32_t ptr)
-{
-  uint32_t begin = load_int<uint32_t>(cx, ptr, 4);
-  uint32_t tagged_code_units = load_int<uint32_t>(cx, ptr + 4, 4);
-  return load_string_from_range(cx, begin, tagged_code_units);
-}
-
 HostStringTuple load_string_from_range(const CallContext &cx, uint32_t ptr, uint32_t tagged_code_units)
 {
   std::string encoding = "utf-8";
@@ -73,6 +65,13 @@ HostStringTuple load_string_from_range(const CallContext &cx, uint32_t ptr, uint
   std::string s(cx.opts->memory[ptr], byte_length);
 
   return HostStringTuple((const char *)&cx.opts->memory[ptr], encoding, byte_length);
+}
+
+HostStringTuple load_string(const CallContext &cx, uint32_t ptr)
+{
+  uint32_t begin = load_int<uint32_t>(cx, ptr, 4);
+  uint32_t tagged_code_units = load_int<uint32_t>(cx, ptr + 4, 4);
+  return load_string_from_range(cx, begin, tagged_code_units);
 }
 
 ListPtr load_list_from_range(const CallContext &cx, uint32_t ptr, uint32_t length, ValType t);
