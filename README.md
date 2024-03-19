@@ -21,10 +21,19 @@ This repository contains a C++ ABI implementation of the WebAssembly Component M
 
 ## Usage
 
-## Related projects and alternatives
+TODO
+
+## Related projects
 
 - [**Component Model design and specification**](https://github.com/WebAssembly/component-model): Official component model specification.
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=GordonSmith/component-model-cpp&type=Date)](https://star-history.com/#GordonSmith/component-model-cpp&Date)
+<a href="https://star-history.com/#GordonSmith/component-model-cpp&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=GordonSmith/component-model-cpp&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=GordonSmith/component-model-cpp&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=GordonSmith/component-model-cpp&type=Date" />
+  </picture>
+</a>
+
