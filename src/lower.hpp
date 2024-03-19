@@ -1,4 +1,7 @@
 #include "context.hpp"
 #include "val.hpp"
 
-std::vector<WasmVal> lower_flat(const CallContext &cx, const Val &v);
+namespace cmcpp
+{
+    std::vector<WasmVal> lower_values(const CallContext &cx, const std::vector<Val> &vs, size_t max_flat = 16, int *out_param = nullptr);
+}

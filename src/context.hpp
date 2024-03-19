@@ -12,46 +12,50 @@
 #include <functional>
 #include <memory>
 
-using GuestMemory = std::span<uint8_t, std::dynamic_extent>;
-using GuestRealloc = std::function<int(int ptr, int old_size, int align, int new_size)>;
-using GuestPostReturn = std::function<void()>;
-
-enum class HostEncoding
+namespace cmcpp
 {
-    Utf8,
-    Utf16,
-    Latin1,
-    Latin1_Utf16
-};
 
-enum class GuestEncoding
-{
-    Utf8,
-    Utf16le,
-    Latin1
-};
+    using GuestMemory = std::span<uint8_t, std::dynamic_extent>;
+    using GuestRealloc = std::function<int(int ptr, int old_size, int align, int new_size)>;
+    using GuestPostReturn = std::function<void()>;
 
-class CanonicalOptions
-{
-public:
-    virtual ~CanonicalOptions() = default;
+    enum class HostEncoding
+    {
+        Utf8,
+        Utf16,
+        Latin1,
+        Latin1_Utf16
+    };
 
-    GuestMemory memory;
-    HostEncoding string_encoding;
+    enum class GuestEncoding
+    {
+        Utf8,
+        Utf16le,
+        Latin1
+    };
 
-    virtual int realloc(int ptr, int old_size, int align, int new_size) = 0;
-    virtual void post_return() = 0;
-};
-using CanonicalOptionsPtr = std::shared_ptr<CanonicalOptions>;
+    class CanonicalOptions
+    {
+    public:
+        virtual ~CanonicalOptions() = default;
 
-class CallContext
-{
-public:
-    virtual ~CallContext() = default;
+        GuestMemory memory;
+        HostEncoding string_encoding;
 
-    CanonicalOptionsPtr opts;
-};
-using CallContextPtr = std::shared_ptr<CallContext>;
-CallContextPtr createCallContext(const GuestMemory &memory, const GuestRealloc &realloc, HostEncoding encoding = HostEncoding::Utf8, const GuestPostReturn &post_return = nullptr);
+        virtual int realloc(int ptr, int old_size, int align, int new_size) = 0;
+        virtual void post_return() = 0;
+    };
+    using CanonicalOptionsPtr = std::shared_ptr<CanonicalOptions>;
+
+    class CallContext
+    {
+    public:
+        virtual ~CallContext() = default;
+
+        CanonicalOptionsPtr opts;
+    };
+    using CallContextPtr = std::shared_ptr<CallContext>;
+    CallContextPtr createCallContext(const GuestMemory &memory, const GuestRealloc &realloc, HostEncoding encoding = HostEncoding::Utf8, const GuestPostReturn &post_return = nullptr);
+}
 
 #endif
