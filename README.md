@@ -16,8 +16,34 @@ This repository contains a C++ ABI implementation of the WebAssembly Component M
 
 ## Features
 
-- [x] [Modern CMake practices](https://pabloariasal.github.io/2018/02/19/its-time-to-do-cmake-right/)
-- [ ] Suited for single header libraries and projects of any scale
+- [x] Bool
+- [x] S8
+- [x] U8
+- [x] S16
+- [x] U16
+- [x] S32
+- [x] U32
+- [x] S64
+- [x] U64
+- [x] Float32
+- [x] Float64
+- [x] Char
+- [x] String
+- [ ] utf8 String
+- [ ] utf16 String
+- [ ] List
+- [ ] Field
+- [ ] Record
+- [ ] Tuple
+- [ ] Case
+- [ ] Variant
+- [ ] Enum
+- [ ] Option
+- [ ] Result
+- [ ] Flags
+- [ ] Own
+- [ ] Borrow
+- [x] lower_flat
 
 ## Usage
 
@@ -26,6 +52,7 @@ TODO
 ## Related projects
 
 - [**Component Model design and specification**](https://github.com/WebAssembly/component-model): Official component model specification.
+- [**wit-bindgen c++ host**](https://github.com/cpetig/wit-bindgen):  C++ host support for the WebAssembly Interface Types (WIT) Bindgen tool.
 
 ## Star History
 
