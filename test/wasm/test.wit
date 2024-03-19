@@ -1,0 +1,43 @@
+package component-model-cpp:test-wasm;
+
+world tests {
+/*  imports  ---
+
+    guests dispose all params as needed
+    guests should dispose "results" as needed
+*/
+
+  import dbglog: func(msg: string);
+
+/*  exports  ---
+
+    guests dispose all params as needed
+    hosts call cabi_post_XXX to dispose "results" as needed
+*/
+  export bool-and: func(a: bool, b: bool) -> bool;
+  export bool-or: func(a: bool, b: bool) -> bool;
+  export bool-xor: func(a: bool, b: bool) -> bool;
+  export float32-add: func(a: float32, b: float32) -> float32;
+  export float32-sub: func(a: float32, b: float32) -> float32;
+  export float64-add: func(a: float64, b: float64) -> float64;
+  export float64-sub: func(a: float64, b: float64) -> float64;
+  export u8-add: func(a: u8, b: u8) -> u8;
+  export u8-sub: func(a: u8, b: u8) -> u8;
+  export u16-add: func(a: u16, b: u16) -> u16;
+  export u16-sub: func(a: u16, b: u16) -> u16;
+  export u32-add: func(a: u32, b: u32) -> u32;
+  export u32-sub: func(a: u32, b: u32) -> u32;
+  export u64-add: func(a: u64, b: u64) -> u64;
+  export u64-sub: func(a: u64, b: u64) -> u64;
+  export s8-add: func(a: s8, b: s8) -> s8;
+  export s8-sub: func(a: s8, b: s8) -> s8;
+  export s16-add: func(a: s16, b: s16) -> s16;
+  export s16-sub: func(a: s16, b: s16) -> s16;
+  export s32-add: func(a: s32, b: s32) -> s32;
+  export s32-sub: func(a: s32, b: s32) -> s32;
+  export s64-add: func(a: s64, b: s64) -> s64;
+  export s64-sub: func(a: s64, b: s64) -> s64;
+  export list-char-append: func(a: list<char>, b: list<char>) -> list<char>;
+  export list-list-string-append: func(a: list<list<string>>, b: list<list<string>>) -> string;
+  export string-append: func(a: string, b: string) -> string;
+}

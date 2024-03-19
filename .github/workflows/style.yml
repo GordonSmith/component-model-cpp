@@ -3,11 +3,11 @@ name: Style
 on:
   push:
     branches:
-      - master
+      - trunk
       - main
   pull_request:
     branches:
-      - master
+      - trunk
       - main
 
 env:

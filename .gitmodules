@@ -1,0 +1,6 @@
+[submodule "vcpkg"]
+	path = vcpkg
+	url = https://github.com/microsoft/vcpkg.git
+[submodule "ref/component-model"]
+	path = ref/component-model
+	url = git@github.com:WebAssembly/component-model.git

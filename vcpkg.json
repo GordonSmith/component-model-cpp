@@ -1,0 +1,9 @@
+{
+  "dependencies": [
+    "boost-pfr",
+    "boost-type-index",
+    "doctest",
+    "fmt",
+    "wasmtime-cpp-api"
+  ]
+}
