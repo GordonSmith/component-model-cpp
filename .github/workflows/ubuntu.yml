@@ -27,6 +27,10 @@ jobs:
           path: "**/cpm_modules"
           key: ${{ github.workflow }}-cpm-modules-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake') }}
 
+      - name: install dependencies
+        run: |
+          apt-get install ninja-build
+
       - name: configure
         run: |
           cmake -G Ninja -S . -B build -DENABLE_TEST_COVERAGE=1 -DCMAKE_BUILD_TYPE=Debug
