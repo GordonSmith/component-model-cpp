@@ -52,11 +52,11 @@ This repository contains a C++ ABI implementation of the WebAssembly Component M
 
 ### Host Functions
 - [x] lower_values
-- [ ] lift_values
+- [x] lift_values
 
 ### Tests
 - [ ] ABI
-- [ ] WasmTime
+- [x] WasmTime
 - [ ] Wamr
 - [ ] WasmEdge
 
