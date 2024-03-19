@@ -1,14 +1,9 @@
-#include "cmcpp.hpp"
+#ifndef VAL_HPP
+#define VAL_HPP
 
-#if __has_include(<span>)
-#include <span>
-#else
-#include <string>
-#include <sstream>
-#endif
+#include "context.hpp"
 
 #include <optional>
-#include <string>
 #include <variant>
 
 using float32_t = float;
@@ -382,4 +377,4 @@ public:
     virtual ~CoreFuncType() = default;
 };
 
-std::vector<WasmVal> lower_flat(const CallContext &cx, const Val &v);
+#endif

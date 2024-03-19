@@ -5,8 +5,20 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(SRC
-  cmcpp.hpp
-  cmcpp.cpp
+  context.hpp
+  context.cpp
+  flatten.hpp
+  flatten.cpp
+  lift.hpp
+  lift.cpp
+  load.hpp
+  load.cpp
+  lower.hpp
+  lower.cpp
+  store.hpp
+  store.cpp
+  util.hpp
+  util.cpp
   val.hpp
   val.cpp
 )

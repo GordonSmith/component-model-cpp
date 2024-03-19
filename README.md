@@ -16,6 +16,12 @@ This repository contains a C++ ABI implementation of the WebAssembly Component M
 
 ## Features
 
+### OS
+- [x] Linux
+- [ ] MacOS
+- [ ] Windows
+
+### Host Data Types
 - [x] Bool
 - [x] S8
 - [x] U8
@@ -43,7 +49,16 @@ This repository contains a C++ ABI implementation of the WebAssembly Component M
 - [ ] Flags
 - [ ] Own
 - [ ] Borrow
-- [x] lower_flat
+
+### Host Functions
+- [x] lower_values
+- [ ] lift_values
+
+### Tests
+- [ ] ABI
+- [ ] WasmTime
+- [ ] Wamr
+- [ ] WasmEdge
 
 ## Usage
 
