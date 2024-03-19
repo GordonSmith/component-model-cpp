@@ -10,7 +10,7 @@ find_package(doctest CONFIG REQUIRED)
 # ---- Create binary ----
 
 include_directories(../src)
-file(GLOB sources CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/source/*.cpp)
+file(GLOB sources CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 add_executable(${PROJECT_NAME} ${sources})
 target_link_libraries(${PROJECT_NAME} doctest::doctest component-model-cpp)
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 20)
