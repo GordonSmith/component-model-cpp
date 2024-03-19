@@ -51,7 +51,7 @@ TODO
 
 ## Related projects
 
-- [**Component Model design and specification**](https://github.com/WebAssembly/component-model): Official component model specification.
+- [**Component Model design and specification**](https://github.com/WebAssembly/component-model): Official Component Model specification.
 - [**wit-bindgen c++ host**](https://github.com/cpetig/wit-bindgen):  C++ host support for the WebAssembly Interface Types (WIT) Bindgen tool.
 
 ## Star History
