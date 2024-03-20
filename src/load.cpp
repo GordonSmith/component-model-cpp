@@ -25,20 +25,20 @@ namespace cmcpp
 
   HostStringTuple load_string_from_range(const CallContext &cx, uint32_t ptr, uint32_t tagged_code_units)
   {
-    std::string encoding = "utf-8";
+    GuestEncoding encoding;
     uint32_t byte_length = tagged_code_units;
     uint32_t alignment = 1;
     if (cx.opts->string_encoding == HostEncoding::Utf8)
     {
       alignment = 1;
       byte_length = tagged_code_units;
-      encoding = "utf-8";
+      encoding = GuestEncoding::Utf8;
     }
     else if (cx.opts->string_encoding == HostEncoding::Utf16)
     {
       alignment = 2;
       byte_length = 2 * tagged_code_units;
-      encoding = "utf-16-le";
+      encoding = GuestEncoding::Utf16le;
     }
     else if (cx.opts->string_encoding == HostEncoding::Latin1_Utf16)
     {
@@ -46,22 +46,18 @@ namespace cmcpp
       if (tagged_code_units & UTF16_TAG)
       {
         byte_length = 2 * (tagged_code_units ^ UTF16_TAG);
-        encoding = "utf-16-le";
+        encoding = GuestEncoding::Utf16le;
       }
       else
       {
         byte_length = tagged_code_units;
-        encoding = "latin-1";
+        encoding = GuestEncoding::Latin1;
       }
     }
     assert(isAligned(ptr, alignment));
     assert(ptr + byte_length <= cx.opts->memory.size());
-    // TODO decode the string
-    // auto s = cx.opts->memory[ptr:ptr+byte_length].decode(encoding);
-    // std::string s((const char *)&cx.opts->memory[ptr], byte_length);
-    // std::cout << "load_string_from_range: " << s << std::endl;
-
-    return HostStringTuple(reinterpret_cast<const char *>(&cx.opts->memory[ptr]), encoding, byte_length);
+    auto [dec_str, dec_len] = decode(&cx.opts->memory[ptr], byte_length, encoding);
+    return HostStringTuple(dec_str, cx.opts->string_encoding, dec_len);
   }
 
   HostStringTuple load_string(const CallContext &cx, uint32_t ptr)

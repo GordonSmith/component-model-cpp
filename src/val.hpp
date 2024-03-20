@@ -42,11 +42,11 @@ namespace cmcpp
         // Borrow
     };
 
-    typedef struct string_
+    typedef struct utf8String
     {
-        const char *ptr;
+        const char8_t *ptr;
         size_t len;
-    } string_t;
+    } utf8_t;
 
     typedef struct func
     {
@@ -98,7 +98,7 @@ namespace cmcpp
         float32_t f32;
         float64_t f64;
         char c;
-        string_t s;
+        utf8_t s;
         List *list;
         Field *field;
         Record *record;
@@ -143,7 +143,7 @@ namespace cmcpp
         Val(float64_t f64);
         Val(char c);
         Val(const char *s);
-        Val(const char *s, size_t len);
+        Val(const char8_t *s, size_t len);
         Val(ListPtr list);
         Val(FieldPtr field);
         Val(RecordPtr record);
@@ -177,7 +177,8 @@ namespace cmcpp
         float32_t f32() const;
         float64_t f64() const;
         char c() const;
-        string_t s() const;
+        utf8_t s() const;
+        std::string string() const;
         ListPtr list() const;
         FieldPtr field() const;
         RecordPtr record() const;

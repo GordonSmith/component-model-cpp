@@ -144,12 +144,10 @@ TEST_CASE("component-model-cpp")
     wasmtimeVals = utf8_string_test.call(store, wasmtimeVals).unwrap();
     cmcppWasmVals = wasmtimeVals2WasmVals(wasmtimeVals);
     cmcppVals = cmcpp::lift_values(*cx, cmcppWasmVals, {cmcpp::ValType::String});
-    std::string str = std::string(cmcppVals[0].s().ptr, cmcppVals[0].s().len);
-    CHECK(str.compare("aaabbb") == 0);
+    CHECK(cmcppVals[0].string().compare("aaabbb") == 0);
 
     cmcppVals = cmcpp::lift_values(*cx, wasmtimeVals2WasmVals(utf8_string_test.call(store, vals2WasmtimeVals(cmcpp::lower_values(*cx, {"1234", "5678"}))).unwrap()), {cmcpp::ValType::String});
-    str = std::string(cmcppVals[0].s().ptr, cmcppVals[0].s().len);
-    CHECK(str.compare("12345678") == 0);
+    CHECK(cmcppVals[0].string().compare("12345678") == 0);
     //  Actual ABI Test Code  --------------------------------------------
 }
 

@@ -87,11 +87,11 @@ namespace cmcpp
   Val::Val(const char *s) : val{}
   {
     val.kind = ValType::String;
-    val.of.s.ptr = s;
+    val.of.s.ptr = (const char8_t *)s;
     val.of.s.len = strlen(s);
   }
 
-  Val::Val(const char *s, size_t len) : val{}
+  Val::Val(const char8_t *s, size_t len) : val{}
   {
     val.kind = ValType::String;
     val.of.s.ptr = s;
@@ -304,11 +304,18 @@ namespace cmcpp
     return val.of.c;
   }
 
-  string_t Val::s() const
+  utf8_t Val::s() const
   {
     if (val.kind != ValType::String)
       std::abort();
     return val.of.s;
+  }
+
+  std::string Val::string() const
+  {
+    if (val.kind != ValType::String)
+      std::abort();
+    return std::string((const char *)val.of.s.ptr, val.of.s.len);
   }
 
   ListPtr Val::list() const

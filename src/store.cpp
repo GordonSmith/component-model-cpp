@@ -9,63 +9,58 @@
 namespace cmcpp
 {
 
-  std::tuple<uint32_t, uint32_t> store_string_copy(const CallContext &cx, const char *_src, uint32_t src_code_units, uint32_t dst_code_unit_size, uint32_t dst_alignment, const std::string & /* dst_encoding*/)
+  std::tuple<uint32_t, uint32_t> store_string_copy(const CallContext &cx, const char8_t *src, uint32_t src_code_units, uint32_t dst_code_unit_size, uint32_t dst_alignment, GuestEncoding dst_encoding)
   {
-    std::string src(_src, src_code_units);
     const uint32_t MAX_STRING_BYTE_LENGTH = (1U << 31) - 1;
     uint32_t dst_byte_length = dst_code_unit_size * src_code_units;
     assert(dst_byte_length <= MAX_STRING_BYTE_LENGTH);
     uint32_t ptr = cx.opts->realloc(0, 0, dst_alignment, dst_byte_length);
     assert(ptr == align_to(ptr, dst_alignment));
     assert(ptr + dst_byte_length <= cx.opts->memory.size());
-    // TODO:    std::string encoded = encode(src, dst_encoding);
-    // TODO:    assert(dst_byte_length == encoded.size());
-    std::string encoded = src;
-    // assert(dst_byte_length == encoded.size());
-    std::memcpy(&cx.opts->memory[ptr], encoded.data(), encoded.size());
-    return std::make_tuple(ptr, src_code_units);
+    auto [enc_src, enc_len] = encode(src, src_code_units, dst_encoding);
+    assert(dst_byte_length == enc_len);
+    std::memcpy(&cx.opts->memory[ptr], enc_src, enc_len);
+    return std::make_tuple(ptr, enc_len);
   }
 
   auto MAX_STRING_BYTE_LENGTH = (1U << 31) - 1;
 
-  std::tuple<uint32_t, uint32_t> store_string_to_utf8(const CallContext &cx, const char *src, uint32_t src_code_units, uint32_t worst_case_size)
+  std::tuple<uint32_t, uint32_t> store_string_to_utf8(const CallContext &cx, const char8_t *src, uint32_t src_code_units, uint32_t worst_case_size)
   {
     assert(src_code_units <= MAX_STRING_BYTE_LENGTH);
     uint32_t ptr = cx.opts->realloc(0, 0, 1, src_code_units);
     assert(ptr + src_code_units <= cx.opts->memory.size());
-    //  TODO:  std::string encoded = encode(src, "utf-8");
-    std::string encoded = std::string(src, src_code_units);
-    assert(src_code_units <= encoded.size());
-    std::memcpy(&cx.opts->memory[ptr], encoded.data(), src_code_units);
-    if (src_code_units < encoded.size())
+    auto [enc_src, enc_len] = encode(src, src_code_units, GuestEncoding::Utf8);
+    assert(src_code_units <= enc_len);
+    std::memcpy(&cx.opts->memory[ptr], enc_src, enc_len);
+    if (src_code_units <= enc_len)
     {
       assert(worst_case_size <= MAX_STRING_BYTE_LENGTH);
       ptr = cx.opts->realloc(ptr, src_code_units, 1, worst_case_size);
       assert(ptr + worst_case_size <= cx.opts->memory.size());
-      std::memcpy(&cx.opts->memory[ptr + src_code_units], &encoded[src_code_units],
-                  encoded.size() - src_code_units);
-      if (worst_case_size > encoded.size())
+      std::memcpy(&cx.opts->memory[ptr + src_code_units], enc_src, enc_len);
+      if (worst_case_size > enc_len)
       {
-        ptr = cx.opts->realloc(ptr, worst_case_size, 1, encoded.size());
-        assert(ptr + encoded.size() <= cx.opts->memory.size());
+        ptr = cx.opts->realloc(ptr, worst_case_size, 1, enc_len);
+        assert(ptr + enc_len <= cx.opts->memory.size());
       }
     }
-    return std::make_tuple(ptr, encoded.size());
+    return std::make_tuple(ptr, enc_len);
   }
 
-  std::tuple<uint32_t, uint32_t> store_utf16_to_utf8(const CallContext &cx, const char *src, uint32_t src_code_units)
+  std::tuple<uint32_t, uint32_t> store_utf16_to_utf8(const CallContext &cx, const char8_t *src, uint32_t src_code_units)
   {
     uint32_t worst_case_size = src_code_units * 3;
     return store_string_to_utf8(cx, src, src_code_units, worst_case_size);
   }
 
-  std::tuple<uint32_t, uint32_t> store_latin1_to_utf8(const CallContext &cx, const char *src, uint32_t src_code_units)
+  std::tuple<uint32_t, uint32_t> store_latin1_to_utf8(const CallContext &cx, const char8_t *src, uint32_t src_code_units)
   {
     uint32_t worst_case_size = src_code_units * 2;
     return store_string_to_utf8(cx, src, src_code_units, worst_case_size);
   }
 
-  std::tuple<uint32_t, uint32_t> store_utf8_to_utf16(const CallContext &cx, const char *src, uint32_t src_code_units)
+  std::tuple<uint32_t, uint32_t> store_utf8_to_utf16(const CallContext &cx, const char8_t *src, uint32_t src_code_units)
   {
     uint32_t worst_case_size = 2 * src_code_units;
     if (worst_case_size > MAX_STRING_BYTE_LENGTH)
@@ -75,22 +70,21 @@ namespace cmcpp
       throw std::runtime_error("Pointer misaligned");
     if (ptr + worst_case_size > cx.opts->memory.size())
       throw std::runtime_error("Out of bounds access");
-    //  TODO:  std::string encoded = encode(src, "utf-16-le");
-    std::string encoded = std::string(src, src_code_units);
-    std::memcpy(&cx.opts->memory[ptr], encoded.data(), encoded.size());
-    if (encoded.size() < worst_case_size)
+    auto [enc_src, enc_len] = encode(src, src_code_units, GuestEncoding::Utf16le);
+    std::memcpy(&cx.opts->memory[ptr], enc_src, enc_len);
+    if (enc_len < worst_case_size)
     {
-      ptr = cx.opts->realloc(ptr, worst_case_size, 2, encoded.size());
+      ptr = cx.opts->realloc(ptr, worst_case_size, 2, enc_len);
       if (ptr != align_to(ptr, 2))
         throw std::runtime_error("Pointer misaligned");
-      if (ptr + encoded.size() > cx.opts->memory.size())
+      if (ptr + enc_len > cx.opts->memory.size())
         throw std::runtime_error("Out of bounds access");
     }
-    uint32_t code_units = static_cast<uint32_t>(encoded.size() / 2);
+    uint32_t code_units = static_cast<uint32_t>(enc_len / 2);
     return std::make_tuple(ptr, code_units);
   }
 
-  std::tuple<uint32_t, uint32_t> store_string_to_latin1_or_utf16(const CallContext &cx, const char *src, uint32_t src_code_units)
+  std::tuple<uint32_t, uint32_t> store_string_to_latin1_or_utf16(const CallContext &cx, const char8_t *src, uint32_t src_code_units)
   {
     assert(src_code_units <= MAX_STRING_BYTE_LENGTH);
     uint32_t ptr = cx.opts->realloc(0, 0, 2, src_code_units);
@@ -101,7 +95,7 @@ namespace cmcpp
     uint32_t dst_byte_length = 0;
     for (size_t i = 0; i < src_code_units; ++i)
     {
-      char usv = *reinterpret_cast<const char *>(src);
+      char usv = *(const char8_t *)src;
       if (static_cast<uint32_t>(usv) < (1 << 8))
       {
         cx.opts->memory[ptr + dst_byte_length] = static_cast<uint32_t>(usv);
@@ -122,18 +116,17 @@ namespace cmcpp
           cx.opts->memory[ptr + 2 * j] = cx.opts->memory[ptr + j];
           cx.opts->memory[ptr + 2 * j + 1] = 0;
         }
-        // TODO: Implement encoding to 'utf-16-le'
-        std::string encoded = std::string(src, src_code_units);
-        std::memcpy(&cx.opts->memory[ptr + 2 * dst_byte_length], encoded.data(), encoded.size());
-        if (worst_case_size > encoded.size())
+        auto [enc_src, enc_len] = encode(src, src_code_units, GuestEncoding::Utf16le);
+        std::memcpy(&cx.opts->memory[ptr + 2 * dst_byte_length], enc_src, enc_len);
+        if (worst_case_size > enc_len)
         {
-          ptr = cx.opts->realloc(ptr, worst_case_size, 2, encoded.size());
+          ptr = cx.opts->realloc(ptr, worst_case_size, 2, enc_len);
           if (ptr != align_to(ptr, 2))
             throw std::runtime_error("Pointer misaligned");
-          if (ptr + encoded.size() > cx.opts->memory.size())
+          if (ptr + enc_len > cx.opts->memory.size())
             throw std::runtime_error("Out of bounds access");
         }
-        uint32_t tagged_code_units = static_cast<uint32_t>(encoded.size() / 2) | UTF16_TAG;
+        uint32_t tagged_code_units = static_cast<uint32_t>(enc_len / 2) | UTF16_TAG;
         return std::make_tuple(ptr, tagged_code_units);
       }
     }
@@ -148,7 +141,7 @@ namespace cmcpp
     return std::make_tuple(ptr, dst_byte_length);
   }
 
-  std::tuple<uint32_t, uint32_t> store_probably_utf16_to_latin1_or_utf16(const CallContext &cx, const char *_src, uint32_t src_code_units)
+  std::tuple<uint32_t, uint32_t> store_probably_utf16_to_latin1_or_utf16(const CallContext &cx, const char8_t *src, uint32_t src_code_units)
   {
     uint32_t src_byte_length = 2 * src_code_units;
     if (src_byte_length > MAX_STRING_BYTE_LENGTH)
@@ -161,20 +154,17 @@ namespace cmcpp
     if (ptr + src_byte_length > cx.opts->memory.size())
       throw std::runtime_error("Not enough memory");
 
-    //  TODO:  std::string encoded = encode_utf16le(src);
-    std::string src = std::string(_src, src_code_units);
-    std::string encoded = src;
-    std::copy(encoded.begin(), encoded.end(), cx.opts->memory.begin() + ptr);
-
-    if (std::any_of(src.begin(), src.end(),
-                    [](char c)
+    auto [enc_src, enc_len] = encode(src, src_code_units, GuestEncoding::Utf16le);
+    const uint8_t *enc_src_ptr = static_cast<const uint8_t *>(enc_src);
+    std::memcpy(&cx.opts->memory[ptr], enc_src_ptr, enc_len);
+    if (std::any_of(enc_src_ptr, enc_src_ptr + enc_len, [](uint8_t c)
                     { return static_cast<unsigned char>(c) >= (1 << 8); }))
     {
-      uint32_t tagged_code_units = static_cast<uint32_t>(encoded.size() / 2) | UTF16_TAG;
+      uint32_t tagged_code_units = static_cast<uint32_t>(enc_len / 2) | UTF16_TAG;
       return std::make_tuple(ptr, tagged_code_units);
     }
 
-    uint32_t latin1_size = static_cast<uint32_t>(encoded.size() / 2);
+    uint32_t latin1_size = static_cast<uint32_t>(enc_len / 2);
     for (uint32_t i = 0; i < latin1_size; ++i)
       cx.opts->memory[ptr + i] = cx.opts->memory[ptr + 2 * i];
 
@@ -187,7 +177,7 @@ namespace cmcpp
 
   std::tuple<uint32_t, uint32_t> store_string_into_range(const CallContext &cx, const Val &v, HostEncoding src_encoding)
   {
-    const char *src = v.s().ptr;
+    const char8_t *src = v.s().ptr;
     const size_t src_tagged_code_units = v.s().len;
     HostEncoding src_simple_encoding;
     uint32_t src_code_units;
@@ -214,7 +204,7 @@ namespace cmcpp
     if (cx.opts->string_encoding == HostEncoding::Utf8)
     {
       if (src_simple_encoding == HostEncoding::Utf8)
-        return store_string_copy(cx, src, src_code_units, 1, 1, "utf-8");
+        return store_string_copy(cx, src, src_code_units, 1, 1, GuestEncoding::Utf8);
       else if (src_simple_encoding == HostEncoding::Utf16)
         return store_utf16_to_utf8(cx, src, src_code_units);
       else if (src_simple_encoding == HostEncoding::Latin1)
@@ -225,7 +215,7 @@ namespace cmcpp
       if (src_simple_encoding == HostEncoding::Utf8)
         return store_utf8_to_utf16(cx, src, src_code_units);
       else if (src_simple_encoding == HostEncoding::Utf16 || src_simple_encoding == HostEncoding::Latin1)
-        return store_string_copy(cx, src, src_code_units, 2, 2, "utf-16-le");
+        return store_string_copy(cx, src, src_code_units, 2, 2, GuestEncoding::Utf16le);
     }
     else if (cx.opts->string_encoding == HostEncoding::Latin1_Utf16)
     {
@@ -234,7 +224,7 @@ namespace cmcpp
       else if (src_encoding == HostEncoding::Latin1_Utf16)
       {
         if (src_simple_encoding == HostEncoding::Latin1)
-          return store_string_copy(cx, src, src_code_units, 1, 2, "latin-1");
+          return store_string_copy(cx, src, src_code_units, 1, 2, GuestEncoding::Latin1);
         else if (src_simple_encoding == HostEncoding::Utf16)
           return store_probably_utf16_to_latin1_or_utf16(cx, src, src_code_units);
       }
