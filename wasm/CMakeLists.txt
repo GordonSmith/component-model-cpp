@@ -23,7 +23,12 @@ include_directories(
 )
 
 add_executable(wasmtests
-    main.cpp
+    bool.cpp
+    int.cpp
+    float.cpp
+    string.cpp
+    uint.cpp
+    util.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/tests.c
     ${CMAKE_CURRENT_BINARY_DIR}/tests.h
 )
@@ -31,7 +36,7 @@ add_executable(wasmtests
 add_custom_command(
     TARGET wasmtests POST_BUILD  
     # OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/wasmtests-component.wasm
-    COMMAND wasm-tools component new ${CMAKE_CURRENT_BINARY_DIR}/wasmtests.wasm -o ${CMAKE_CURRENT_BINARY_DIR}/wasmtests-component.wasm --adapt wasi_snapshot_preview1=${CMAKE_CURRENT_BINARY_DIR}/wasi_snapshot_preview1.reactor.wasm
+    COMMAND wasm-tools component new ${CMAKE_CURRENT_BINARY_DIR}/wasmtests.wasm -o ${CMAKE_CURRENT_BINARY_DIR}/wasmtests-component.wasm --adapt wasi_snapshot_preview1=${CMAKE_CURRENT_SOURCE_DIR}/wasi_snapshot_preview1.reactor.wasm
 )
 
 target_link_libraries(wasmtests

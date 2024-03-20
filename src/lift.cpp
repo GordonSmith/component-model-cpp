@@ -44,8 +44,11 @@ namespace cmcpp
     uint64_t lift_flat_unsigned(int64_t v, int t_width)
     {
         uint64_t i = static_cast<uint64_t>(v);
-        assert(0 <= i && i < (1ULL << 64));
-        return i % (1ULL << t_width);
+        if (t_width < 64)
+        {
+            i %= (1ULL << t_width);
+        }
+        return i;
     }
 
     int32_t lift_flat_signed(int32_t i, int t_width)
@@ -61,7 +64,6 @@ namespace cmcpp
 
     int64_t lift_flat_signed(int64_t i, int t_width)
     {
-        assert(0 <= i && i < (1LL << 64));
         i %= (1LL << t_width);
         if (i >= (1LL << (t_width - 1)))
         {
@@ -70,39 +72,43 @@ namespace cmcpp
         return i;
     }
 
-    Val lift_flat(const CallContext &cx, std::vector<WasmVal>::const_iterator vi, const ValType &t)
+    Val lift_flat(const CallContext &cx, const WasmVal &v, const ValType &t, const ValType &lt = ValType::Unknown)
     {
         switch (despecialize(t))
         {
         case ValType::Bool:
-            return convert_int_to_bool(vi->i32());
+            return convert_int_to_bool(v.i32());
         case ValType::U8:
-            return lift_flat_unsigned(vi->i32(), 8);
+            return lift_flat_unsigned(v.i32(), 8);
         case ValType::U16:
-            return lift_flat_unsigned(vi->i32(), 16);
+            return lift_flat_unsigned(v.i32(), 16);
         case ValType::U32:
-            return lift_flat_unsigned(vi->i32(), 32);
+            return lift_flat_unsigned(v.i32(), 32);
         case ValType::U64:
-            return lift_flat_unsigned(vi->i64(), 64);
+            return lift_flat_unsigned(v.i64(), 64);
         case ValType::S8:
-            return lift_flat_signed(vi->i32(), 8);
+            return lift_flat_signed(v.i32(), 8);
         case ValType::S16:
-            return lift_flat_signed(vi->i32(), 16);
+            return lift_flat_signed(v.i32(), 16);
         case ValType::S32:
-            return lift_flat_signed(vi->i32(), 32);
+            return lift_flat_signed(v.i32(), 32);
         case ValType::S64:
-            return lift_flat_signed(vi->i64(), 64);
+            return lift_flat_signed(v.i64(), 64);
         case ValType::Float32:
-            return canonicalize_nan32(vi->f32());
+            return canonicalize_nan32(v.f32());
         case ValType::Float64:
-            return canonicalize_nan64(vi->f64());
+            return canonicalize_nan64(v.f64());
         case ValType::Char:
-            return convert_i32_to_char(vi->i32());
+            return convert_i32_to_char(v.i32());
         case ValType::String:
         {
-            auto str = load_string(cx, vi->i32());
+            auto str = load_string(cx, v.i32());
             Val v(std::get<0>(str), std::get<2>(str));
             return v;
+        }
+        case ValType::List:
+        {
+            return Val(load_list(cx, v.i32(), lt));
         }
         default:
             throw std::runtime_error("Invalid type");
@@ -131,9 +137,43 @@ namespace cmcpp
         {
             for (size_t i = 0; i < ts.size(); ++i)
             {
-                retVal.push_back(lift_flat(cx, vs.begin(), ts[i]));
+                retVal.push_back(lift_flat(cx, vs[i], ts[i]));
             }
         }
         return retVal;
     }
+
+    std::vector<Val> lift_values(const CallContext &cx, const std::vector<WasmVal> &vs, const std::vector<std::pair<ValType, ValType>> &tps, int max_flat)
+    {
+        std::vector<ValType> ts;
+        for (auto tp : tps)
+        {
+            ts.push_back(tp.first);
+        }
+        auto flat_types = flatten_types(ts);
+        std::vector<Val> retVal;
+        if (flat_types.size() > max_flat)
+        {
+            // auto ptr = vi.next('i32');
+            // auto tuple_type = Tuple(ts);
+            // if (ptr != align_to(ptr, alignment(tuple_type)))
+            // {
+            //   throw std::runtime_error("Misaligned pointer");
+            // }
+            // if (ptr + size(tuple_type) > cx.opts.memory.size())
+            // {
+            //   throw std::runtime_error("Out of bounds access");
+            // }
+            // return load(cx, ptr, tuple_type).values();
+        }
+        else
+        {
+            for (size_t i = 0; i < tps.size(); ++i)
+            {
+                retVal.push_back(lift_flat(cx, vs[i], tps[i].first, tps[i].second));
+            }
+        }
+        return retVal;
+    }
+
 }

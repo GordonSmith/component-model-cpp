@@ -5,6 +5,12 @@
 namespace cmcpp
 {
 
+  std::vector<WasmVal> lower_flat_list(const CallContext &cx, const Val &v)
+  {
+    auto [ptr, length] = store_list_into_range(cx, v.list());
+    return {ptr, length};
+  }
+
   std::vector<WasmVal> lower_flat_string(const CallContext &cx, const Val &v)
   {
     auto [ptr, packed_length] = store_string_into_range(cx, v);
@@ -41,6 +47,8 @@ namespace cmcpp
       return {WasmVal(char_to_i32(v.c()))};
     case ValType::String:
       return lower_flat_string(cx, v);
+    case ValType::List:
+      return lower_flat_list(cx, v);
     default:
       throw std::runtime_error("Invalid type");
     }

@@ -8,7 +8,8 @@ namespace cmcpp
 {
 
     void store(const CallContext &cx, const Val &v, uint32_t ptr);
-    std::tuple<uint32_t, uint32_t> store_string_into_range(const CallContext &cx, const Val &v, HostEncoding src_encoding = HostEncoding::Utf8);
+    std::pair<uint32_t, uint32_t> store_list_into_range(const CallContext &cx, ListPtr list);
+    std::pair<uint32_t, uint32_t> store_string_into_range(const CallContext &cx, const Val &v, HostEncoding src_encoding = HostEncoding::Utf8);
 
 }
 #endif

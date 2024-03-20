@@ -1,6 +1,7 @@
 #include "context.hpp"
 #include "lower.hpp"
 #include "lift.hpp"
+#include "val2.hpp"
 
 #include <doctest/doctest.h>
 
@@ -68,6 +69,11 @@ std::vector<cmcpp::WasmVal> wasmtimeVals2WasmVals(const std::vector<wasmtime::Va
     return retVal;
 }
 
+TEST_CASE("generic Val")
+{
+    test();
+}
+
 TEST_CASE("component-model-cpp")
 {
     std::cout << "component-model-cpp" << std::endl;
@@ -111,8 +117,9 @@ TEST_CASE("component-model-cpp")
     auto memory = std::get<wasmtime::Memory>(*instance.get(store, "memory"));
     store.context().set_data(memory);
     wasmtime::Span<uint8_t> data = memory.data(store.context());
-    auto bool_test = std::get<wasmtime::Func>(*instance.get(store, "bool-test"));
-    auto utf8_string_test = std::get<wasmtime::Func>(*instance.get(store, "utf8-string-test"));
+    auto bool_and = std::get<wasmtime::Func>(*instance.get(store, "bool-and"));
+    auto list_char_append = std::get<wasmtime::Func>(*instance.get(store, "list-char-append"));
+    auto string_append = std::get<wasmtime::Func>(*instance.get(store, "string-append"));
 
     //  Actual ABI Test Code  --------------------------------------------
     cmcpp::CallContextPtr cx = cmcpp::createCallContext(data, realloc);
@@ -121,32 +128,43 @@ TEST_CASE("component-model-cpp")
     std::vector<cmcpp::WasmVal> cmcppWasmVals;
 
     wasmtimeVals = vals2WasmtimeVals(cmcpp::lower_values(*cx, {false, false}));
-    wasmtimeVals = bool_test.call(store, wasmtimeVals).unwrap();
+    wasmtimeVals = bool_and.call(store, wasmtimeVals).unwrap();
     cmcppVals = cmcpp::lift_values(*cx, wasmtimeVals2WasmVals(wasmtimeVals), {cmcpp::ValType::Bool});
     CHECK(cmcppVals[0].b() == false);
 
     wasmtimeVals = vals2WasmtimeVals(cmcpp::lower_values(*cx, {false, true}));
-    wasmtimeVals = bool_test.call(store, wasmtimeVals).unwrap();
+    wasmtimeVals = bool_and.call(store, wasmtimeVals).unwrap();
     cmcppVals = cmcpp::lift_values(*cx, wasmtimeVals2WasmVals(wasmtimeVals), {cmcpp::ValType::Bool});
     CHECK(cmcppVals[0].b() == false);
 
     wasmtimeVals = vals2WasmtimeVals(cmcpp::lower_values(*cx, {true, false}));
-    wasmtimeVals = bool_test.call(store, wasmtimeVals).unwrap();
+    wasmtimeVals = bool_and.call(store, wasmtimeVals).unwrap();
     cmcppVals = cmcpp::lift_values(*cx, wasmtimeVals2WasmVals(wasmtimeVals), {cmcpp::ValType::Bool});
     CHECK(cmcppVals[0].b() == false);
 
     wasmtimeVals = vals2WasmtimeVals(cmcpp::lower_values(*cx, {true, true}));
-    wasmtimeVals = bool_test.call(store, wasmtimeVals).unwrap();
+    wasmtimeVals = bool_and.call(store, wasmtimeVals).unwrap();
     cmcppVals = cmcpp::lift_values(*cx, wasmtimeVals2WasmVals(wasmtimeVals), {cmcpp::ValType::Bool});
     CHECK(cmcppVals[0].b() == true);
 
-    wasmtimeVals = vals2WasmtimeVals(cmcpp::lower_values(*cx, {"aaa", "bbb"}));
-    wasmtimeVals = utf8_string_test.call(store, wasmtimeVals).unwrap();
+    auto l = std::make_shared<cmcpp::List>(cmcpp::ValType::Char);
+    l->vs.push_back('a');
+    l->vs.push_back('b');
+    l->vs.push_back('c');
+    auto l2 = std::make_shared<cmcpp::List>(cmcpp::ValType::Char);
+    l2->vs.push_back('d');
+    l2->vs.push_back('e');
+    l2->vs.push_back('f');
+    wasmtimeVals = vals2WasmtimeVals(cmcpp::lower_values(*cx, {l, l2}));
+    wasmtimeVals = list_char_append.call(store, wasmtimeVals).unwrap();
     cmcppWasmVals = wasmtimeVals2WasmVals(wasmtimeVals);
-    cmcppVals = cmcpp::lift_values(*cx, cmcppWasmVals, {cmcpp::ValType::String});
-    CHECK(cmcppVals[0].string().compare("aaabbb") == 0);
+    cmcppVals = cmcpp::lift_values(*cx, cmcppWasmVals, {std::make_pair(cmcpp::ValType::List, cmcpp::ValType::Char)});
+    CHECK(cmcppVals[0].list()->vs.size() == 6);
+    CHECK(cmcppVals[0].list()->vs[0].c() == 'a');
+    CHECK(cmcppVals[0].list()->vs[3].c() == 'd');
+    CHECK(cmcppVals[0].list()->vs[5].c() == 'f');
 
-    cmcppVals = cmcpp::lift_values(*cx, wasmtimeVals2WasmVals(utf8_string_test.call(store, vals2WasmtimeVals(cmcpp::lower_values(*cx, {"1234", "5678"}))).unwrap()), {cmcpp::ValType::String});
+    cmcppVals = cmcpp::lift_values(*cx, wasmtimeVals2WasmVals(string_append.call(store, vals2WasmtimeVals(cmcpp::lower_values(*cx, {"1234", "5678"}))).unwrap()), {cmcpp::ValType::String});
     CHECK(cmcppVals[0].string().compare("12345678") == 0);
     //  Actual ABI Test Code  --------------------------------------------
 }

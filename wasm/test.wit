@@ -6,30 +6,37 @@ world tests {
     guests dispose all params as needed
     guests should dispose "results" as needed
 */
+
   import dbglog: func(msg: string);
-//  import list-a: func(a: list<u8>);
-//  import list-b: func() -> list<u8>;
 
 /*  exports  ---
 
     guests dispose all params as needed
     hosts call cabi_post_XXX to dispose "results" as needed
 */
-  export bool-test: func(a: bool, b: bool) -> bool;
-  export float32-test: func(a: float32, b: float32) -> float32;
-  export float64-test: func(a: float64, b: float64) -> float64;
-  export u8-test: func(a: u8, b: u8) -> u8;
-  export u16-test: func(a: u16, b: u16) -> u16;
-  export u32-test: func(a: u32, b: u32) -> u32;
-  export u64-test: func(a: u64, b: u64) -> u64;
-  export s8-test: func(a: s8, b: s8) -> s8;
-  export s16-test: func(a: s16, b: s16) -> s16;
-  export s32-test: func(a: s32, b: s32) -> s32;
-  export s64-test: func(a: s64, b: s64) -> s64;
-  export utf8-string-test: func(a: string, b: string) -> string;
-  export utf8-string-test2: func(a: string, b: string) -> (a: string, b: string);
-
-//  export list-c: func(a: list<u8>);
-//  export list-d: func() -> list<u8>;
-//  export u8-list-test: func(a: list<u8>, b: list<u8>) -> list<u8>;
+  export bool-and: func(a: bool, b: bool) -> bool;
+  export bool-or: func(a: bool, b: bool) -> bool;
+  export bool-xor: func(a: bool, b: bool) -> bool;
+  export float32-add: func(a: float32, b: float32) -> float32;
+  export float32-sub: func(a: float32, b: float32) -> float32;
+  export float64-add: func(a: float64, b: float64) -> float64;
+  export float64-sub: func(a: float64, b: float64) -> float64;
+  export u8-add: func(a: u8, b: u8) -> u8;
+  export u8-sub: func(a: u8, b: u8) -> u8;
+  export u16-add: func(a: u16, b: u16) -> u16;
+  export u16-sub: func(a: u16, b: u16) -> u16;
+  export u32-add: func(a: u32, b: u32) -> u32;
+  export u32-sub: func(a: u32, b: u32) -> u32;
+  export u64-add: func(a: u64, b: u64) -> u64;
+  export u64-sub: func(a: u64, b: u64) -> u64;
+  export s8-add: func(a: s8, b: s8) -> s8;
+  export s8-sub: func(a: s8, b: s8) -> s8;
+  export s16-add: func(a: s16, b: s16) -> s16;
+  export s16-sub: func(a: s16, b: s16) -> s16;
+  export s32-add: func(a: s32, b: s32) -> s32;
+  export s32-sub: func(a: s32, b: s32) -> s32;
+  export s64-add: func(a: s64, b: s64) -> s64;
+  export s64-sub: func(a: s64, b: s64) -> s64;
+  export list-char-append: func(a: list<char>, b: list<char>) -> list<char>;
+  export string-append: func(a: string, b: string) -> string;
 }

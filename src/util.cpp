@@ -140,7 +140,7 @@ namespace cmcpp
         // case ValType::Flags:
         //     return alignment_flags(_v.flags()->labels);
         default:
-            return alignment(v);
+            return alignment(v.kind());
         }
     }
 

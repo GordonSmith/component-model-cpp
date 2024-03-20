@@ -17,5 +17,5 @@
 			]
 		}
 	},
-	"postCreateCommand": "sudo apt update && sudo apt install -y cmake wget && rm -rf build/*.wasm && wget https://github.com/bytecodealliance/wasmtime/releases/download/v15.0.1/wasi_snapshot_preview1.reactor.wasm && mv wasi_snapshot_preview1.reactor.wasm ./build"
+	"postCreateCommand": "sudo apt update && sudo apt install -y cmake wget && rm -rf build/*.wasm && wget https://github.com/bytecodealliance/wasmtime/releases/download/v15.0.1/wasi_snapshot_preview1.reactor.wasm"
 }
