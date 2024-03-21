@@ -369,7 +369,7 @@ namespace cmcpp
         return record;
     }
 
-    uint32_t char_to_i32(char c) { return static_cast<uint32_t>(c); }
+    int32_t char_to_i32(char c) { return static_cast<uint32_t>(c); }
 
     template <typename T>
     T random_nan_bits(int bits, int quiet_bits)

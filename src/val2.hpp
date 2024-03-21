@@ -8,7 +8,7 @@ struct TypeNameTrait
 {
     static std::vector<std::string> name()
     {
-        return {typeid(T).name()};
+        throw std::runtime_error("Unsupported Type");
     }
 };
 

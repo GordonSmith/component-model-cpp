@@ -409,120 +409,120 @@ namespace cmcpp
     //     return val.of.func;
     // }
 
-    WasmVal::WasmVal() : val{} {}
+    // WasmVal::WasmVal() {}
 
-    WasmVal::WasmVal(val_t val) : val(val) {}
+    // WasmVal::WasmVal(val_t val) : val(val) {}
 
-    WasmVal::WasmVal(int32_t i32) : val{}
-    {
-        val.kind = ValType::S32;
-        val.of.s32 = i32;
-    }
+    // WasmVal::WasmVal(int32_t i32) : val{}
+    // {
+    //     val.kind = ValType::S32;
+    //     val.of.s32 = i32;
+    // }
 
-    WasmVal::WasmVal(uint32_t i32) : val{}
-    {
-        val.kind = ValType::S32;
-        val.of.s32 = i32;
-    }
+    // WasmVal::WasmVal(uint32_t i32) : val{}
+    // {
+    //     val.kind = ValType::S32;
+    //     val.of.s32 = i32;
+    // }
 
-    WasmVal::WasmVal(int64_t i64) : val{}
-    {
-        val.kind = ValType::S64;
-        val.of.s64 = i64;
-    }
+    // WasmVal::WasmVal(int64_t i64) : val{}
+    // {
+    //     val.kind = ValType::S64;
+    //     val.of.s64 = i64;
+    // }
 
-    WasmVal::WasmVal(uint64_t i64) : val{}
-    {
-        val.kind = ValType::S64;
-        val.of.s64 = i64;
-    }
+    // WasmVal::WasmVal(uint64_t i64) : val{}
+    // {
+    //     val.kind = ValType::S64;
+    //     val.of.s64 = i64;
+    // }
 
-    WasmVal::WasmVal(float32_t f32) : val{}
-    {
-        val.kind = ValType::Float32;
-        val.of.f32 = f32;
-    }
+    // WasmVal::WasmVal(float32_t f32) : val{}
+    // {
+    //     val.kind = ValType::Float32;
+    //     val.of.f32 = f32;
+    // }
 
-    WasmVal::WasmVal(float64_t f64) : val{}
-    {
-        val.kind = ValType::Float64;
-        val.of.f64 = f64;
-    }
+    // WasmVal::WasmVal(float64_t f64) : val{}
+    // {
+    //     val.kind = ValType::Float64;
+    //     val.of.f64 = f64;
+    // }
 
-    WasmVal::WasmVal(const WasmVal &other) : val{} { val = other.val; }
+    // WasmVal::WasmVal(const WasmVal &other) : val{} { val = other.val; }
 
-    WasmVal::WasmVal(WasmVal &&other) noexcept : val{}
-    {
-        val.kind = ValType::S32;
-        val.of.s32 = 0;
-        std::swap(val, other.val);
-    }
+    // WasmVal::WasmVal(WasmVal &&other) noexcept : val{}
+    // {
+    //     val.kind = ValType::S32;
+    //     val.of.s32 = 0;
+    //     std::swap(val, other.val);
+    // }
 
-    WasmVal::~WasmVal()
-    {
-        // if (val.kind == WASMTIME_EXTERNREF && val.of.externref != nullptr)
-        // {
-        //      TODO:  wasmtime_externref_delete(val.of.externref);
-        // }
-    }
+    // WasmVal::~WasmVal()
+    // {
+    //     // if (val.kind == WASMTIME_EXTERNREF && val.of.externref != nullptr)
+    //     // {
+    //     //      TODO:  wasmtime_externref_delete(val.of.externref);
+    //     // }
+    // }
 
-    /// Copies the contents of another value into this one.
-    WasmVal &WasmVal::operator=(const WasmVal &other) noexcept
-    {
-        val = other.val;
-        return *this;
-    }
+    // /// Copies the contents of another value into this one.
+    // WasmVal &WasmVal::operator=(const WasmVal &other) noexcept
+    // {
+    //     val = other.val;
+    //     return *this;
+    // }
 
-    WasmVal &WasmVal::operator=(WasmVal &&other) noexcept
-    {
-        std::swap(val, other.val);
-        return *this;
-    }
+    // WasmVal &WasmVal::operator=(WasmVal &&other) noexcept
+    // {
+    //     std::swap(val, other.val);
+    //     return *this;
+    // }
 
-    WasmValType WasmVal::kind() const
-    {
-        switch (val.kind)
-        {
-        case ValType::S32:
-            return WasmValType::I32;
-        case ValType::S64:
-            return WasmValType::I64;
-        case ValType::Float32:
-            return WasmValType::F32;
-        case ValType::Float64:
-            return WasmValType::F64;
-        default:
-            throw std::runtime_error("Invalid WasmValType");
-        }
-    }
+    // WasmValType WasmVal::kind() const
+    // {
+    //     switch (val.kind)
+    //     {
+    //     case ValType::S32:
+    //         return WasmValType::I32;
+    //     case ValType::S64:
+    //         return WasmValType::I64;
+    //     case ValType::Float32:
+    //         return WasmValType::F32;
+    //     case ValType::Float64:
+    //         return WasmValType::F64;
+    //     default:
+    //         throw std::runtime_error("Invalid WasmValType");
+    //     }
+    // }
 
-    int32_t WasmVal::i32() const
-    {
-        if (val.kind != ValType::S32)
-            std::abort();
-        return val.of.s32;
-    }
+    // int32_t WasmVal::i32() const
+    // {
+    //     if (val.kind != ValType::S32)
+    //         std::abort();
+    //     return val.of.s32;
+    // }
 
-    int64_t WasmVal::i64() const
-    {
-        if (val.kind != ValType::S64)
-            std::abort();
-        return val.of.s64;
-    }
+    // int64_t WasmVal::i64() const
+    // {
+    //     if (val.kind != ValType::S64)
+    //         std::abort();
+    //     return val.of.s64;
+    // }
 
-    float32_t WasmVal::f32() const
-    {
-        if (val.kind != ValType::Float32)
-            std::abort();
-        return val.of.f32;
-    }
+    // float32_t WasmVal::f32() const
+    // {
+    //     if (val.kind != ValType::Float32)
+    //         std::abort();
+    //     return val.of.f32;
+    // }
 
-    float64_t WasmVal::f64() const
-    {
-        if (val.kind != ValType::Float64)
-            std::abort();
-        return val.of.f64;
-    }
+    // float64_t WasmVal::f64() const
+    // {
+    //     if (val.kind != ValType::Float64)
+    //         std::abort();
+    //     return val.of.f64;
+    // }
 
     List::List(const ValType &t) : t(t) {}
 

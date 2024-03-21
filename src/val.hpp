@@ -2,45 +2,14 @@
 #define VAL_HPP
 
 #include "context.hpp"
+#include "traits.hpp"
 
 #include <optional>
 #include <variant>
+#include <any>
 
 namespace cmcpp
 {
-
-    using float32_t = float;
-    using float64_t = double;
-
-    enum class ValType : uint8_t
-    {
-        Unknown,
-        Bool,
-        S8,
-        U8,
-        S16,
-        U16,
-        S32,
-        U32,
-        S64,
-        U64,
-        Float32,
-        Float64,
-        Char,
-        String,
-        List,
-        Field,
-        Record,
-        Tuple,
-        Case,
-        Variant,
-        Enum,
-        Option,
-        Result,
-        // Flags,
-        // Own,
-        // Borrow
-    };
 
     typedef struct utf8String
     {
@@ -194,41 +163,29 @@ namespace cmcpp
         // FuncType *func() const;
     };
 
-    enum class WasmValType : uint8_t
-    {
-        I32,
-        I64,
-        F32,
-        F64
-    };
-
     class WasmVal
     {
-        val_t val;
-
-        WasmVal();
-        WasmVal(val_t val);
-
     public:
-        WasmVal(int32_t i32);
-        WasmVal(uint32_t i32);
-        WasmVal(int64_t i64);
-        WasmVal(uint64_t i64);
-        WasmVal(float32_t f32);
-        WasmVal(float64_t f64);
+        WasmValType kind;
+        std::variant<int32_t, int64_t, float32_t, float64_t> v;
 
-        WasmVal(const WasmVal &other);
-        WasmVal(WasmVal &&other) noexcept;
-        ~WasmVal();
-        WasmVal &operator=(const WasmVal &other) noexcept;
-        WasmVal &operator=(WasmVal &&other) noexcept;
+        template <typename T>
+        WasmVal(T v) : kind(WasmTypeNameTrait<T>::name()), v(v) {}
+        virtual ~WasmVal() = default;
 
-        WasmValType kind() const;
-        int32_t i32() const;
-        int64_t i64() const;
-        float32_t f32() const;
-        float64_t f64() const;
+        template <typename T>
+        operator T() const { return std::get<T>(v); }
     };
+
+    // template <typename T>
+    // class WasmValT : public WasmValBase
+    // {
+    // public:
+    //     WasmValT(T v) : WasmValBase(WasmTypeNameTrait<T>::name())
+    //     {
+    //         this->v = v;
+    //     }
+    // };
 
     // class FuncType
     // {

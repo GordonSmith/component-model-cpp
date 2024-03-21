@@ -19,7 +19,7 @@ namespace cmcpp
     float32_t canonicalize_nan32(float32_t f);
     float64_t canonicalize_nan64(float64_t f);
     std::string case_label_with_refinements(const Case &c, const std::vector<Case> &cases);
-    uint32_t char_to_i32(char c);
+    int32_t char_to_i32(char c);
     char convert_i32_to_char(int32_t i);
     bool convert_int_to_bool(uint8_t i);
 

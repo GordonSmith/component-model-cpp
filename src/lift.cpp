@@ -77,38 +77,38 @@ namespace cmcpp
         switch (despecialize(t))
         {
         case ValType::Bool:
-            return convert_int_to_bool(v.i32());
+            return convert_int_to_bool((int32_t)v);
         case ValType::U8:
-            return lift_flat_unsigned(v.i32(), 8);
+            return lift_flat_unsigned((int32_t)v, 8);
         case ValType::U16:
-            return lift_flat_unsigned(v.i32(), 16);
+            return lift_flat_unsigned((int32_t)v, 16);
         case ValType::U32:
-            return lift_flat_unsigned(v.i32(), 32);
+            return lift_flat_unsigned((int32_t)v, 32);
         case ValType::U64:
-            return lift_flat_unsigned(v.i64(), 64);
+            return lift_flat_unsigned((int64_t)v, 64);
         case ValType::S8:
-            return lift_flat_signed(v.i32(), 8);
+            return lift_flat_signed((int32_t)v, 8);
         case ValType::S16:
-            return lift_flat_signed(v.i32(), 16);
+            return lift_flat_signed((int32_t)v, 16);
         case ValType::S32:
-            return lift_flat_signed(v.i32(), 32);
+            return lift_flat_signed((int32_t)v, 32);
         case ValType::S64:
-            return lift_flat_signed(v.i64(), 64);
+            return lift_flat_signed((int64_t)v, 64);
         case ValType::Float32:
-            return canonicalize_nan32(v.f32());
+            return canonicalize_nan32(v);
         case ValType::Float64:
-            return canonicalize_nan64(v.f64());
+            return canonicalize_nan64(v);
         case ValType::Char:
-            return convert_i32_to_char(v.i32());
+            return convert_i32_to_char(v);
         case ValType::String:
         {
-            auto str = load_string(cx, v.i32());
+            auto str = load_string(cx, (int32_t)v);
             Val v(std::get<0>(str), std::get<2>(str));
             return v;
         }
         case ValType::List:
         {
-            return Val(load_list(cx, v.i32(), lt));
+            return Val(load_list(cx, (int32_t)v, lt));
         }
         default:
             throw std::runtime_error("Invalid type");
