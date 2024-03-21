@@ -5,381 +5,421 @@
 namespace cmcpp
 {
 
-    Val::Val() : val{}
+    ValType type(const Val &v)
     {
-        val.kind = ValType::U32;
-        val.of.u32 = 0;
-    }
-    Val::Val(val_t val) : val(val) {}
-
-    Val::Val(bool b) : val{}
-    {
-        val.kind = ValType::Bool;
-        val.of.b = b;
+        return static_cast<ValType>(v.index());
     }
 
-    Val::Val(int8_t s8) : val{}
+    size_t index(ValType t)
     {
-        val.kind = ValType::S8;
-        val.of.s8 = s8;
+        return static_cast<size_t>(t);
     }
 
-    Val::Val(uint8_t u8) : val{}
+    template <typename T>
+    T value(Val &v)
     {
-        val.kind = ValType::U8;
-        val.of.u8 = u8;
+        return std::get<T>(v);
     }
 
-    Val::Val(int16_t s16) : val{}
+    template <typename T>
+    T cast(const Val &v)
     {
-        val.kind = ValType::S16;
-        val.of.s16 = s16;
+        return std::get<T>(v);
     }
 
-    Val::Val(uint16_t u16) : val{}
-    {
-        val.kind = ValType::U16;
-        val.of.u16 = u16;
-    }
+    ValBase::ValBase() : t(ValType::Unknown) {}
+    ValBase::ValBase(const ValType &t) : t(t) {}
+    String::String() : ValBase(ValType::String) {}
+    String::String(const char8_t *ptr, size_t len) : ValBase(ValType::String), ptr(ptr), len(len) {}
+    List::List() : ValBase(ValType::List) {}
+    List::List(ValType lt) : ValBase(ValType::List), lt(lt) {}
+    Field::Field(const std::string &label, ValType ft) : ValBase(ValType::Field), label(label), ft(ft) {}
+    Record::Record() : ValBase(ValType::Record) {}
+    Tuple::Tuple() : ValBase(ValType::Tuple) {}
+    Case::Case() : ValBase(ValType::Case) {}
+    Case::Case(const std::string &label, const std::optional<Val> &v, const std::optional<std::string> &refines) : ValBase(ValType::Case), label(label), v(v), refines(refines) {}
+    Variant::Variant() : ValBase(ValType::Variant){};
+    Variant::Variant(const std::vector<Case> &cases) : ValBase(ValType::Variant), cases(cases) {}
+    Enum::Enum() : ValBase(ValType::Enum){};
+    Option::Option() : ValBase(ValType::Option){};
+    Result::Result() : ValBase(ValType::Result){};
+    Flags::Flags() : ValBase(ValType::Flags){};
 
-    Val::Val(int32_t s32) : val{}
-    {
-        val.kind = ValType::S32;
-        val.of.s32 = s32;
-    }
-
-    Val::Val(uint32_t u32) : val{}
-    {
-        val.kind = ValType::U32;
-        val.of.s32 = u32;
-    }
-
-    Val::Val(int64_t s64) : val{}
-    {
-        val.kind = ValType::S64;
-        val.of.s64 = s64;
-    }
-
-    Val::Val(uint64_t u64) : val{}
-    {
-        val.kind = ValType::U64;
-        val.of.u64 = u64;
-    }
-
-    Val::Val(float32_t f32) : val{}
-    {
-        val.kind = ValType::Float32;
-        val.of.f32 = f32;
-    }
-
-    Val::Val(float64_t f64) : val{}
-    {
-        val.kind = ValType::Float64;
-        val.of.f64 = f64;
-    }
-
-    Val::Val(char c) : val{}
-    {
-        val.kind = ValType::Char;
-        val.of.c = c;
-    }
-
-    Val::Val(const char *s) : val{}
-    {
-        val.kind = ValType::String;
-        val.of.s.ptr = (const char8_t *)s;
-        val.of.s.len = strlen(s);
-    }
-
-    Val::Val(const char8_t *s, size_t len) : val{}
-    {
-        val.kind = ValType::String;
-        val.of.s.ptr = s;
-        val.of.s.len = len;
-    }
-
-    Val::Val(ListPtr list) : val{}
-    {
-        val.kind = ValType::List;
-        val.of.list = list.get();
-        shared_ptr = list;
-    }
-
-    Val::Val(FieldPtr field) : val{}
-    {
-        val.kind = ValType::Field;
-        val.of.field = field.get();
-        shared_ptr = field;
-    }
-
-    Val::Val(RecordPtr record) : val{}
-    {
-        val.kind = ValType::Record;
-        val.of.record = record.get();
-        shared_ptr = record;
-    }
-
-    Val::Val(TuplePtr tuple) : val{}
-    {
-        val.kind = ValType::Tuple;
-        val.of.tuple = tuple.get();
-        shared_ptr = tuple;
-    }
-
-    Val::Val(CasePtr case_) : val{}
-    {
-        val.kind = ValType::Case;
-        val.of.case_ = case_.get();
-        shared_ptr = case_;
-    }
-
-    Val::Val(VariantPtr variant) : val{}
-    {
-        val.kind = ValType::Variant;
-        val.of.variant = variant.get();
-        shared_ptr = variant;
-    }
-
-    Val::Val(EnumPtr enum_) : val{}
-    {
-        val.kind = ValType::Enum;
-        val.of.enum_ = enum_.get();
-        shared_ptr = enum_;
-    }
-
-    Val::Val(OptionPtr option) : val{}
-    {
-        val.kind = ValType::Option;
-        val.of.option = option.get();
-        shared_ptr = option;
-    }
-
-    Val::Val(ResultPtr result) : val{}
-    {
-        val.kind = ValType::Result;
-        val.of.result = result.get();
-        shared_ptr = result;
-    }
-
-    // Val::Val(FlagsPtr flags) : val{}
+    // Val::Val() : val{}
     // {
-    //     val.kind = ValType::Flags;
-    //     val.of.flags = flags.get();
-    //     shared_ptr = flags;
+    //     val.kind = ValType::U32;
+    //     val.of.u32 = 0;
+    // }
+    // Val::Val(val_t val) : val(val) {}
+
+    // Val::Val(bool b) : val{}
+    // {
+    //     val.kind = ValType::Bool;
+    //     val.of.b = b;
     // }
 
-    // Val::Val(OwnPtr own) : val{}
+    // Val::Val(int8_t s8) : val{}
     // {
-    //     val.kind = ValType::Own;
-    //     val.of.own = own.get();
-    //     shared_ptr = own;
+    //     val.kind = ValType::S8;
+    //     val.of.s8 = s8;
     // }
 
-    // Val::Val(BorrowPtr borrow) : val{}
+    // Val::Val(uint8_t u8) : val{}
     // {
-    //     val.kind = ValType::Borrow;
-    //     val.of.borrow = borrow.get();
-    //     shared_ptr = borrow;
+    //     val.kind = ValType::U8;
+    //     val.of.u8 = u8;
     // }
 
-    // Val::Val(FuncTypePtr func) : val{}
+    // Val::Val(int16_t s16) : val{}
     // {
-    //     val.kind = ValType::Func;
-    //     val.of.func = func.get();
-    //     shared_ptr = func;
+    //     val.kind = ValType::S16;
+    //     val.of.s16 = s16;
     // }
 
-    Val::Val(const Val &other) : val{}
-    {
-        val = other.val;
-        shared_ptr = other.shared_ptr;
-    }
+    // Val::Val(uint16_t u16) : val{}
+    // {
+    //     val.kind = ValType::U16;
+    //     val.of.u16 = u16;
+    // }
 
-    Val::Val(Val &&other) noexcept : val{}
-    {
-        val.kind = ValType::U32;
-        val.of.u32 = 0;
-        std::swap(val, other.val);
-        std::swap(shared_ptr, other.shared_ptr);
-    }
+    // Val::Val(int32_t s32) : val{}
+    // {
+    //     val.kind = ValType::S32;
+    //     val.of.s32 = s32;
+    // }
 
-    Val::~Val() {}
+    // Val::Val(uint32_t u32) : val{}
+    // {
+    //     val.kind = ValType::U32;
+    //     val.of.s32 = u32;
+    // }
 
-    Val &Val::operator=(const Val &other) noexcept
-    {
-        val = other.val;
-        shared_ptr = other.shared_ptr;
-        return *this;
-    }
-    Val &Val::operator=(Val &&other) noexcept
-    {
-        std::swap(val, other.val);
-        std::swap(shared_ptr, other.shared_ptr);
-        return *this;
-    }
+    // Val::Val(int64_t s64) : val{}
+    // {
+    //     val.kind = ValType::S64;
+    //     val.of.s64 = s64;
+    // }
 
-    ValType Val::kind() const { return val.kind; }
+    // Val::Val(uint64_t u64) : val{}
+    // {
+    //     val.kind = ValType::U64;
+    //     val.of.u64 = u64;
+    // }
 
-    bool Val::b() const
-    {
-        if (val.kind != ValType::Bool)
-            std::abort();
-        return val.of.b;
-    }
+    // Val::Val(float32_t f32) : val{}
+    // {
+    //     val.kind = ValType::Float32;
+    //     val.of.f32 = f32;
+    // }
 
-    int8_t Val::s8() const
-    {
-        if (val.kind != ValType::S8)
-            std::abort();
-        return val.of.s8;
-    }
+    // Val::Val(float64_t f64) : val{}
+    // {
+    //     val.kind = ValType::Float64;
+    //     val.of.f64 = f64;
+    // }
 
-    uint8_t Val::u8() const
-    {
-        if (val.kind != ValType::U8)
-            std::abort();
-        return val.of.u8;
-    }
+    // Val::Val(char c) : val{}
+    // {
+    //     val.kind = ValType::Char;
+    //     val.of.c = c;
+    // }
 
-    int16_t Val::s16() const
-    {
-        if (val.kind != ValType::S16)
-            std::abort();
-        return val.of.s16;
-    }
+    // Val::Val(const char *s) : val{}
+    // {
+    //     val.kind = ValType::String;
+    //     val.of.s.ptr = (const char8_t *)s;
+    //     val.of.s.len = strlen(s);
+    // }
 
-    uint16_t Val::u16() const
-    {
-        if (val.kind != ValType::U16)
-            std::abort();
-        return val.of.u16;
-    }
+    // Val::Val(const char8_t *s, size_t len) : val{}
+    // {
+    //     val.kind = ValType::String;
+    //     val.of.s.ptr = s;
+    //     val.of.s.len = len;
+    // }
 
-    int32_t Val::s32() const
-    {
-        if (val.kind != ValType::S32)
-            std::abort();
-        return val.of.s32;
-    }
+    // Val::Val(ListPtr list) : val{}
+    // {
+    //     val.kind = ValType::List;
+    //     val.of.list = list.get();
+    //     shared_ptr = list;
+    // }
 
-    uint32_t Val::u32() const
-    {
-        if (val.kind != ValType::U32)
-            std::abort();
-        return val.of.u32;
-    }
+    // Val::Val(FieldPtr field) : val{}
+    // {
+    //     val.kind = ValType::Field;
+    //     val.of.field = field.get();
+    //     shared_ptr = field;
+    // }
 
-    int64_t Val::s64() const
-    {
-        if (val.kind != ValType::S64)
-            std::abort();
-        return val.of.s64;
-    }
+    // Val::Val(RecordPtr record) : val{}
+    // {
+    //     val.kind = ValType::Record;
+    //     val.of.record = record.get();
+    //     shared_ptr = record;
+    // }
 
-    uint64_t Val::u64() const
-    {
-        if (val.kind != ValType::U64)
-            std::abort();
-        return val.of.u64;
-    }
+    // Val::Val(TuplePtr tuple) : val{}
+    // {
+    //     val.kind = ValType::Tuple;
+    //     val.of.tuple = tuple.get();
+    //     shared_ptr = tuple;
+    // }
 
-    float32_t Val::f32() const
-    {
-        if (val.kind != ValType::Float32)
-            std::abort();
-        return val.of.f32;
-    }
+    // Val::Val(CasePtr case_) : val{}
+    // {
+    //     val.kind = ValType::Case;
+    //     val.of.case_ = case_.get();
+    //     shared_ptr = case_;
+    // }
 
-    float64_t Val::f64() const
-    {
-        if (val.kind != ValType::Float64)
-            std::abort();
-        return val.of.f64;
-    }
+    // Val::Val(VariantPtr variant) : val{}
+    // {
+    //     val.kind = ValType::Variant;
+    //     val.of.variant = variant.get();
+    //     shared_ptr = variant;
+    // }
 
-    char Val::c() const
-    {
-        if (val.kind != ValType::Char)
-            std::abort();
-        return val.of.c;
-    }
+    // Val::Val(EnumPtr enum_) : val{}
+    // {
+    //     val.kind = ValType::Enum;
+    //     val.of.enum_ = enum_.get();
+    //     shared_ptr = enum_;
+    // }
 
-    utf8_t Val::s() const
-    {
-        if (val.kind != ValType::String)
-            std::abort();
-        return val.of.s;
-    }
+    // Val::Val(OptionPtr option) : val{}
+    // {
+    //     val.kind = ValType::Option;
+    //     val.of.option = option.get();
+    //     shared_ptr = option;
+    // }
 
-    std::string Val::string() const
-    {
-        if (val.kind != ValType::String)
-            std::abort();
-        return std::string((const char *)val.of.s.ptr, val.of.s.len);
-    }
+    // Val::Val(ResultPtr result) : val{}
+    // {
+    //     val.kind = ValType::Result;
+    //     val.of.result = result.get();
+    //     shared_ptr = result;
+    // }
 
-    ListPtr Val::list() const
-    {
-        if (val.kind != ValType::List)
-            std::abort();
-        return std::get<ListPtr>(shared_ptr);
-    }
+    // // Val::Val(FlagsPtr flags) : val{}
+    // // {
+    // //     val.kind = ValType::Flags;
+    // //     val.of.flags = flags.get();
+    // //     shared_ptr = flags;
+    // // }
 
-    FieldPtr Val::field() const
-    {
-        if (val.kind != ValType::Field)
-            std::abort();
-        return std::get<FieldPtr>(shared_ptr);
-    }
+    // // Val::Val(OwnPtr own) : val{}
+    // // {
+    // //     val.kind = ValType::Own;
+    // //     val.of.own = own.get();
+    // //     shared_ptr = own;
+    // // }
 
-    RecordPtr Val::record() const
-    {
-        if (val.kind != ValType::Record)
-            std::abort();
-        return std::get<RecordPtr>(shared_ptr);
-    }
+    // // Val::Val(BorrowPtr borrow) : val{}
+    // // {
+    // //     val.kind = ValType::Borrow;
+    // //     val.of.borrow = borrow.get();
+    // //     shared_ptr = borrow;
+    // // }
 
-    TuplePtr Val::tuple() const
-    {
-        if (val.kind != ValType::Tuple)
-            std::abort();
-        return std::get<TuplePtr>(shared_ptr);
-    }
+    // // Val::Val(FuncTypePtr func) : val{}
+    // // {
+    // //     val.kind = ValType::Func;
+    // //     val.of.func = func.get();
+    // //     shared_ptr = func;
+    // // }
 
-    CasePtr Val::case_() const
-    {
-        if (val.kind != ValType::Case)
-            std::abort();
-        return std::get<CasePtr>(shared_ptr);
-    }
+    // Val::Val(const Val &other) : val{}
+    // {
+    //     val = other.val;
+    //     shared_ptr = other.shared_ptr;
+    // }
 
-    VariantPtr Val::variant() const
-    {
-        if (val.kind != ValType::Variant)
-            std::abort();
-        return std::get<VariantPtr>(shared_ptr);
-    }
+    // Val::Val(Val &&other) noexcept : val{}
+    // {
+    //     val.kind = ValType::U32;
+    //     val.of.u32 = 0;
+    //     std::swap(val, other.val);
+    //     std::swap(shared_ptr, other.shared_ptr);
+    // }
 
-    EnumPtr Val::enum_() const
-    {
-        if (val.kind != ValType::Enum)
-            std::abort();
-        return std::get<EnumPtr>(shared_ptr);
-    }
+    // Val::~Val() {}
 
-    OptionPtr Val::option() const
-    {
-        if (val.kind != ValType::Option)
-            std::abort();
-        return std::get<OptionPtr>(shared_ptr);
-    }
+    // Val &Val::operator=(const Val &other) noexcept
+    // {
+    //     val = other.val;
+    //     shared_ptr = other.shared_ptr;
+    //     return *this;
+    // }
+    // Val &Val::operator=(Val &&other) noexcept
+    // {
+    //     std::swap(val, other.val);
+    //     std::swap(shared_ptr, other.shared_ptr);
+    //     return *this;
+    // }
 
-    ResultPtr Val::result() const
-    {
-        if (val.kind != ValType::Result)
-            std::abort();
-        return std::get<ResultPtr>(shared_ptr);
-    }
+    // ValType Val::kind() const { return val.kind; }
+
+    // bool Val::b() const
+    // {
+    //     if (val.kind != ValType::Bool)
+    //         std::abort();
+    //     return val.of.b;
+    // }
+
+    // int8_t Val::s8() const
+    // {
+    //     if (val.kind != ValType::S8)
+    //         std::abort();
+    //     return val.of.s8;
+    // }
+
+    // uint8_t Val::u8() const
+    // {
+    //     if (val.kind != ValType::U8)
+    //         std::abort();
+    //     return val.of.u8;
+    // }
+
+    // int16_t Val::s16() const
+    // {
+    //     if (val.kind != ValType::S16)
+    //         std::abort();
+    //     return val.of.s16;
+    // }
+
+    // uint16_t Val::u16() const
+    // {
+    //     if (val.kind != ValType::U16)
+    //         std::abort();
+    //     return val.of.u16;
+    // }
+
+    // int32_t Val::s32() const
+    // {
+    //     if (val.kind != ValType::S32)
+    //         std::abort();
+    //     return val.of.s32;
+    // }
+
+    // uint32_t Val::u32() const
+    // {
+    //     if (val.kind != ValType::U32)
+    //         std::abort();
+    //     return val.of.u32;
+    // }
+
+    // int64_t Val::s64() const
+    // {
+    //     if (val.kind != ValType::S64)
+    //         std::abort();
+    //     return val.of.s64;
+    // }
+
+    // uint64_t Val::u64() const
+    // {
+    //     if (val.kind != ValType::U64)
+    //         std::abort();
+    //     return val.of.u64;
+    // }
+
+    // float32_t Val::f32() const
+    // {
+    //     if (val.kind != ValType::Float32)
+    //         std::abort();
+    //     return val.of.f32;
+    // }
+
+    // float64_t Val::f64() const
+    // {
+    //     if (val.kind != ValType::Float64)
+    //         std::abort();
+    //     return val.of.f64;
+    // }
+
+    // char Val::c() const
+    // {
+    //     if (val.kind != ValType::Char)
+    //         std::abort();
+    //     return val.of.c;
+    // }
+
+    // utf8_t Val::s() const
+    // {
+    //     if (val.kind != ValType::String)
+    //         std::abort();
+    //     return val.of.s;
+    // }
+
+    // std::string Val::string() const
+    // {
+    //     if (val.kind != ValType::String)
+    //         std::abort();
+    //     return std::string((const char *)val.of.s.ptr, val.of.s.len);
+    // }
+
+    // ListPtr Val::list() const
+    // {
+    //     if (val.kind != ValType::List)
+    //         std::abort();
+    //     return std::get<ListPtr>(shared_ptr);
+    // }
+
+    // FieldPtr Val::field() const
+    // {
+    //     if (val.kind != ValType::Field)
+    //         std::abort();
+    //     return std::get<FieldPtr>(shared_ptr);
+    // }
+
+    // RecordPtr Val::record() const
+    // {
+    //     if (val.kind != ValType::Record)
+    //         std::abort();
+    //     return std::get<RecordPtr>(shared_ptr);
+    // }
+
+    // TuplePtr Val::tuple() const
+    // {
+    //     if (val.kind != ValType::Tuple)
+    //         std::abort();
+    //     return std::get<TuplePtr>(shared_ptr);
+    // }
+
+    // CasePtr Val::case_() const
+    // {
+    //     if (val.kind != ValType::Case)
+    //         std::abort();
+    //     return std::get<CasePtr>(shared_ptr);
+    // }
+
+    // VariantPtr Val::variant() const
+    // {
+    //     if (val.kind != ValType::Variant)
+    //         std::abort();
+    //     return std::get<VariantPtr>(shared_ptr);
+    // }
+
+    // EnumPtr Val::enum_() const
+    // {
+    //     if (val.kind != ValType::Enum)
+    //         std::abort();
+    //     return std::get<EnumPtr>(shared_ptr);
+    // }
+
+    // OptionPtr Val::option() const
+    // {
+    //     if (val.kind != ValType::Option)
+    //         std::abort();
+    //     return std::get<OptionPtr>(shared_ptr);
+    // }
+
+    // ResultPtr Val::result() const
+    // {
+    //     if (val.kind != ValType::Result)
+    //         std::abort();
+    //     return std::get<ResultPtr>(shared_ptr);
+    // }
 
     // FlagsPtr Val::flags() const
     // {
@@ -524,26 +564,26 @@ namespace cmcpp
     //     return val.of.f64;
     // }
 
-    List::List(const ValType &t) : t(t) {}
+    // List::List(const ValType &t) : t(t) {}
 
-    Field::Field(const std::string &label, const ValType &t) : label(label), t(t) {}
+    // Field::Field(const std::string &label, const ValType &t) : label(label), t(t) {}
 
-    Record::Record() {}
+    // Record::Record() {}
 
-    Tuple::Tuple() {}
+    // Tuple::Tuple() {}
 
-    Case::Case(const std::string &label, const std::optional<Val> &v,
-               const std::optional<std::string> &refines)
-        : label(label), v(v), refines(refines) {}
+    // Case::Case(const std::string &label, const std::optional<Val> &v,
+    //            const std::optional<std::string> &refines)
+    //     : label(label), v(v), refines(refines) {}
 
-    Variant::Variant(const std::vector<Case> &cases) : cases(cases) {}
+    // Variant::Variant(const std::vector<Case> &cases) : cases(cases) {}
 
-    Enum::Enum(const std::vector<std::string> &labels) : labels(labels) {}
+    // Enum::Enum(const std::vector<std::string> &labels) : labels(labels) {}
 
-    Option::Option(const Val &v) : v(v) {}
+    // Option::Option(const Val &v) : v(v) {}
 
-    Result::Result(const std::optional<Val> &ok, const std::optional<Val> &error)
-        : ok(ok), error(error) {}
+    // Result::Result(const std::optional<Val> &ok, const std::optional<Val> &error)
+    //     : ok(ok), error(error) {}
 
     // Flags::Flags(const std::vector<std::string> &labels) : labels(labels) {}
 

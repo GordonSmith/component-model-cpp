@@ -5,50 +5,50 @@
 namespace cmcpp
 {
 
-    std::vector<WasmVal> lower_flat_list(const CallContext &cx, const Val &v)
+    std::vector<WasmVal> lower_flat_list(const CallContext &cx, ListPtr list)
     {
-        auto [ptr, length] = store_list_into_range(cx, v.list());
+        auto [ptr, length] = store_list_into_range(cx, list);
         return {(int32_t)ptr, (int32_t)length};
     }
 
-    std::vector<WasmVal> lower_flat_string(const CallContext &cx, const Val &v)
+    std::vector<WasmVal> lower_flat_string(const CallContext &cx, StringPtr string)
     {
-        auto [ptr, packed_length] = store_string_into_range(cx, v);
+        auto [ptr, packed_length] = store_string_into_range(cx, string);
         return {(int32_t)ptr, (int32_t)packed_length};
     }
 
     std::vector<WasmVal> lower_flat(const CallContext &cx, const Val &v)
     {
-        switch (despecialize(v).kind())
+        switch (despecialize(type(v)))
         {
         case ValType::Bool:
-            return {static_cast<int32_t>(v.b())};
+            return {static_cast<int32_t>(std::get<bool>(v))};
         case ValType::U8:
-            return {static_cast<int32_t>(v.u8())};
+            return {static_cast<int32_t>(std::get<uint8_t>(v))};
         case ValType::U16:
-            return {static_cast<int32_t>(v.u16())};
+            return {static_cast<int32_t>(std::get<uint16_t>(v))};
         case ValType::U32:
-            return {static_cast<int32_t>(v.u32())};
+            return {static_cast<int32_t>(std::get<uint32_t>(v))};
         case ValType::U64:
-            return {static_cast<int64_t>(v.u64())};
+            return {static_cast<int64_t>(std::get<uint64_t>(v))};
         case ValType::S8:
-            return {static_cast<int32_t>(v.s8())};
+            return {static_cast<int32_t>(std::get<int8_t>(v))};
         case ValType::S16:
-            return {static_cast<int32_t>(v.s16())};
+            return {static_cast<int32_t>(std::get<int16_t>(v))};
         case ValType::S32:
-            return {static_cast<int32_t>(v.s32())};
+            return {static_cast<int32_t>(std::get<int32_t>(v))};
         case ValType::S64:
-            return {static_cast<int64_t>(v.s64())};
+            return {static_cast<int64_t>(std::get<int64_t>(v))};
         case ValType::Float32:
-            return {static_cast<float32_t>(maybe_scramble_nan32(v.f32()))};
+            return {static_cast<float32_t>(maybe_scramble_nan32(std::get<float32_t>(v)))};
         case ValType::Float64:
-            return {static_cast<float64_t>(maybe_scramble_nan64(v.f64()))};
+            return {static_cast<float64_t>(maybe_scramble_nan64(std::get<float64_t>(v)))};
         case ValType::Char:
-            return {char_to_i32(v.c())};
+            return {char_to_i32(std::get<char>(v))};
         case ValType::String:
-            return lower_flat_string(cx, v);
+            return lower_flat_string(cx, std::get<StringPtr>(v));
         case ValType::List:
-            return lower_flat_list(cx, v);
+            return lower_flat_list(cx, std::get<ListPtr>(v));
         default:
             throw std::runtime_error("Invalid type");
         }
@@ -63,7 +63,7 @@ namespace cmcpp
             uint32_t ptr;
             if (out_param == nullptr)
             {
-                ptr = cx.opts->realloc(0, 0, alignment(tuple), size(tuple));
+                ptr = cx.opts->realloc(0, 0, alignment(tuple), size(tuple->t));
             }
             else
             {

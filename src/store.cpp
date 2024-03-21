@@ -175,10 +175,10 @@ namespace cmcpp
         return std::make_pair(ptr, latin1_size);
     }
 
-    std::pair<uint32_t, uint32_t> store_string_into_range(const CallContext &cx, const Val &v, HostEncoding src_encoding)
+    std::pair<uint32_t, uint32_t> store_string_into_range(const CallContext &cx, StringPtr v, HostEncoding src_encoding)
     {
-        const char8_t *src = v.s().ptr;
-        const size_t src_tagged_code_units = v.s().len;
+        const char8_t *src = v->ptr;
+        const size_t src_tagged_code_units = v->len;
         HostEncoding src_simple_encoding;
         uint32_t src_code_units;
 
@@ -243,7 +243,7 @@ namespace cmcpp
         }
     }
 
-    void store_string(const CallContext &cx, const Val &v, uint32_t ptr)
+    void store_string(const CallContext &cx, StringPtr v, uint32_t ptr)
     {
         auto [begin, tagged_code_units] = store_string_into_range(cx, v);
         store_int(cx, begin, ptr, 4);
@@ -252,13 +252,13 @@ namespace cmcpp
 
     std::pair<uint32_t, uint32_t> store_list_into_range(const CallContext &cx, ListPtr list)
     {
-        auto byte_length = list->vs.size() * size(list->t);
+        auto byte_length = list->vs.size() * size(list->lt);
         if (byte_length >= std::numeric_limits<uint32_t>::max())
         {
             throw std::runtime_error("byte_length exceeds limit");
         }
-        uint32_t ptr = cx.opts->realloc(0, 0, alignment(list->t), byte_length);
-        if (ptr != align_to(ptr, alignment(list->t)))
+        uint32_t ptr = cx.opts->realloc(0, 0, alignment(list->lt), byte_length);
+        if (ptr != align_to(ptr, alignment(list->lt)))
         {
             throw std::runtime_error("ptr not aligned");
         }
@@ -268,7 +268,7 @@ namespace cmcpp
         }
         for (size_t i = 0; i < list->vs.size(); ++i)
         {
-            store(cx, list->vs[i], ptr + i * size(list->t));
+            store(cx, list->vs[i], ptr + i * size(list->lt));
         }
         return {ptr, list->vs.size()};
     }
@@ -284,9 +284,9 @@ namespace cmcpp
     {
         for (const auto &f : record->fields)
         {
-            ptr = align_to(ptr, alignment(f.v.value()));
-            store(cx, f.v.value(), ptr);
-            ptr += size(f.v.value());
+            ptr = align_to(ptr, alignment(f.ft));
+            store(cx, f.v, ptr);
+            ptr += size(f.ft);
         }
     }
 
@@ -306,57 +306,57 @@ namespace cmcpp
 
     void store(const CallContext &cx, const Val &v, uint32_t ptr)
     {
-        assert(ptr == align_to(ptr, alignment(v)));
+        assert(ptr == align_to(ptr, alignment(type(v))));
         assert(ptr + size(v) <= cx.opts->memory.size());
-        switch (v.kind())
+        switch (type(v))
         {
         case ValType::Bool:
-            store_int(cx, v.b(), ptr, 1);
+            store_int(cx, std::get<bool>(v), ptr, 1);
             break;
         case ValType::U8:
-            store_int(cx, v.u8(), ptr, 1);
+            store_int(cx, std::get<uint8_t>(v), ptr, 1);
             break;
         case ValType::U16:
-            store_int(cx, v.u16(), ptr, 2);
+            store_int(cx, std::get<uint16_t>(v), ptr, 2);
             break;
         case ValType::U32:
-            store_int(cx, v.u32(), ptr, 4);
+            store_int(cx, std::get<uint32_t>(v), ptr, 4);
             break;
         case ValType::U64:
-            store_int(cx, v.u64(), ptr, 8);
+            store_int(cx, std::get<uint64_t>(v), ptr, 8);
             break;
         case ValType::S8:
-            store_int(cx, v.s8(), ptr, 1);
+            store_int(cx, std::get<int8_t>(v), ptr, 1);
             break;
         case ValType::S16:
-            store_int(cx, v.s16(), ptr, 2);
+            store_int(cx, std::get<int16_t>(v), ptr, 2);
             break;
         case ValType::S32:
-            store_int(cx, v.s32(), ptr, 4);
+            store_int(cx, std::get<int32_t>(v), ptr, 4);
             break;
         case ValType::S64:
-            store_int(cx, v.s64(), ptr, 8);
+            store_int(cx, std::get<int64_t>(v), ptr, 8);
             break;
         case ValType::Float32:
-            store_int(cx, encode_float_as_i32(v.f32()), ptr, 4);
+            store_int(cx, encode_float_as_i32(std::get<float32_t>(v)), ptr, 4);
             break;
         case ValType::Float64:
-            store_int(cx, encode_float_as_i64(v.f64()), ptr, 8);
+            store_int(cx, encode_float_as_i64(std::get<float64_t>(v)), ptr, 8);
             break;
         case ValType::Char:
-            store_int(cx, char_to_i32(v.c()), ptr, 4);
+            store_int(cx, char_to_i32(std::get<char>(v)), ptr, 4);
             break;
         case ValType::String:
-            store_string(cx, v, ptr);
+            store_string(cx, std::get<StringPtr>(v), ptr);
             break;
         case ValType::List:
-            store_list(cx, v.list(), ptr);
+            store_list(cx, std::get<ListPtr>(v), ptr);
             break;
         case ValType::Record:
-            store_record(cx, v.record(), ptr);
+            store_record(cx, std::get<RecordPtr>(v), ptr);
             break;
         case ValType::Variant:
-            store_variant(cx, v.variant(), ptr);
+            store_variant(cx, std::get<VariantPtr>(v), ptr);
             break;
         // case ValType::Flags:
         //     store_flags(cx, v.flags(), ptr);

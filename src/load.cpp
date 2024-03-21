@@ -23,7 +23,7 @@ namespace cmcpp
         return retVal;
     }
 
-    HostStringTuple load_string_from_range(const CallContext &cx, uint32_t ptr, uint32_t tagged_code_units)
+    StringPtr load_string_from_range(const CallContext &cx, uint32_t ptr, uint32_t tagged_code_units)
     {
         GuestEncoding encoding;
         uint32_t byte_length = tagged_code_units;
@@ -57,10 +57,10 @@ namespace cmcpp
         assert(isAligned(ptr, alignment));
         assert(ptr + byte_length <= cx.opts->memory.size());
         auto [dec_str, dec_len] = decode(&cx.opts->memory[ptr], byte_length, encoding);
-        return HostStringTuple(dec_str, cx.opts->string_encoding, dec_len);
+        return std::make_shared<String>(dec_str, dec_len);
     }
 
-    HostStringTuple load_string(const CallContext &cx, uint32_t ptr)
+    StringPtr load_string(const CallContext &cx, uint32_t ptr)
     {
         uint32_t begin = load_int<uint32_t>(cx, ptr, 4);
         uint32_t tagged_code_units = load_int<uint32_t>(cx, ptr + 4, 4);
@@ -88,7 +88,7 @@ namespace cmcpp
 
     RecordPtr load_record(const CallContext &cx, uint32_t ptr, const std::vector<Field> &fields)
     {
-        RecordPtr retVal = std::make_shared<Record>();
+        auto retVal = std::make_shared<Record>();
         for (auto &field : fields)
         {
             ptr = align_to(ptr, alignment(field.t));
@@ -114,13 +114,13 @@ namespace cmcpp
         std::string case_label = case_label_with_refinements(c, cases);
         if (!c.v.has_value())
         {
-            Case c2(case_label, nullptr, c.refines);
+            Case c2(case_label, std::nullopt, c.refines);
             std::vector<Case> cases2 = {c2};
             return std::make_shared<Variant>(cases2);
         }
         else
         {
-            Case c2(case_label, load(cx, ptr, c.v.value().kind()), c.refines);
+            Case c2(case_label, load(cx, ptr, type(c.v.value())), c.refines);
             std::vector<Case> cases2 = {c2};
             return std::make_shared<Variant>(cases2);
         }
@@ -161,10 +161,7 @@ namespace cmcpp
         case ValType::Char:
             return convert_i32_to_char(load_int<int32_t>(cx, ptr, 4));
         case ValType::String:
-        {
-            auto s = load_string(cx, ptr);
-            return Val(std::get<0>(s), std::get<2>(s));
-        }
+            return load_string(cx, ptr);
             // case ValType::Flags:
             //     return load_flags(cx, ptr, std::get<3>(opt));
             // case ValType::Own:
@@ -205,5 +202,4 @@ namespace cmcpp
             throw std::runtime_error("Invalid type");
         }
     }
-
 }

@@ -10,167 +10,170 @@
 
 namespace cmcpp
 {
+    struct String;
+    using StringPtr = std::shared_ptr<String>;
+    struct List;
+    using ListPtr = std::shared_ptr<List>;
+    struct Field;
+    using FieldPtr = std::shared_ptr<Field>;
+    struct Record;
+    using RecordPtr = std::shared_ptr<Record>;
+    struct Tuple;
+    using TuplePtr = std::shared_ptr<Tuple>;
+    struct Case;
+    using CasePtr = std::shared_ptr<Case>;
+    struct Variant;
+    using VariantPtr = std::shared_ptr<Variant>;
+    struct Enum;
+    using EnumPtr = std::shared_ptr<Enum>;
+    struct Option;
+    using OptionPtr = std::shared_ptr<Option>;
+    struct Result;
+    using ResultPtr = std::shared_ptr<Result>;
+    struct Flags;
+    using FlagsPtr = std::shared_ptr<Flags>;
+    using Val = std::variant<void *, bool, int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t, int64_t, uint64_t, float32_t, float64_t, char,
+                             StringPtr,
+                             ListPtr,
+                             FieldPtr,
+                             RecordPtr,
+                             TuplePtr,
+                             CasePtr,
+                             VariantPtr,
+                             EnumPtr,
+                             OptionPtr,
+                             ResultPtr,
+                             FlagsPtr>;
+    ;
 
-    typedef struct utf8String
+    ValType type(const Val &v);
+    size_t index(ValType t);
+
+    template <typename T>
+    T value(Val &v);
+    template <typename T>
+    T cast(const Val &v);
+    template <typename T>
+    const T &get(const Val &v)
+    {
+        ValType t = type(v);
+        bool isCopyConstructible = std::is_copy_constructible<T>::value;
+        const T &c = std::get<T>(v);
+        return c;
+    }
+
+    template <typename T>
+    T *getRef(const Val &v)
+    {
+        ValType t = type(v);
+        bool isCopyConstructible = std::is_copy_constructible<T>::value;
+        std::shared_ptr<T> c = std::get<std::shared_ptr<T>>(v);
+        return c.get();
+    }
+
+    struct ValBase
+    {
+        ValType t;
+
+        ValBase();
+        ValBase(const ValType &t);
+    };
+
+    struct String : ValBase
     {
         const char8_t *ptr;
         size_t len;
-    } utf8_t;
 
-    typedef struct func
+        String();
+        String(const char8_t *ptr, size_t len);
+    };
+
+    struct List : ValBase
     {
-        uint64_t store_id;
-        size_t index;
-    } func_t;
+        ValType lt;
+        std::vector<Val> vs;
 
-    // class FuncType;
-    // using FuncTypePtr = std::shared_ptr<FuncType>;
+        List();
+        List(ValType lt);
+    };
 
-    class List;
-    using ListPtr = std::shared_ptr<List>;
-    class Field;
-    using FieldPtr = std::shared_ptr<Field>;
-    class Record;
-    using RecordPtr = std::shared_ptr<Record>;
-    class Tuple;
-    using TuplePtr = std::shared_ptr<Tuple>;
-    class Case;
-    using CasePtr = std::shared_ptr<Case>;
-    class Variant;
-    using VariantPtr = std::shared_ptr<Variant>;
-    class Enum;
-    using EnumPtr = std::shared_ptr<Enum>;
-    class Option;
-    using OptionPtr = std::shared_ptr<Option>;
-    class Result;
-    using ResultPtr = std::shared_ptr<Result>;
-    // class Flags;
-    // using FlagsPtr = std::shared_ptr<Flags>;
-    // class Own;
-    // using OwnPtr = std::shared_ptr<Own>;
-    // class Borrow;
-    // using BorrowPtr = std::shared_ptr<Borrow>;
-
-    using PtrVariant = std::variant<ListPtr, FieldPtr, RecordPtr, TuplePtr, CasePtr, VariantPtr, EnumPtr, OptionPtr, ResultPtr>;
-
-    typedef union valunion
+    struct Field : ValBase
     {
-        bool b;
-        int8_t s8;
-        uint8_t u8;
-        int16_t s16;
-        uint16_t u16;
-        int32_t s32;
-        uint32_t u32;
-        int64_t s64;
-        uint64_t u64;
-        float32_t f32;
-        float64_t f64;
-        char c;
-        utf8_t s;
-        List *list;
-        Field *field;
-        Record *record;
-        Tuple *tuple;
-        Case *case_;
-        Variant *variant;
-        Enum *enum_;
-        Option *option;
-        Result *result;
-        // Flags *flags;
-        // Own *own;
-        // Borrow *borrow;
+        const std::string &label;
+        ValType ft;
+        Val v;
 
-        // FuncType *func;
-    } valunion_t;
+        Field(const std::string &label, ValType ft);
+    };
 
-    typedef struct val
+    struct Record : ValBase
     {
-        ValType kind;
-        valunion_t of;
-    } val_t;
+        std::vector<Field> fields;
 
-    class Val
+        Record();
+    };
+    struct Tuple : ValBase
     {
-        val_t val;
-        PtrVariant shared_ptr;
+        std::vector<Val> vs;
 
-        Val();
-        Val(val_t val);
+        Tuple();
+    };
 
-    public:
-        Val(bool b);
-        Val(int8_t s8);
-        Val(uint8_t u8);
-        Val(int16_t s16);
-        Val(uint16_t u16);
-        Val(int32_t s32);
-        Val(uint32_t u32);
-        Val(int64_t s64);
-        Val(uint64_t u64);
-        Val(float32_t f32);
-        Val(float64_t f64);
-        Val(char c);
-        Val(const char *s);
-        Val(const char8_t *s, size_t len);
-        Val(ListPtr list);
-        Val(FieldPtr field);
-        Val(RecordPtr record);
-        Val(TuplePtr tuple);
-        Val(CasePtr case_);
-        Val(VariantPtr variant);
-        Val(EnumPtr enum_);
-        Val(OptionPtr option);
-        Val(ResultPtr result);
-        // Val(FlagsPtr flags);
-        // Val(OwnPtr own);
-        // Val(BorrowPtr borrow);
-        // Val(FuncTypePtr func);
+    struct Case : ValBase
+    {
+        std::string label;
+        std::optional<Val> v = std::nullopt;
+        std::optional<std::string> refines = std::nullopt;
 
-        Val(const Val &other);
-        Val(Val &&other) noexcept;
-        ~Val();
-        Val &operator=(const Val &other) noexcept;
-        Val &operator=(Val &&other) noexcept;
+        Case();
+        Case(const std::string &label, const std::optional<Val> &v = std::nullopt, const std::optional<std::string> &refines = std::nullopt);
+    };
 
-        ValType kind() const;
-        bool b() const;
-        int8_t s8() const;
-        uint8_t u8() const;
-        int16_t s16() const;
-        uint16_t u16() const;
-        int32_t s32() const;
-        uint32_t u32() const;
-        int64_t s64() const;
-        uint64_t u64() const;
-        float32_t f32() const;
-        float64_t f64() const;
-        char c() const;
-        utf8_t s() const;
-        std::string string() const;
-        ListPtr list() const;
-        FieldPtr field() const;
-        RecordPtr record() const;
-        TuplePtr tuple() const;
-        CasePtr case_() const;
-        VariantPtr variant() const;
-        EnumPtr enum_() const;
-        OptionPtr option() const;
-        ResultPtr result() const;
-        // FlagsPtr flags() const;
-        // OwnPtr own() const;
-        // BorrowPtr borrow() const;
-        // FuncType *func() const;
+    struct Variant : ValBase
+    {
+        std::vector<Case> cases;
+
+        Variant();
+        Variant(const std::vector<Case> &cases);
+    };
+
+    struct Enum : ValBase
+    {
+        std::vector<std::string> labels;
+
+        Enum();
+    };
+
+    struct Option : ValBase
+    {
+        Val v;
+
+        Option();
+    };
+
+    struct Result : ValBase
+    {
+        std::optional<Val> ok;
+        std::optional<Val> error;
+
+        Result();
+    };
+
+    struct Flags : ValBase
+    {
+        std::vector<std::string> labels;
+
+        Flags();
     };
 
     class WasmVal
     {
     public:
         WasmValType kind;
-        std::variant<int32_t, int64_t, float32_t, float64_t> v;
+        WasmValVariant v;
 
         template <typename T>
-        WasmVal(T v) : kind(WasmTypeNameTrait<T>::name()), v(v) {}
+        WasmVal(T v) : kind(WasmValTrait<T>::name()), v(v) {}
         virtual ~WasmVal() = default;
 
         template <typename T>
@@ -181,7 +184,7 @@ namespace cmcpp
     // class WasmValT : public WasmValBase
     // {
     // public:
-    //     WasmValT(T v) : WasmValBase(WasmTypeNameTrait<T>::name())
+    //     WasmValT(T v) : WasmValBase(WasmValTrait<T>::name())
     //     {
     //         this->v = v;
     //     }
@@ -197,101 +200,26 @@ namespace cmcpp
     // };
     // FuncTypePtr createFuncType();
 
-    class List
-    {
-    public:
-        const ValType &t;
-        std::vector<Val> vs;
+    // class List
+    // {
+    // public:
+    //     const ValType &t;
+    //     std::vector<Val> vs;
 
-        List(const ValType &t);
-        virtual ~List() = default;
-    };
+    //     List(const ValType &t);
+    //     virtual ~List() = default;
+    // };
 
-    class Field
-    {
-    public:
-        const std::string &label;
-        const ValType &t;
-        std::optional<Val> v;
+    // class Field
+    // {
+    // public:
+    //     const std::string &label;
+    //     const ValType &t;
+    //     std::optional<Val> v;
 
-        Field(const std::string &label, const ValType &t);
-        virtual ~Field() = default;
-    };
-
-    class Record
-    {
-    public:
-        std::vector<Field> fields;
-
-        Record();
-        virtual ~Record() = default;
-    };
-
-    class Tuple
-    {
-    public:
-        std::vector<Val> vs;
-
-        Tuple();
-        virtual ~Tuple() = default;
-    };
-
-    class Case
-    {
-    public:
-        const std::string &label;
-        std::optional<Val> v;
-        std::optional<std::string> refines;
-
-        Case(const std::string &label, const std::optional<Val> &v = std::nullopt, const std::optional<std::string> &refines = std::nullopt);
-        virtual ~Case() = default;
-    };
-
-    class Variant
-    {
-    public:
-        const std::vector<Case> &cases;
-
-        Variant(const std::vector<Case> &cases);
-        virtual ~Variant() = default;
-    };
-
-    class Enum
-    {
-    public:
-        const std::vector<std::string> &labels;
-
-        Enum(const std::vector<std::string> &labels);
-        virtual ~Enum() = default;
-    };
-
-    class Option
-    {
-    public:
-        const Val &v;
-
-        Option(const Val &v);
-        virtual ~Option() = default;
-    };
-
-    class Result
-    {
-    public:
-        const std::optional<Val> &ok;
-        const std::optional<Val> &error;
-
-        Result(const std::optional<Val> &ok, const std::optional<Val> &error);
-        virtual ~Result() = default;
-    };
-
-    class Flags
-    {
-    public:
-        const std::vector<std::string> &labels;
-
-        Flags(const std::vector<std::string> &labels);
-        virtual ~Flags() = default;
-    };
+    //     Field(const std::string &label, const ValType &t);
+    //     virtual ~Field() = default;
+    // };
 
     // class Own
     // {

@@ -29,14 +29,14 @@ namespace cmcpp
 
     Val despecialize(const Val &v)
     {
-        switch (v.kind())
+        switch (type(v))
         {
         case ValType::Tuple:
         {
             RecordPtr r = std::make_shared<Record>();
-            for (const auto &v2 : v.tuple()->vs)
+            for (const auto &v2 : std::get<TuplePtr>(v)->vs)
             {
-                Field f("", despecialize(v).kind());
+                Field f("", type(despecialize(v)));
                 f.v = v2;
                 r->fields.push_back(f);
             }
@@ -45,19 +45,17 @@ namespace cmcpp
         case ValType::Enum:
         {
             std::vector<Case> cases;
-            for (const auto &label : v.enum_()->labels)
+            for (const auto &label : std::get<EnumPtr>(v)->labels)
             {
-                cases.push_back(Case(label));
+                Case c(label);
+                cases.push_back(c);
             }
-            VariantPtr v = std::make_shared<Variant>(cases);
-            return v;
+            return std::make_shared<Variant>(cases);
         }
         case ValType::Option:
-            return std::make_shared<Variant>(
-                std::vector<Case>{Case("None"), Case("Some", v.option()->v)});
+            return std::make_shared<Variant>(std::vector<Case>{Case("None"), Case("Some", std::get<OptionPtr>(v)->v)});
         case ValType::Result:
-            return std::make_shared<Variant>(
-                std::vector<Case>{Case("Ok", v.result()->ok), Case("Error", v.result()->error)});
+            return std::make_shared<Variant>(std::vector<Case>{Case("Ok", std::get<ResultPtr>(v)->ok), Case("Error", std::get<ResultPtr>(v)->error)});
         default:
             return v;
         }
@@ -128,19 +126,19 @@ namespace cmcpp
         }
     }
 
-    int alignment(Val _v)
+    int alignment(const Val &_v)
     {
         Val v = despecialize(_v);
-        switch (v.kind())
+        switch (type(v))
         {
         case ValType::Record:
-            return alignment_record(_v.record()->fields);
+            return alignment_record(std::get<RecordPtr>(_v)->fields);
         case ValType::Variant:
-            return alignment_variant(_v.variant()->cases);
+            return alignment_variant(std::get<VariantPtr>(_v)->cases);
         // case ValType::Flags:
         //     return alignment_flags(_v.flags()->labels);
         default:
-            return alignment(v.kind());
+            return alignment(type(v));
         }
     }
 
@@ -149,7 +147,7 @@ namespace cmcpp
         int a = 1;
         for (const auto &f : fields)
         {
-            a = std::max(a, alignment(f.v.value()));
+            a = std::max(a, alignment(f.v));
         }
         return a;
     }
@@ -211,13 +209,13 @@ namespace cmcpp
 
     int size(const Val &v)
     {
-        ValType kind = despecialize(v).kind();
+        ValType kind = type(despecialize(v));
         switch (kind)
         {
         case ValType::Record:
-            return size_record(v.record()->fields);
+            return size_record(std::get<RecordPtr>(v)->fields);
         case ValType::Variant:
-            return size_variant(v.variant()->cases);
+            return size_variant(std::get<VariantPtr>(v)->cases);
         // case ValType::Flags:
         //     return size_flags(v.flags()->labels);
         default:
@@ -231,8 +229,8 @@ namespace cmcpp
         int s = 0;
         for (const auto &f : fields)
         {
-            s = align_to(s, alignment(f.v.value()));
-            s += size(f.v.value());
+            s = align_to(s, alignment(f.v));
+            s += size(f.v);
         }
         assert(s > 0);
         return align_to(s, alignment_record(fields));

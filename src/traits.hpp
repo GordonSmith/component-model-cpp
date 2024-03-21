@@ -5,6 +5,7 @@
 
 #include <optional>
 #include <variant>
+#include <map>
 
 namespace cmcpp
 {
@@ -37,21 +38,13 @@ namespace cmcpp
         Enum,
         Option,
         Result,
-        // Flags,
+        Flags,
         // Own,
         // Borrow
     };
 
-    enum class WasmValType : uint8_t
-    {
-        I32,
-        I64,
-        F32,
-        F64
-    };
-
     template <typename T>
-    struct TypeNameTrait
+    struct ValTrait
     {
         static ValType name()
         {
@@ -60,7 +53,7 @@ namespace cmcpp
     };
 
     template <>
-    struct TypeNameTrait<bool>
+    struct ValTrait<bool>
     {
         static ValType name()
         {
@@ -69,7 +62,7 @@ namespace cmcpp
     };
 
     template <>
-    struct TypeNameTrait<int8_t>
+    struct ValTrait<int8_t>
     {
         static ValType name()
         {
@@ -78,7 +71,7 @@ namespace cmcpp
     };
 
     template <>
-    struct TypeNameTrait<uint8_t>
+    struct ValTrait<uint8_t>
     {
         static ValType name()
         {
@@ -87,7 +80,7 @@ namespace cmcpp
     };
 
     template <>
-    struct TypeNameTrait<int16_t>
+    struct ValTrait<int16_t>
     {
         static ValType name()
         {
@@ -96,7 +89,7 @@ namespace cmcpp
     };
 
     template <>
-    struct TypeNameTrait<uint16_t>
+    struct ValTrait<uint16_t>
     {
         static ValType name()
         {
@@ -105,7 +98,7 @@ namespace cmcpp
     };
 
     template <>
-    struct TypeNameTrait<int32_t>
+    struct ValTrait<int32_t>
     {
         static ValType name()
         {
@@ -114,7 +107,7 @@ namespace cmcpp
     };
 
     template <>
-    struct TypeNameTrait<uint32_t>
+    struct ValTrait<uint32_t>
     {
         static ValType name()
         {
@@ -123,7 +116,7 @@ namespace cmcpp
     };
 
     template <>
-    struct TypeNameTrait<int64_t>
+    struct ValTrait<int64_t>
     {
         static ValType name()
         {
@@ -132,7 +125,7 @@ namespace cmcpp
     };
 
     template <>
-    struct TypeNameTrait<uint64_t>
+    struct ValTrait<uint64_t>
     {
         static ValType name()
         {
@@ -141,7 +134,7 @@ namespace cmcpp
     };
 
     template <>
-    struct TypeNameTrait<float>
+    struct ValTrait<float>
     {
         static ValType name()
         {
@@ -150,7 +143,7 @@ namespace cmcpp
     };
 
     template <>
-    struct TypeNameTrait<double>
+    struct ValTrait<double>
     {
         static ValType name()
         {
@@ -159,7 +152,7 @@ namespace cmcpp
     };
 
     template <>
-    struct TypeNameTrait<char>
+    struct ValTrait<char>
     {
         static ValType name()
         {
@@ -168,7 +161,7 @@ namespace cmcpp
     };
 
     template <>
-    struct TypeNameTrait<std::string>
+    struct ValTrait<std::string>
     {
         static ValType name()
         {
@@ -177,11 +170,11 @@ namespace cmcpp
     };
 
     template <typename LT>
-    struct TypeNameTrait<std::vector<LT>>
+    struct ValTrait<std::vector<LT>>
     {
         static std::pair<ValType, ValType> name()
         {
-            return {ValType::List, TypeNameTrait<LT>::name()};
+            return {ValType::List, ValTrait<LT>::name()};
         }
     };
 
@@ -194,12 +187,21 @@ namespace cmcpp
 
     //     ValType kind() const
     //     {
-    //         return TypeNameTrait<T>::name();
+    //         return ValTrait<T>::name();
     //     }
     // };
 
+    enum class WasmValType : uint8_t
+    {
+        I32,
+        I64,
+        F32,
+        F64
+    };
+    using WasmValVariant = std::variant<int32_t, int64_t, float32_t, float64_t>;
+
     template <typename T>
-    struct WasmTypeNameTrait
+    struct WasmValTrait
     {
         static WasmValType name()
         {
@@ -208,38 +210,59 @@ namespace cmcpp
     };
 
     template <>
-    struct WasmTypeNameTrait<int32_t>
+    struct WasmValTrait<int32_t>
     {
         static WasmValType name()
         {
             return WasmValType::I32;
         }
+
+        static int32_t value(WasmValVariant v)
+        {
+            return std::get<int32_t>(v);
+        }
     };
 
     template <>
-    struct WasmTypeNameTrait<int64_t>
+    struct WasmValTrait<int64_t>
     {
         static WasmValType name()
         {
             return WasmValType::I64;
         }
+
+        static int64_t value(WasmValVariant v)
+        {
+
+            return std::get<int64_t>(v);
+        }
     };
 
     template <>
-    struct WasmTypeNameTrait<float32_t>
+    struct WasmValTrait<float32_t>
     {
         static WasmValType name()
         {
             return WasmValType::F32;
         }
+
+        static float32_t value(WasmValVariant v)
+        {
+            return std::get<float32_t>(v);
+        }
     };
 
     template <>
-    struct WasmTypeNameTrait<float64_t>
+    struct WasmValTrait<float64_t>
     {
         static WasmValType name()
         {
             return WasmValType::F64;
+        }
+
+        static float64_t value(WasmValVariant v)
+        {
+            return std::get<float64_t>(v);
         }
     };
 
@@ -252,10 +275,9 @@ namespace cmcpp
 
     //     WasmValType kind() const
     //     {
-    //         return WasmTypeNameTrait<T>::name();
+    //         return WasmValTrait<T>::name();
     //     }
     // };
-
 }
 
 #endif

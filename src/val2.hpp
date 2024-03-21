@@ -4,7 +4,7 @@
 #include <typeinfo>
 
 template <typename T>
-struct TypeNameTrait
+struct ValTrait
 {
     static std::vector<std::string> name()
     {
@@ -13,7 +13,7 @@ struct TypeNameTrait
 };
 
 template <>
-struct TypeNameTrait<bool>
+struct ValTrait<bool>
 {
     static std::vector<std::string> name()
     {
@@ -22,7 +22,7 @@ struct TypeNameTrait<bool>
 };
 
 template <>
-struct TypeNameTrait<int8_t>
+struct ValTrait<int8_t>
 {
     static std::vector<std::string> name()
     {
@@ -31,7 +31,7 @@ struct TypeNameTrait<int8_t>
 };
 
 template <>
-struct TypeNameTrait<uint8_t>
+struct ValTrait<uint8_t>
 {
     static std::vector<std::string> name()
     {
@@ -40,7 +40,7 @@ struct TypeNameTrait<uint8_t>
 };
 
 template <>
-struct TypeNameTrait<int16_t>
+struct ValTrait<int16_t>
 {
     static std::vector<std::string> name()
     {
@@ -49,7 +49,7 @@ struct TypeNameTrait<int16_t>
 };
 
 template <>
-struct TypeNameTrait<uint16_t>
+struct ValTrait<uint16_t>
 {
     static std::vector<std::string> name()
     {
@@ -58,7 +58,7 @@ struct TypeNameTrait<uint16_t>
 };
 
 template <>
-struct TypeNameTrait<int32_t>
+struct ValTrait<int32_t>
 {
     static std::vector<std::string> name()
     {
@@ -67,7 +67,7 @@ struct TypeNameTrait<int32_t>
 };
 
 template <>
-struct TypeNameTrait<uint32_t>
+struct ValTrait<uint32_t>
 {
     static std::vector<std::string> name()
     {
@@ -76,7 +76,7 @@ struct TypeNameTrait<uint32_t>
 };
 
 template <>
-struct TypeNameTrait<int64_t>
+struct ValTrait<int64_t>
 {
     static std::vector<std::string> name()
     {
@@ -85,7 +85,7 @@ struct TypeNameTrait<int64_t>
 };
 
 template <>
-struct TypeNameTrait<uint64_t>
+struct ValTrait<uint64_t>
 {
     static std::vector<std::string> name()
     {
@@ -94,7 +94,7 @@ struct TypeNameTrait<uint64_t>
 };
 
 template <>
-struct TypeNameTrait<float>
+struct ValTrait<float>
 {
     static std::vector<std::string> name()
     {
@@ -103,7 +103,7 @@ struct TypeNameTrait<float>
 };
 
 template <>
-struct TypeNameTrait<double>
+struct ValTrait<double>
 {
     static std::vector<std::string> name()
     {
@@ -112,7 +112,7 @@ struct TypeNameTrait<double>
 };
 
 template <>
-struct TypeNameTrait<char>
+struct ValTrait<char>
 {
     static std::vector<std::string> name()
     {
@@ -121,7 +121,7 @@ struct TypeNameTrait<char>
 };
 
 template <>
-struct TypeNameTrait<std::string>
+struct ValTrait<std::string>
 {
     static std::vector<std::string> name()
     {
@@ -130,12 +130,12 @@ struct TypeNameTrait<std::string>
 };
 
 template <typename LT>
-struct TypeNameTrait<std::vector<LT>>
+struct ValTrait<std::vector<LT>>
 {
     static std::vector<std::string> name()
     {
         std::vector<std::string> name = {"List"};
-        std::vector<std::string> tname = TypeNameTrait<LT>::name();
+        std::vector<std::string> tname = ValTrait<LT>::name();
         name.insert(name.end(), tname.begin(), tname.end());
         return name;
     }
@@ -153,11 +153,11 @@ struct Val
 
     std::string kind() const
     {
-        return TypeNameTrait<T>::name()[0];
+        return ValTrait<T>::name()[0];
     }
     std::vector<std::string> types() const
     {
-        return TypeNameTrait<T>::name();
+        return ValTrait<T>::name();
     }
 };
 

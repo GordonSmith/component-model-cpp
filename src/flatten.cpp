@@ -46,7 +46,7 @@ namespace cmcpp
     std::vector<std::string> result;
     for (Val v : vs)
     {
-      std::vector<std::string> flattened = flatten_type(v.kind());
+      std::vector<std::string> flattened = flatten_type(type(v));
       result.insert(result.end(), flattened.begin(), flattened.end());
     }
     return result;
@@ -97,7 +97,7 @@ namespace cmcpp
       // case ValType::Record:
       //     return flatten_record(static_cast<const Record &>(t).fields);
       // case ValType::Variant:
-      //     return flatten_variant(static_cast<const Variant &>(t).cases);
+      //     return flatten_variant(static_cast<VariantPtr >(t).cases);
       // case ValType::Flags:
       //     return std::vector<std::string>(num_i32_flags(static_cast<const Flags &>(t).labels),
       //     "i32");
@@ -114,7 +114,7 @@ namespace cmcpp
     std::vector<std::string> flat;
     for (const Field &f : fields)
     {
-      auto flattened = flatten_type(f.v.value().kind());
+      auto flattened = flatten_type(f.ft);
       flat.insert(flat.end(), flattened.begin(), flattened.end());
     }
     return flat;

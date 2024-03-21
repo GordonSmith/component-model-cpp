@@ -14,7 +14,7 @@ namespace cmcpp
     const float64_t CANONICAL_FLOAT64_NAN = 0x7ff8000000000000;
 
     uint32_t align_to(uint32_t ptr, uint32_t alignment);
-    int alignment(Val _v);
+    int alignment(const Val &v);
     int alignment(ValType t);
     float32_t canonicalize_nan32(float32_t f);
     float64_t canonicalize_nan64(float64_t f);

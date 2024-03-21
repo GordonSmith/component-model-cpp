@@ -101,15 +101,9 @@ namespace cmcpp
         case ValType::Char:
             return convert_i32_to_char(v);
         case ValType::String:
-        {
-            auto str = load_string(cx, (int32_t)v);
-            Val v(std::get<0>(str), std::get<2>(str));
-            return v;
-        }
+            return load_string(cx, (int32_t)v);
         case ValType::List:
-        {
-            return Val(load_list(cx, (int32_t)v, lt));
-        }
+            return load_list(cx, (int32_t)v, lt);
         default:
             throw std::runtime_error("Invalid type");
         }
