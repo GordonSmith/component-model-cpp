@@ -38,5 +38,6 @@ world tests {
   export s64-add: func(a: s64, b: s64) -> s64;
   export s64-sub: func(a: s64, b: s64) -> s64;
   export list-char-append: func(a: list<char>, b: list<char>) -> list<char>;
+  export list-list-string-append: func(a: list<list<string>>, b: list<list<string>>) -> string;
   export string-append: func(a: string, b: string) -> string;
 }

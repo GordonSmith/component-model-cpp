@@ -14,7 +14,7 @@ namespace cmcpp
   const int MAX_FLAT_PARAMS = 16;
   const int MAX_FLAT_RESULTS = 1;
 
-  std::vector<std::string> flatten_type(ValType kind);
+  std::vector<std::string_view> flatten_type(ValType kind);
 
   // CoreFuncType flatten_functype(FuncTypePtr ft, std::string context)
   // {
@@ -41,32 +41,32 @@ namespace cmcpp
   //     return CoreFuncType(flat_params, flat_results);
   // }
 
-  std::vector<std::string> flatten_types(const std::vector<Val> &vs)
+  std::vector<std::string_view> flatten_types(const std::vector<Val> &vs)
   {
-    std::vector<std::string> result;
+    std::vector<std::string_view> result;
     for (Val v : vs)
     {
-      std::vector<std::string> flattened = flatten_type(type(v));
+      std::vector<std::string_view> flattened = flatten_type(type(v));
       result.insert(result.end(), flattened.begin(), flattened.end());
     }
     return result;
   }
 
-  std::vector<std::string> flatten_types(const std::vector<ValType> &ts)
+  std::vector<std::string_view> flatten_types(const std::vector<ValType> &ts)
   {
-    std::vector<std::string> result;
+    std::vector<std::string_view> result;
     for (ValType t : ts)
     {
-      std::vector<std::string> flattened = flatten_type(t);
+      std::vector<std::string_view> flattened = flatten_type(t);
       result.insert(result.end(), flattened.begin(), flattened.end());
     }
     return result;
   }
 
-  std::vector<std::string> flatten_record(const std::vector<Field> &fields);
-  std::vector<std::string> flatten_variant(const std::vector<Case> &cases);
+  std::vector<std::string_view> flatten_record(const std::vector<Field> &fields);
+  std::vector<std::string_view> flatten_variant(const std::vector<Case> &cases);
 
-  std::vector<std::string> flatten_type(ValType kind)
+  std::vector<std::string_view> flatten_type(ValType kind)
   {
     switch (kind)
     {
@@ -109,9 +109,9 @@ namespace cmcpp
     }
   }
 
-  std::vector<std::string> flatten_record(const std::vector<Field> &fields)
+  std::vector<std::string_view> flatten_record(const std::vector<Field> &fields)
   {
-    std::vector<std::string> flat;
+    std::vector<std::string_view> flat;
     for (const Field &f : fields)
     {
       auto flattened = flatten_type(f.ft);

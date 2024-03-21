@@ -43,33 +43,11 @@ namespace cmcpp
                              EnumPtr,
                              OptionPtr,
                              ResultPtr,
-                             FlagsPtr>;
-    ;
+                             FlagsPtr,
+                             std::string_view>;
 
     ValType type(const Val &v);
     size_t index(ValType t);
-
-    template <typename T>
-    T value(Val &v);
-    template <typename T>
-    T cast(const Val &v);
-    template <typename T>
-    const T &get(const Val &v)
-    {
-        ValType t = type(v);
-        bool isCopyConstructible = std::is_copy_constructible<T>::value;
-        const T &c = std::get<T>(v);
-        return c;
-    }
-
-    template <typename T>
-    T *getRef(const Val &v)
-    {
-        ValType t = type(v);
-        bool isCopyConstructible = std::is_copy_constructible<T>::value;
-        std::shared_ptr<T> c = std::get<std::shared_ptr<T>>(v);
-        return c.get();
-    }
 
     struct ValBase
     {
@@ -81,11 +59,15 @@ namespace cmcpp
 
     struct String : ValBase
     {
+        std::string str;
         const char8_t *ptr;
         size_t len;
 
         String();
         String(const char8_t *ptr, size_t len);
+        String(const std::string &str);
+
+        std::string to_string() const;
     };
 
     struct List : ValBase

@@ -252,7 +252,8 @@ namespace cmcpp
 
     std::pair<uint32_t, uint32_t> store_list_into_range(const CallContext &cx, ListPtr list)
     {
-        auto byte_length = list->vs.size() * size(list->lt);
+        size_t nbytes = size(list->lt);
+        auto byte_length = list->vs.size() * nbytes;
         if (byte_length >= std::numeric_limits<uint32_t>::max())
         {
             throw std::runtime_error("byte_length exceeds limit");
@@ -268,7 +269,7 @@ namespace cmcpp
         }
         for (size_t i = 0; i < list->vs.size(); ++i)
         {
-            store(cx, list->vs[i], ptr + i * size(list->lt));
+            store(cx, list->vs[i], ptr + i * nbytes);
         }
         return {ptr, list->vs.size()};
     }

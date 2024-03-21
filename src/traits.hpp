@@ -46,16 +46,16 @@ namespace cmcpp
     template <typename T>
     struct ValTrait
     {
-        static ValType name()
+        static ValType type()
         {
-            throw std::runtime_error("Unsupported Type");
+            throw std::runtime_error(typeid(T).name());
         }
     };
 
     template <>
     struct ValTrait<bool>
     {
-        static ValType name()
+        static ValType type()
         {
             return ValType::Bool;
         }
@@ -64,7 +64,7 @@ namespace cmcpp
     template <>
     struct ValTrait<int8_t>
     {
-        static ValType name()
+        static ValType type()
         {
             return ValType::S8;
         }
@@ -73,7 +73,7 @@ namespace cmcpp
     template <>
     struct ValTrait<uint8_t>
     {
-        static ValType name()
+        static ValType type()
         {
             return ValType::U8;
         }
@@ -82,7 +82,7 @@ namespace cmcpp
     template <>
     struct ValTrait<int16_t>
     {
-        static ValType name()
+        static ValType type()
         {
             return ValType::S16;
         }
@@ -91,7 +91,7 @@ namespace cmcpp
     template <>
     struct ValTrait<uint16_t>
     {
-        static ValType name()
+        static ValType type()
         {
             return ValType::U16;
         }
@@ -100,7 +100,7 @@ namespace cmcpp
     template <>
     struct ValTrait<int32_t>
     {
-        static ValType name()
+        static ValType type()
         {
             return ValType::S32;
         }
@@ -109,7 +109,7 @@ namespace cmcpp
     template <>
     struct ValTrait<uint32_t>
     {
-        static ValType name()
+        static ValType type()
         {
             return ValType::U32;
         }
@@ -118,7 +118,7 @@ namespace cmcpp
     template <>
     struct ValTrait<int64_t>
     {
-        static ValType name()
+        static ValType type()
         {
             return ValType::S64;
         }
@@ -127,7 +127,7 @@ namespace cmcpp
     template <>
     struct ValTrait<uint64_t>
     {
-        static ValType name()
+        static ValType type()
         {
             return ValType::U64;
         }
@@ -136,7 +136,7 @@ namespace cmcpp
     template <>
     struct ValTrait<float>
     {
-        static ValType name()
+        static ValType type()
         {
             return ValType::Float32;
         }
@@ -145,7 +145,7 @@ namespace cmcpp
     template <>
     struct ValTrait<double>
     {
-        static ValType name()
+        static ValType type()
         {
             return ValType::Float64;
         }
@@ -154,7 +154,7 @@ namespace cmcpp
     template <>
     struct ValTrait<char>
     {
-        static ValType name()
+        static ValType type()
         {
             return ValType::Char;
         }
@@ -163,7 +163,16 @@ namespace cmcpp
     template <>
     struct ValTrait<std::string>
     {
-        static ValType name()
+        static ValType type()
+        {
+            return ValType::String;
+        }
+    };
+
+    template <>
+    struct ValTrait<std::string_view>
+    {
+        static ValType type()
         {
             return ValType::String;
         }
@@ -172,24 +181,42 @@ namespace cmcpp
     template <typename LT>
     struct ValTrait<std::vector<LT>>
     {
-        static std::pair<ValType, ValType> name()
+        static ValType type()
         {
-            return {ValType::List, ValTrait<LT>::name()};
+            return ValType::List;
+        }
+
+        static ValType ltype()
+        {
+            return ValTrait<LT>::type();
         }
     };
-
-    // template <typename T>
-    // struct Val
+    // template <typename RT1, typename MT2>
+    // struct ValTrait<std::map<std::string, MT2>>
     // {
-    //     T value;
-
-    //     Val(const T &val) : value(val) {}
-
-    //     ValType kind() const
+    //     static ValType type()
     //     {
-    //         return ValTrait<T>::name();
+    //         return ValType::Record;
+    //     }
+
+    //     static std::pair<ValType, ValType> rtype()
+    //     {
+    //         return {ValTrait<MT1>::type(), ValTrait<MT2>::type()};
     //     }
     // };
+
+    template <typename T>
+    struct HostVal
+    {
+        T value;
+
+        HostVal(const T &val) : value(val) {}
+
+        ValType type() const
+        {
+            return ValTrait<T>::type();
+        }
+    };
 
     enum class WasmValType : uint8_t
     {

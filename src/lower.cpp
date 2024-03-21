@@ -54,12 +54,24 @@ namespace cmcpp
         }
     }
 
+    Val adapt(const Val &v)
+    {
+        if (auto str = std::get_if<std::string_view>(&v))
+        {
+            return std::make_shared<String>((const char8_t *)str->begin(), str->size());
+        }
+        return v;
+    }
+
     std::vector<WasmVal> lower_values(const CallContext &cx, const std::vector<Val> &vs, size_t max_flat, int *out_param)
     {
         if (vs.size() > max_flat)
         {
             TuplePtr tuple = std::make_shared<Tuple>();
-            tuple->vs.insert(tuple->vs.end(), vs.begin(), vs.end());
+            for (Val v : vs)
+            {
+                tuple->vs.push_back(adapt(v));
+            }
             uint32_t ptr;
             if (out_param == nullptr)
             {
@@ -80,9 +92,9 @@ namespace cmcpp
         else
         {
             std::vector<WasmVal> flat_vals;
-            for (const Val &v : vs)
+            for (Val v : vs)
             {
-                std::vector<WasmVal> temp = lower_flat(cx, v);
+                std::vector<WasmVal> temp = lower_flat(cx, adapt(v));
                 flat_vals.insert(flat_vals.end(), temp.begin(), temp.end());
             }
             return flat_vals;

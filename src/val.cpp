@@ -29,8 +29,20 @@ namespace cmcpp
 
     ValBase::ValBase() : t(ValType::Unknown) {}
     ValBase::ValBase(const ValType &t) : t(t) {}
+
     String::String() : ValBase(ValType::String) {}
     String::String(const char8_t *ptr, size_t len) : ValBase(ValType::String), ptr(ptr), len(len) {}
+    String::String(const std::string &_str)
+    {
+        str = _str;
+        ptr = (const char8_t *)str.c_str();
+        len = str.size();
+    }
+    std::string String::to_string() const
+    {
+        return std::string((const char *)ptr, len);
+    }
+
     List::List() : ValBase(ValType::List) {}
     List::List(ValType lt) : ValBase(ValType::List), lt(lt) {}
     Field::Field(const std::string &label, ValType ft) : ValBase(ValType::Field), label(label), ft(ft) {}

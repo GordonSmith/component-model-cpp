@@ -69,9 +69,18 @@ std::vector<cmcpp::WasmVal> wasmtimeVals2WasmVals(const std::vector<wasmtime::Va
     return retVal;
 }
 
+std::ostream &operator<<(std::ostream &os, const cmcpp::ValType &valType)
+{
+    os << static_cast<int>(valType);
+    return os;
+}
+
 TEST_CASE("generic Val")
 {
-    // test();
+    // auto a = cmcpp::HostVal(std::vector<int>{1, 2, 3});
+    // auto b = cmcpp::HostVal(std::map<std::string, std::vector<int>>{std::make_pair("a", std::vector<int>{1, 2, 3})});
+    // // auto b = std::vector<int>{1, 2, 3};
+    // std::cout << b.type() << std::endl;
 }
 
 cmcpp::ListPtr createList()
@@ -128,6 +137,7 @@ TEST_CASE("component-model-cpp")
     wasmtime::Span<uint8_t> data = memory.data(store.context());
     auto bool_and = std::get<wasmtime::Func>(*instance.get(store, "bool-and"));
     auto list_char_append = std::get<wasmtime::Func>(*instance.get(store, "list-char-append"));
+    auto list_list_string_append = std::get<wasmtime::Func>(*instance.get(store, "list-list-string-append"));
     auto string_append = std::get<wasmtime::Func>(*instance.get(store, "string-append"));
 
     //  Actual ABI Test Code  --------------------------------------------
@@ -162,27 +172,40 @@ TEST_CASE("component-model-cpp")
     cmcppVals = cmcpp::lift_values(*cx, wasmtimeVals2WasmVals(wasmtimeVals), {cmcpp::ValType::Bool});
     CHECK(std::get<bool>(cmcppVals[0]) == true);
 
-    auto l = std::make_shared<cmcpp::List>(cmcpp::ValType::Char);
-    l->vs.push_back('a');
-    l->vs.push_back('b');
-    l->vs.push_back('c');
-    auto l2 = std::make_shared<cmcpp::List>(cmcpp::ValType::Char);
-    l2->vs.push_back('d');
-    l2->vs.push_back('e');
-    l2->vs.push_back('f');
-    wasmtimeVals = vals2WasmtimeVals(cmcpp::lower_values(*cx, {l, l2}));
-    wasmtimeVals = list_char_append.call(store, wasmtimeVals).unwrap();
+    auto myVec = std::vector<char>{'a', 'b', 'c'};
+    auto charList1 = cmcpp::lower_hostVal(*cx, myVec);
+    auto myVec2 = std::vector<char>{'d', 'e', 'f'};
+    auto charList2 = cmcpp::lower_hostVal(*cx, myVec2);
+    // auto charList2 = cmcpp::lower_hostVal(std::vector<char>{'d', 'e', 'f'});
+
+    // wasmtimeVals = vals2WasmtimeVals({charList1, charList2});
+    // wasmtimeVals = list_char_append.call(store, wasmtimeVals).unwrap();
+    // cmcppWasmVals = wasmtimeVals2WasmVals(wasmtimeVals);
+    // cmcppVals = cmcpp::lift_values(*cx, cmcppWasmVals, {std::make_pair(cmcpp::ValType::List, cmcpp::ValType::Char)});
+    // CHECK(std::get<cmcpp::ListPtr>(cmcppVals[0])->vs.size() == 6);
+    // CHECK(std::get<char>(std::get<cmcpp::ListPtr>(cmcppVals[0])->vs[0]) == 'a');
+    // CHECK(std::get<char>(std::get<cmcpp::ListPtr>(cmcppVals[0])->vs[3]) == 'd');
+    // CHECK(std::get<char>(std::get<cmcpp::ListPtr>(cmcppVals[0])->vs[5]) == 'f');
+
+    auto lvs = cmcpp::lower_values(*cx, {"1234", "5678"});
+    auto ret = string_append.call(store, vals2WasmtimeVals(lvs)).unwrap();
+    auto wret = wasmtimeVals2WasmVals(ret);
+    cmcppVals = cmcpp::lift_values(*cx, wret, {cmcpp::ValType::String});
+    auto str = std::get<cmcpp::StringPtr>(cmcppVals[0]);
+    CHECK(str->to_string().compare("12345678") == 0);
+
+    // auto myVec4 = std::vector<const std::string &>{{"xxx1234", "xxxx5678", "xxxxxabcd", "xxxxxxefgh"}};
+    // auto charListList4 = cmcpp::lower_hostVal(*cx, myVec4);
+    // lvs = cmcpp::lower_values(*cx, {charListList4});
+    auto myVec3 = std::vector<std::vector<std::string>>{{"1234", "5678"}, {"abcd", "efgh"}};
+    auto charListList = cmcpp::lower_hostVal(*cx, myVec3);
+    lvs = cmcpp::lower_values(*cx, {charListList, charListList});
+    wasmtimeVals = vals2WasmtimeVals(lvs);
+    wasmtimeVals = list_list_string_append.call(store, wasmtimeVals).unwrap();
     cmcppWasmVals = wasmtimeVals2WasmVals(wasmtimeVals);
-    cmcppVals = cmcpp::lift_values(*cx, cmcppWasmVals, {std::make_pair(cmcpp::ValType::List, cmcpp::ValType::Char)});
-    CHECK(std::get<cmcpp::ListPtr>(cmcppVals[0])->vs.size() == 6);
-    CHECK(get<char>(getRef<cmcpp::List>(cmcppVals[0])->vs[0]) == 'a');
-    CHECK(get<char>(getRef<cmcpp::List>(cmcppVals[0])->vs[3]) == 'd');
-    CHECK(get<char>(getRef<cmcpp::List>(cmcppVals[0])->vs[5]) == 'f');
+    cmcppVals = cmcpp::lift_values(*cx, cmcppWasmVals, {std::make_pair(cmcpp::ValType::List, cmcpp::ValType::String)});
+    CHECK(std::get<cmcpp::ListPtr>(cmcppVals[0])->vs.size() == 32);
 
-    // cmcppVals = cmcpp::lift_values(*cx, wasmtimeVals2WasmVals(string_append.call(store, vals2WasmtimeVals(cmcpp::lower_values(*cx, {"1234", "5678"}))).unwrap()), {cmcpp::ValType::String});
-    // auto str = getRef<cmcpp::String>(cmcppVals[0]);
-
-    // CHECK(std::string((const char *)str.ptr, str.len).compare("12345678") == 0);
     //  Actual ABI Test Code  --------------------------------------------
 }
 

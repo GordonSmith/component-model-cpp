@@ -6,7 +6,7 @@
 
 namespace cmcpp
 {
-    std::vector<std::string> flatten_types(const std::vector<ValType> &ts);
+    std::vector<std::string_view> flatten_types(const std::vector<ValType> &ts);
 }
 
 #endif
