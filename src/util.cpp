@@ -85,7 +85,7 @@ namespace cmcpp
     int alignment_record(const std::vector<Field> &fields);
     int alignment_variant(const std::vector<Case> &cases);
 
-    int alignment_flags(const std::vector<std::string_view> &labels)
+    int alignment_flags(const std::vector<std::string> &labels)
     {
         int n = labels.size();
         if (n <= 8)

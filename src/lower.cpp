@@ -56,9 +56,9 @@ namespace cmcpp
 
     Val adapt(const Val &v)
     {
-        if (auto str = std::get_if<std::string_view>(&v))
+        if (auto str = std::get_if<std::string>(&v))
         {
-            return std::make_shared<String>((const char8_t *)str->begin(), str->size());
+            return std::make_shared<String>((const char8_t *)str->c_str(), str->size());
         }
         return v;
     }

@@ -44,7 +44,7 @@ namespace cmcpp
                              OptionPtr,
                              ResultPtr,
                              FlagsPtr,
-                             std::string_view>;
+                             std::string>;
 
     ValType type(const Val &v);
     size_t index(ValType t);

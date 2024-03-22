@@ -169,15 +169,6 @@ namespace cmcpp
         }
     };
 
-    template <>
-    struct ValTrait<std::string_view>
-    {
-        static ValType type()
-        {
-            return ValType::String;
-        }
-    };
-
     template <typename LT>
     struct ValTrait<std::vector<LT>>
     {
