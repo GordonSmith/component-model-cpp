@@ -202,9 +202,9 @@ TEST_CASE("component-model-cpp")
     lvs = cmcpp::lower_values(*cx, {charListList, charListList});
     wasmtimeVals = vals2WasmtimeVals(lvs);
     wasmtimeVals = list_list_string_append.call(store, wasmtimeVals).unwrap();
-    cmcppWasmVals = wasmtimeVals2WasmVals(wasmtimeVals);
-    cmcppVals = cmcpp::lift_values(*cx, cmcppWasmVals, {std::make_pair(cmcpp::ValType::List, cmcpp::ValType::String)});
-    CHECK(std::get<cmcpp::ListPtr>(cmcppVals[0])->vs.size() == 32);
+    wret = wasmtimeVals2WasmVals(wasmtimeVals);
+    cmcppVals = cmcpp::lift_values(*cx, wret, {cmcpp::ValType::String});
+    CHECK(std::get<cmcpp::StringPtr>(cmcppVals[0])->len == 32);
 
     //  Actual ABI Test Code  --------------------------------------------
 }
