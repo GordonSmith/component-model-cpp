@@ -24,31 +24,30 @@ namespace cmcpp
 
     auto MAX_STRING_BYTE_LENGTH = (1U << 31) - 1;
 
-    std::pair<uint32_t, uint32_t> store_string_to_utf8(const CallContext &cx, const char8_t *src, uint32_t src_code_units)
+    std::pair<uint32_t, uint32_t> store_string_to_utf8(const CallContext &cx, const char8_t *src, uint32_t src_code_units, uint32_t worst_case_size)
     {
-        assert(src_code_units <= MAX_STRING_BYTE_LENGTH);
-        uint32_t ptr = cx.opts->realloc(0, 0, 1, src_code_units);
+        assert(worst_case_size <= MAX_STRING_BYTE_LENGTH);
+        uint32_t ptr = cx.opts->realloc(0, 0, 1, worst_case_size);
         assert(ptr + src_code_units <= cx.opts->memory.size());
-        auto enc_len = encodeTo(&cx.opts->memory[ptr], src, src_code_units, GuestEncoding::Utf8);
-        assert(src_code_units <= enc_len);
-        if (src_code_units < enc_len)
+        auto enc_len = encodeTo(&cx.opts->memory[ptr], src, worst_case_size, GuestEncoding::Utf8);
+        if (enc_len < worst_case_size)
         {
             assert(enc_len <= MAX_STRING_BYTE_LENGTH);
-            uint32_t ptr = cx.opts->realloc(ptr, src_code_units, 1, enc_len);
-            assert(ptr + enc_len <= cx.opts->memory.size());
-            enc_len = encodeTo(&cx.opts->memory[ptr], src, enc_len, GuestEncoding::Utf8);
+            ptr = cx.opts->realloc(ptr, src_code_units, 1, enc_len);
         }
         return std::make_pair(ptr, enc_len);
     }
 
     std::pair<uint32_t, uint32_t> store_utf16_to_utf8(const CallContext &cx, const char8_t *src, uint32_t src_code_units)
     {
-        return store_string_to_utf8(cx, src, src_code_units);
+        uint32_t worst_case_size = src_code_units * 3;
+        return store_string_to_utf8(cx, src, src_code_units, worst_case_size);
     }
 
     std::pair<uint32_t, uint32_t> store_latin1_to_utf8(const CallContext &cx, const char8_t *src, uint32_t src_code_units)
     {
-        return store_string_to_utf8(cx, src, src_code_units);
+        uint32_t worst_case_size = src_code_units * 2;
+        return store_string_to_utf8(cx, src, src_code_units, worst_case_size);
     }
 
     std::pair<uint32_t, uint32_t> store_utf8_to_utf16(const CallContext &cx, const char8_t *src, uint32_t src_code_units)

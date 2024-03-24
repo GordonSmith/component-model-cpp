@@ -1,0 +1,1 @@
+sudo apt install -y bison flex build-essential binutils-dev curl pkg-config libtool autotools-dev automake autoconf-archive

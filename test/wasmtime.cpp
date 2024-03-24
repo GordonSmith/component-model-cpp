@@ -2,6 +2,7 @@
 #include "lower.hpp"
 #include "lift.hpp"
 #include "val.hpp"
+#include "util.hpp"
 
 #include <doctest/doctest.h>
 
@@ -147,7 +148,7 @@ TEST_CASE("component-model-cpp")
     auto list3 = std::get<cmcpp::ListPtr>(v);
     CHECK(list3->vs.size() == 3);
 
-    cmcpp::CallContextPtr cx = cmcpp::createCallContext(data, realloc);
+    cmcpp::CallContextPtr cx = cmcpp::createCallContext(data, realloc, cmcpp::encodeTo);
     std::vector<wasmtime::Val> wasmtimeVals;
     std::vector<cmcpp::Val> cmcppVals;
     std::vector<cmcpp::WasmVal> cmcppWasmVals;
