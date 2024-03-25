@@ -216,5 +216,12 @@
                 "-m"
             ]
         }
+    ],
+    "testPresets": [
+        {
+            "name": "xxx",
+            "description": "",
+            "displayName": ""
+        }
     ]
 }

@@ -44,9 +44,8 @@ jobs:
         run: cmake --build build --parallel
 
       - name: test
-        working-directory: build/test
         run: |
-          ctest
+          ctest --test-dir ./build/test
 
       - name: collect code coverage
         run: bash <(curl -s https://codecov.io/bash) || echo "Codecov did not collect coverage reports"
