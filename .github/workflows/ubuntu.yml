@@ -37,6 +37,9 @@ jobs:
         run: |
           cmake -G Ninja -S . -B build -DENABLE_TEST_COVERAGE=1 -DCMAKE_BUILD_TYPE=Debug
 
+      - name: build-wasm
+        run: ./test/wasm/build.sh
+
       - name: build
         run: cmake --build build --parallel
 

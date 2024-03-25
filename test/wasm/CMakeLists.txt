@@ -16,7 +16,7 @@ add_custom_command(
 add_custom_target(wit-generate ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/tests.c)
 
 set(CMAKE_EXECUTABLE_SUFFIX ".wasm")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -nostartfiles -fno-exceptions --sysroot=/${WASI_SDK_PREFIX}/share/wasi-sysroot -Wl,--no-entry")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions --sysroot=/${WASI_SDK_PREFIX}/share/wasi-sysroot")
 
 include_directories(
     ${CMAKE_CURRENT_BINARY_DIR}
@@ -33,10 +33,13 @@ add_executable(wasmtests
     ${CMAKE_CURRENT_BINARY_DIR}/tests.h
 )
 
+target_link_options(wasmtests PRIVATE "LINKER:--no-entry")
+
+
 add_custom_command(
     TARGET wasmtests POST_BUILD  
     # OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/wasmtests-component.wasm
-    COMMAND wasm-tools component new ${CMAKE_CURRENT_BINARY_DIR}/wasmtests.wasm -o ${CMAKE_CURRENT_BINARY_DIR}/wasmtests-component.wasm --adapt wasi_snapshot_preview1=${CMAKE_CURRENT_SOURCE_DIR}/wasi_snapshot_preview1.reactor.wasm
+    COMMAND echo "wasm-tools component new ${CMAKE_CURRENT_BINARY_DIR}/wasmtests.wasm -o ${CMAKE_CURRENT_BINARY_DIR}/wasmtests-component.wasm --adapt wasi_snapshot_preview1=${WASI_SDK_PREFIX}/wasi_snapshot_preview1.reactor.wasm"
 )
 
 target_link_libraries(wasmtests

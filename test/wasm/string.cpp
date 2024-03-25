@@ -1,4 +1,6 @@
 #include "util.hpp"
+#include <vector>
+#include <cstdint>
 
 static uint32_t tally = 0;
 

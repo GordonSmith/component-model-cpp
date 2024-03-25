@@ -100,7 +100,7 @@ TEST_CASE("component-model-cpp")
     wasmtime::Engine engine;
 
     wasmtime::Store store(engine);
-    std::vector<uint8_t> _contents = readWasmBinaryToBuffer("wasm/build/wasmtests.wasm");
+    std::vector<uint8_t> _contents = readWasmBinaryToBuffer("test/wasm/build/wasmtests.wasm");
     const wasmtime::Span<uint8_t> &contents = _contents;
     auto module = wasmtime::Module::compile(engine, contents).unwrap();
 

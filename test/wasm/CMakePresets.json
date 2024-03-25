@@ -9,11 +9,11 @@
         {
             "name": "wasi-sdk",
             "displayName": "wasi-sdk",
-            "toolchainFile": "/usr/local/lib/wasi-sdk-20.0/share/cmake/wasi-sdk.cmake",
+            "toolchainFile": "$env{WASI_SDK_PREFIX}/share/cmake/wasi-sdk.cmake",
             "binaryDir": "${sourceDir}/build",
             "installDir": "${sourceDir}/build/stage",
             "cacheVariables": {
-                "WASI_SDK_PREFIX": "/usr/local/lib/wasi-sdk-20.0"
+                "WASI_SDK_PREFIX": "$env{WASI_SDK_PREFIX}"
             }
         }
     ],
