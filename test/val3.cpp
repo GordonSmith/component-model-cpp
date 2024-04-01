@@ -1,62 +1,125 @@
-#include "val.hpp"
+#include "val3.hpp"
 
-#include <cstring>
+#include <string>
 
-namespace cmcpp
+#include <doctest/doctest.h>
+
+using namespace cmcpp3;
+
+enum class ValType : uint8_t
 {
+    Unknown,
+    Bool,
+    S8,
+    U8,
+    S16,
+    U16,
+    S32,
+    U32,
+    S64,
+    U64,
+    Float32,
+    Float64,
+    Char,
+    String,
+    List,
+    Field,
+    Record,
+    Tuple,
+    Case,
+    Variant,
+    Enum,
+    Option,
+    Result,
+    Flags,
+    Own,
+    Borrow
+};
 
-    ValType type(const Val &v)
-    {
-        return static_cast<ValType>(v.index());
-    }
+struct Bool
+{
+    bool v;
+};
 
-    size_t index(ValType t)
-    {
-        return static_cast<size_t>(t);
-    }
+struct String
+{
+    std::string v;
+};
 
-    template <typename T>
-    T value(Val &v)
-    {
-        return std::get<T>(v);
-    }
+struct Person
+{
+    std::string lname;
+    std::string rname;
+    int age;
+    std::vector<Person> children;
+};
 
-    template <typename T>
-    T cast(const Val &v)
-    {
-        return std::get<T>(v);
-    }
+TEST_CASE("Val")
+{
+    // auto x = HostVal(true);
+    // static_assert(std::is_same_v<decltype(x), cmcpp3::detail::reference<int>>, "Error");
 
-    ValBase::ValBase() : t(ValType::Unknown) {}
-    ValBase::ValBase(const ValType &t) : t(t) {}
+    Bool b{true};
+    String s{"Hello"};
 
-    String::String() : ValBase(ValType::String) {}
-    String::String(const char8_t *ptr, size_t len) : ValBase(ValType::String), ptr(ptr), len(len) {}
-    String::String(const std::string &_str)
-    {
-        str = _str;
-        ptr = (const char8_t *)str.c_str();
-        len = str.size();
-    }
-    std::string String::to_string() const
-    {
-        return std::string((const char *)ptr, len);
-    }
+    // std::cout << HostVal(b) << std::endl;
+    // std::cout << HostVal(s) << std::endl;
 
-    List::List() : ValBase(ValType::List) {}
-    List::List(ValType lt) : ValBase(ValType::List), lt(lt) {}
-    Field::Field(const std::string &label, ValType ft) : ValBase(ValType::Field), label(label), ft(ft) {}
-    Record::Record() : ValBase(ValType::Record) {}
-    Record::Record(const std::vector<Field> &fields) : ValBase(ValType::Record), fields(fields) {}
-    Tuple::Tuple() : ValBase(ValType::Tuple) {}
-    Case::Case() : ValBase(ValType::Case) {}
-    Case::Case(const std::string &label, const std::optional<Val> &v, const std::optional<std::string> &refines) : ValBase(ValType::Case), label(label), v(v), refines(refines) {}
-    Variant::Variant() : ValBase(ValType::Variant){};
-    Variant::Variant(const std::vector<Case> &cases) : ValBase(ValType::Variant), cases(cases) {}
-    Enum::Enum() : ValBase(ValType::Enum){};
-    Option::Option() : ValBase(ValType::Option){};
-    Result::Result() : ValBase(ValType::Result){};
-    Flags::Flags() : ValBase(ValType::Flags){};
+    print(true);
+    std::cout << std::endl;
+    print((int8_t)22);
+    std::cout << std::endl;
+    print((uint8_t)22);
+    std::cout << std::endl;
+    print((int16_t)22);
+    std::cout << std::endl;
+    print((uint16_t)22);
+    std::cout << std::endl;
+    print((int32_t)22);
+    std::cout << std::endl;
+    print((uint32_t)22);
+    std::cout << std::endl;
+
+    print((int64_t)22);
+    std::cout << std::endl;
+    print((uint64_t)22);
+    std::cout << std::endl;
+    print((float32_t)22);
+    std::cout << std::endl;
+    print((float64_t)22);
+    std::cout << std::endl;
+    print('q');
+    std::cout << std::endl;
+    print("aaaabbb123");
+    std::cout << std::endl;
+
+    std::vector<bool> v1 = {true, false, true};
+    print(v1);
+    std::cout << std::endl;
+
+    std::vector<std::vector<bool>> v2 = {{true, false, true}, {false, true, false}};
+    print(v2);
+    std::cout << std::endl;
+
+    std::vector<std::vector<std::string>> v3 = {{"aaa", "bbb", "ccc"}, {"ddd", "eee", "fff"}};
+    print(v3);
+    std::cout << std::endl;
+
+    Person p1{"John", "Doe", 22, {}};
+    print(p1);
+    std::cout << std::endl;
+
+    std::vector<Person> v4 = {};
+    print(v4);
+    std::cout << std::endl;
+
+    std::tuple<bool, int, std::string, Person, std::vector<Person>> t1;
+    print(t1);
+    std::cout << std::endl;
+}
+
+namespace cmcpp3
+{
 
     // Val::Val() : val{}
     // {
@@ -634,8 +697,5 @@ namespace cmcpp
     // {
     //     return std::make_shared<FuncTypeImpl>();
     // }
-
-    CoreFuncType::CoreFuncType(const std::vector<std::string> &params, const std::vector<std::string> &results)
-        : params(params), results(results) {}
 
 }

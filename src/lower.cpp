@@ -100,4 +100,11 @@ namespace cmcpp
             return flat_vals;
         }
     }
+
+    Val lower_hostVal(const CallContext &cx, std::string hostVal)
+    {
+        auto retVal = std::make_shared<String>(hostVal);
+        return retVal;
+    }
+
 }

@@ -93,9 +93,9 @@ cmcpp::ListPtr createList()
     return list;
 }
 
-TEST_CASE("component-model-cpp")
+TEST_CASE("wasmtime")
 {
-    std::cout << "component-model-cpp" << std::endl;
+    std::cout << "wasmtime" << std::endl;
 
     wasmtime::Engine engine;
 

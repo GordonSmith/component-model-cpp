@@ -39,8 +39,8 @@ namespace cmcpp
         Option,
         Result,
         Flags,
-        // Own,
-        // Borrow
+        Own,
+        Borrow
     };
 
     template <typename T>
@@ -168,7 +168,6 @@ namespace cmcpp
             return ValType::String;
         }
     };
-
     template <typename LT>
     struct ValTrait<std::vector<LT>>
     {
@@ -182,6 +181,7 @@ namespace cmcpp
             return ValTrait<LT>::type();
         }
     };
+
     // template <typename RT1, typename MT2>
     // struct ValTrait<std::map<std::string, MT2>>
     // {

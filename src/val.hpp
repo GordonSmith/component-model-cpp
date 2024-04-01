@@ -93,6 +93,7 @@ namespace cmcpp
         std::vector<Field> fields;
 
         Record();
+        Record(const std::vector<Field> &fields);
     };
     struct Tuple : ValBase
     {

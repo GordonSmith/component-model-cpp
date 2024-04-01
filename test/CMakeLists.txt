@@ -22,11 +22,16 @@ include_directories(
     ${WASMTIME_CPP_API_INCLUDE_DIRS}/wasmtime-c-api
     ${WASMTIME_CPP_API_INCLUDE_DIRS}/wasmtime-cpp-api
 )
-file(GLOB sources CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
-add_executable(${PROJECT_NAME} ${sources})
+
+add_executable(${PROJECT_NAME} 
+  main.cpp
+  # wasmtime.cpp
+  val3.cpp
+)
+
 target_link_libraries(${PROJECT_NAME} 
   ${WASMTIME_LIB}
-  doctest::doctest 
+  doctest::doctest
   component-model-cpp
 )
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 20)
