@@ -21,8 +21,6 @@ set(SRC
   util.cpp
   val.hpp
   val.cpp
-  val2.hpp
-  val2.cpp
 )
 
 add_library(${PROJECT_NAME} SHARED ${SRC})

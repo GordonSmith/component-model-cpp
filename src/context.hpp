@@ -48,6 +48,7 @@ namespace cmcpp
         virtual void post_return() = 0;
     };
     using CanonicalOptionsPtr = std::shared_ptr<CanonicalOptions>;
+    CanonicalOptionsPtr createCanonicalOptions(const GuestMemory &memory, const GuestRealloc &realloc, const HostEncodeTo &encodeTo, HostEncoding encoding, const GuestPostReturn &post_return);
 
     class CallContext
     {

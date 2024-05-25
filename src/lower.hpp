@@ -1,3 +1,6 @@
+#ifndef LOWER_HPP
+#define LOWER_HPP
+
 #include "context.hpp"
 #include "val.hpp"
 
@@ -8,20 +11,20 @@ namespace cmcpp
     std::vector<WasmVal> lower_values(const CallContext &cx, const std::vector<Val> &vs, size_t max_flat = 16, int *out_param = nullptr);
 
     template <typename T>
-    Val lower_hostVal(const CallContext &cx, T hostVal)
+    inline Val lower_hostVal(const CallContext &cx, T hostVal)
     {
         return hostVal;
     }
 
     template <>
-    Val lower_hostVal(const CallContext &cx, std::string hostVal)
+    inline Val lower_hostVal(const CallContext &cx, std::string hostVal)
     {
         auto retVal = std::make_shared<String>(hostVal);
         return retVal;
     }
 
     template <typename T>
-    Val lower_hostVal(const CallContext &cx, std::vector<T> hostVal)
+    inline Val lower_hostVal(const CallContext &cx, std::vector<T> hostVal)
     {
         auto size = hostVal.size();
         auto lt = ValTrait<T>::type();
@@ -31,3 +34,5 @@ namespace cmcpp
         return retVal;
     }
 }
+
+#endif
