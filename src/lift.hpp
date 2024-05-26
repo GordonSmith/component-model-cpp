@@ -12,14 +12,14 @@ namespace cmcpp
 
     class CoreValueIter
     {
-    protected:
-        std::vector<std::variant<int, float>> values;
-        size_t i = 0;
 
     public:
-        CoreValueIter(const std::vector<std::variant<int, float>> &values);
+        std::vector<WasmVal> values;
+        size_t i = 0;
 
-        std::variant<int, float> next(const std::string &t);
+        CoreValueIter(const std::vector<std::variant<int32_t, float32_t>> &values);
+
+        std::variant<int32_t, float32_t> next(WasmValType t);
     };
 }
 
