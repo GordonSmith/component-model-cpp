@@ -47,6 +47,7 @@ namespace cmcpp
     List::List(ValType lt) : ValBase(ValType::List), lt(lt) {}
     Field::Field(const std::string &label, ValType ft) : ValBase(ValType::Field), label(label), ft(ft) {}
     Record::Record() : ValBase(ValType::Record) {}
+    Record::Record(const std::vector<Field> &fields) : ValBase(ValType::Record), fields(fields) {}
     Tuple::Tuple() : ValBase(ValType::Tuple) {}
     Case::Case() : ValBase(ValType::Case) {}
     Case::Case(const std::string &label, const std::optional<Val> &v, const std::optional<std::string> &refines) : ValBase(ValType::Case), label(label), v(v), refines(refines) {}

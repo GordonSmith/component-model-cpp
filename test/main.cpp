@@ -126,15 +126,16 @@ void fail(const std::string &msg)
     throw std::runtime_error(msg);
 }
 
-void test(const auto &t, const auto &vals_to_lift, const auto &v,
-          const auto &cx = mk_cx(),
-          const auto &dst_encoding = std::string(),
-          const auto &lower_t = std::optional<decltype(t)>(),
-          const auto &lower_v = std::optional<decltype(v)>())
+void test(const cmcpp::ValBase &t, const std::vector<std::variant<int, float>> &vals_to_lift, const std::string &v,
+          const cmcpp::CallContextPtr &cx = mk_cx()
+          //   ,const auto &dst_encoding = std::string(),
+          //   const auto &lower_t = std::optional<decltype(t)>(),
+          //   const auto &lower_v = std::optional<decltype(v)>()
+)
 {
     auto test_name = [&]()
     {
-        return "test(" + std::to_string(t) + "," + std::to_string(vals_to_lift) + "," + std::to_string(v) + "):";
+        return "test():";
     };
 
     cmcpp::CoreValueIter vi(vals_to_lift);
@@ -152,7 +153,7 @@ void test(const auto &t, const auto &vals_to_lift, const auto &v,
     //     }
     // }
 
-    // auto got = lift_flat(cx, vi, t);
+    // auto got = cmcpp::lift_flat(*cx, vi, t.t);
     // assert(vi.i == vi.values.size());
     // if (got != v)
     // {
@@ -187,4 +188,8 @@ void test(const auto &t, const auto &vals_to_lift, const auto &v,
 TEST_CASE("run_tests.py")
 {
     std::cout << "run_tests.py" << std::endl;
+    // cmcpp::Field('x', U8()), cmcpp::Field('y', U16()), cmcpp::Field('z', U32())}), cmcpp::List({1, 2, 3}), {'x' : 1, 'y' : 2, 'z' : 3}
+    cmcpp::Record r({cmcpp::Field("x", cmcpp::ValType::U8), cmcpp::Field("y", cmcpp::ValType::U16), cmcpp::Field("z", cmcpp::ValType::U32)});
+    std::vector<std::variant<int, float>> vals_to_lift({1, 2, 3});
+    test(r, {1, 2, 3}, "{'x': 1, 'y': 2, 'z': 3}");
 }

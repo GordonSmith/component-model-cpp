@@ -103,7 +103,7 @@ namespace cmcpp
         return v;
     }
 
-    Val lift_flat(const CallContext &cx, const WasmVal &v, const ValType &t, const ValType &lt = ValType::Unknown)
+    Val lift_flat(const CallContext &cx, const WasmVal &v, const ValType &t, const ValType &lt)
     {
         switch (despecialize(t))
         {
