@@ -8,10 +8,10 @@
 
 namespace cmcpp
 {
+    const uint32_t MAX_STRING_BYTE_LENGTH = (1U << 31) - 1;
 
     std::pair<uint32_t, uint32_t> store_string_copy(const CallContext &cx, const char8_t *src, uint32_t src_code_units, uint32_t dst_code_unit_size, uint32_t dst_alignment, GuestEncoding dst_encoding)
     {
-        const uint32_t MAX_STRING_BYTE_LENGTH = (1U << 31) - 1;
         uint32_t dst_byte_length = dst_code_unit_size * src_code_units;
         assert(dst_byte_length <= MAX_STRING_BYTE_LENGTH);
         uint32_t ptr = cx.opts->realloc(0, 0, dst_alignment, dst_byte_length);
@@ -19,10 +19,8 @@ namespace cmcpp
         assert(ptr + dst_byte_length <= cx.opts->memory.size());
         auto enc_len = encodeTo(&cx.opts->memory[ptr], src, src_code_units, dst_encoding);
         assert(dst_byte_length == enc_len);
-        return std::make_pair(ptr, enc_len);
+        return std::make_pair(ptr, src_code_units);
     }
-
-    auto MAX_STRING_BYTE_LENGTH = (1U << 31) - 1;
 
     std::pair<uint32_t, uint32_t> store_string_to_utf8(const CallContext &cx, const char8_t *src, uint32_t src_code_units, uint32_t worst_case_size)
     {

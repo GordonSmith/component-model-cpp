@@ -3,6 +3,8 @@
 #include "load.hpp"
 #include "util.hpp"
 
+#include <vector>
+#include <variant>
 #include <cassert>
 
 namespace cmcpp
@@ -70,6 +72,35 @@ namespace cmcpp
             return i - (1LL << t_width);
         }
         return i;
+    }
+
+    CoreValueIter::CoreValueIter(const std::vector<std::variant<int, float>> &values) : values(values)
+    {
+    }
+
+    std::variant<int, float> CoreValueIter::next(const std::string &t)
+    {
+        std::variant<int, float> v = values[i];
+        i++;
+
+        if (t == "i32")
+        {
+            assert(std::holds_alternative<int>(v) && std::get<int>(v) >= 0 && std::get<int>(v) < (1UL << 32));
+        }
+        else if (t == "i64")
+        {
+            assert(std::holds_alternative<int>(v) && std::get<int>(v) >= 0 && std::get<int>(v) < (1ULL << 64));
+        }
+        else if (t == "f32" || t == "f64")
+        {
+            assert(std::holds_alternative<int>(v) || std::holds_alternative<float>(v));
+        }
+        else
+        {
+            assert(false);
+        }
+
+        return v;
     }
 
     Val lift_flat(const CallContext &cx, const WasmVal &v, const ValType &t, const ValType &lt = ValType::Unknown)
@@ -169,5 +200,4 @@ namespace cmcpp
         }
         return retVal;
     }
-
 }
