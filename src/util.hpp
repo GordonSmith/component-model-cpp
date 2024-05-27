@@ -20,7 +20,7 @@ namespace cmcpp
     float64_t canonicalize_nan64(float64_t f);
     std::string case_label_with_refinements(const Case &c, const std::vector<Case> &cases);
     int32_t char_to_i32(char c);
-    char convert_i32_to_char(int32_t i);
+    char convert_i32_to_char(const CallContext &cx, int32_t i);
     bool convert_int_to_bool(uint8_t i);
 
     std::pair<char8_t *, uint32_t> decode(void *src, uint32_t byte_len, GuestEncoding encoding);
@@ -40,9 +40,11 @@ namespace cmcpp
     float32_t maybe_scramble_nan32(float32_t f);
     float64_t maybe_scramble_nan64(float64_t f);
     int max_case_alignment(const std::vector<Case> &cases);
-    int size(const Val &v);
-    int size(ValType t);
-    int size_flags(const std::vector<std::string> &labels);
+    int elem_size(const Val &v);
+    int elem_size(ValType t);
+
+    int elem_size_flags(const std::vector<std::string> &labels);
     std::map<std::string, bool> unpack_flags_from_int(int i, const std::vector<std::string> &labels);
+    int num_i32_flags(const std::vector<std::string> &labels);
 }
 #endif

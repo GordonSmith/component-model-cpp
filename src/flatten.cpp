@@ -64,7 +64,6 @@ namespace cmcpp
   }
 
   std::vector<std::string> flatten_record(const std::vector<Field> &fields);
-  std::vector<std::string> flatten_variant(const std::vector<Case> &cases);
 
   std::vector<std::string> flatten_type(ValType kind)
   {
@@ -84,9 +83,9 @@ namespace cmcpp
       return {"i32"};
     case ValType::S64:
       return {"i64"};
-    case ValType::Float32:
+    case ValType::F32:
       return {"f32"};
-    case ValType::Float64:
+    case ValType::F64:
       return {"f64"};
     case ValType::Char:
       return {"i32"};

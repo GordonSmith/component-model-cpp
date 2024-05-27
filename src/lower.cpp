@@ -39,9 +39,9 @@ namespace cmcpp
             return {static_cast<int32_t>(std::get<int32_t>(v))};
         case ValType::S64:
             return {static_cast<int64_t>(std::get<int64_t>(v))};
-        case ValType::Float32:
+        case ValType::F32:
             return {static_cast<float32_t>(maybe_scramble_nan32(std::get<float32_t>(v)))};
-        case ValType::Float64:
+        case ValType::F64:
             return {static_cast<float64_t>(maybe_scramble_nan64(std::get<float64_t>(v)))};
         case ValType::Char:
             return {char_to_i32(std::get<char>(v))};
@@ -49,6 +49,16 @@ namespace cmcpp
             return lower_flat_string(cx, std::get<StringPtr>(v));
         case ValType::List:
             return lower_flat_list(cx, std::get<ListPtr>(v));
+        case ValType::Record:
+            // return lower_flat_record(cx, std::get<RecordPtr>(v));
+        case ValType::Variant:
+            // return lower_flat_variant(cx, std::get<VariantPtr>(v));
+        case ValType::Flags:
+            // return lower_flat_flags(cx, std::get<FlagsPtr>(v));
+        case ValType::Own:
+            // return lower_own(cx, std::get<OwnPtr>(v));
+        case ValType::Borrow:
+            // return lower_borrow(cx, std::get<BorrowPtr>(v));
         default:
             throw std::runtime_error("Invalid type");
         }
@@ -75,14 +85,14 @@ namespace cmcpp
             uint32_t ptr;
             if (out_param == nullptr)
             {
-                ptr = cx.opts->realloc(0, 0, alignment(tuple), size(tuple->t));
+                ptr = cx.opts->realloc(0, 0, alignment(tuple), elem_size(tuple->t));
             }
             else
             {
                 //  TODO:  ptr = out_param.next('i32');
                 std::abort();
             }
-            if (ptr != align_to(ptr, alignment(ValType::Tuple)) || ptr + size(ValType::Tuple) > cx.opts->memory.size())
+            if (ptr != align_to(ptr, alignment(ValType::Tuple)) || ptr + elem_size(ValType::Tuple) > cx.opts->memory.size())
             {
                 throw std::runtime_error("Out of bounds access");
             }

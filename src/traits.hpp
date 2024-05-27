@@ -25,8 +25,8 @@ namespace cmcpp
         U32,
         S64,
         U64,
-        Float32,
-        Float64,
+        F32,
+        F64,
         Char,
         String,
         List,
@@ -138,7 +138,7 @@ namespace cmcpp
     {
         static ValType type()
         {
-            return ValType::Float32;
+            return ValType::F32;
         }
     };
 
@@ -147,7 +147,7 @@ namespace cmcpp
     {
         static ValType type()
         {
-            return ValType::Float64;
+            return ValType::F64;
         }
     };
 

@@ -240,7 +240,7 @@ namespace cmcpp
 
     std::pair<uint32_t, uint32_t> store_list_into_range(const CallContext &cx, ListPtr list)
     {
-        size_t nbytes = size(list->lt);
+        size_t nbytes = elem_size(list->lt);
         auto byte_length = list->vs.size() * nbytes;
         if (byte_length >= std::numeric_limits<uint32_t>::max())
         {
@@ -275,14 +275,14 @@ namespace cmcpp
         {
             ptr = align_to(ptr, alignment(f.ft));
             store(cx, f.v, ptr);
-            ptr += size(f.ft);
+            ptr += elem_size(f.ft);
         }
     }
 
     void store_variant(const CallContext &cx, VariantPtr v, uint32_t ptr)
     {
         auto [case_index, case_value] = match_case(v);
-        auto disc_size = size(discriminant_type(v->cases));
+        auto disc_size = elem_size(discriminant_type(v->cases));
         store_int(cx, case_index, ptr, disc_size);
         ptr += disc_size;
         ptr = align_to(ptr, max_case_alignment(v->cases));
@@ -296,7 +296,7 @@ namespace cmcpp
     void store(const CallContext &cx, const Val &v, uint32_t ptr)
     {
         assert(ptr == align_to(ptr, alignment(type(v))));
-        assert(ptr + size(v) <= cx.opts->memory.size());
+        assert(ptr + elem_size(v) <= cx.opts->memory.size());
         switch (type(v))
         {
         case ValType::Bool:
@@ -326,10 +326,10 @@ namespace cmcpp
         case ValType::S64:
             store_int(cx, std::get<int64_t>(v), ptr, 8);
             break;
-        case ValType::Float32:
+        case ValType::F32:
             store_int(cx, encode_float_as_i32(std::get<float32_t>(v)), ptr, 4);
             break;
-        case ValType::Float64:
+        case ValType::F64:
             store_int(cx, encode_float_as_i64(std::get<float64_t>(v)), ptr, 8);
             break;
         case ValType::Char:

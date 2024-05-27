@@ -49,6 +49,7 @@ namespace cmcpp
     Record::Record() : ValBase(ValType::Record) {}
     Record::Record(const std::vector<Field> &fields) : ValBase(ValType::Record), fields(fields) {}
     Tuple::Tuple() : ValBase(ValType::Tuple) {}
+    Tuple::Tuple(const std::vector<Val> &vs) : ValBase(ValType::Tuple), vs(vs) {}
     Case::Case() : ValBase(ValType::Case) {}
     Case::Case(const std::string &label, const std::optional<Val> &v, const std::optional<std::string> &refines) : ValBase(ValType::Case), label(label), v(v), refines(refines) {}
     Variant::Variant() : ValBase(ValType::Variant){};
@@ -121,13 +122,13 @@ namespace cmcpp
 
     // Val::Val(float32_t f32) : val{}
     // {
-    //     val.kind = ValType::Float32;
+    //     val.kind = ValType::F32;
     //     val.of.f32 = f32;
     // }
 
     // Val::Val(float64_t f64) : val{}
     // {
-    //     val.kind = ValType::Float64;
+    //     val.kind = ValType::F64;
     //     val.of.f64 = f64;
     // }
 
@@ -338,14 +339,14 @@ namespace cmcpp
 
     // float32_t Val::f32() const
     // {
-    //     if (val.kind != ValType::Float32)
+    //     if (val.kind != ValType::F32)
     //         std::abort();
     //     return val.of.f32;
     // }
 
     // float64_t Val::f64() const
     // {
-    //     if (val.kind != ValType::Float64)
+    //     if (val.kind != ValType::F64)
     //         std::abort();
     //     return val.of.f64;
     // }
@@ -492,13 +493,13 @@ namespace cmcpp
 
     // WasmVal::WasmVal(float32_t f32) : val{}
     // {
-    //     val.kind = ValType::Float32;
+    //     val.kind = ValType::F32;
     //     val.of.f32 = f32;
     // }
 
     // WasmVal::WasmVal(float64_t f64) : val{}
     // {
-    //     val.kind = ValType::Float64;
+    //     val.kind = ValType::F64;
     //     val.of.f64 = f64;
     // }
 
@@ -540,9 +541,9 @@ namespace cmcpp
     //         return WasmValType::I32;
     //     case ValType::S64:
     //         return WasmValType::I64;
-    //     case ValType::Float32:
+    //     case ValType::F32:
     //         return WasmValType::F32;
-    //     case ValType::Float64:
+    //     case ValType::F64:
     //         return WasmValType::F64;
     //     default:
     //         throw std::runtime_error("Invalid WasmValType");
@@ -565,14 +566,14 @@ namespace cmcpp
 
     // float32_t WasmVal::f32() const
     // {
-    //     if (val.kind != ValType::Float32)
+    //     if (val.kind != ValType::F32)
     //         std::abort();
     //     return val.of.f32;
     // }
 
     // float64_t WasmVal::f64() const
     // {
-    //     if (val.kind != ValType::Float64)
+    //     if (val.kind != ValType::F64)
     //         std::abort();
     //     return val.of.f64;
     // }

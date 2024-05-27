@@ -100,6 +100,7 @@ namespace cmcpp
         std::vector<Val> vs;
 
         Tuple();
+        Tuple(const std::vector<Val> &vs);
     };
 
     struct Case : ValBase
@@ -144,34 +145,11 @@ namespace cmcpp
 
     struct Flags : ValBase
     {
+    public:
         std::vector<std::string> labels;
 
         Flags();
     };
-
-    class WasmVal
-    {
-    public:
-        WasmValType kind;
-        WasmValVariant v;
-
-        template <typename T>
-        WasmVal(T v) : kind(WasmValTrait<T>::name()), v(v) {}
-        virtual ~WasmVal() = default;
-
-        template <typename T>
-        operator T() const { return std::get<T>(v); }
-    };
-
-    // template <typename T>
-    // class WasmValT : public WasmValBase
-    // {
-    // public:
-    //     WasmValT(T v) : WasmValBase(WasmValTrait<T>::name())
-    //     {
-    //         this->v = v;
-    //     }
-    // };
 
     // class FuncType
     // {

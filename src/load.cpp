@@ -7,7 +7,6 @@
 namespace cmcpp
 {
 
-    Val load(const CallContext &cx, uint32_t ptr, ValType t);
     Val load(const CallContext &cx, uint32_t ptr, ValType t, ValType lt);
     Val load(const CallContext &cx, uint32_t ptr, ValType t, const std::vector<Field> &fields);
     Val load(const CallContext &cx, uint32_t ptr, ValType t, const std::vector<Case> &cases);
@@ -70,11 +69,11 @@ namespace cmcpp
     ListPtr load_list_from_range(const CallContext &cx, uint32_t ptr, uint32_t length, ValType t)
     {
         assert(ptr == align_to(ptr, alignment(t)));
-        assert(ptr + length * size(t) <= cx.opts->memory.size());
+        assert(ptr + length * elem_size(t) <= cx.opts->memory.size());
         auto list = std::make_shared<List>(t);
         for (uint32_t i = 0; i < length; ++i)
         {
-            list->vs.push_back(load(cx, ptr + i * size(t), t));
+            list->vs.push_back(load(cx, ptr + i * elem_size(t), t));
         }
         return list;
     }
@@ -95,14 +94,14 @@ namespace cmcpp
             Field f(field.label, field.t);
             f.v = load(cx, ptr, field.t);
             retVal->fields.push_back(f);
-            ptr += size(f.t);
+            ptr += elem_size(f.t);
         }
         return retVal;
     }
 
     VariantPtr load_variant(const CallContext &cx, uint32_t ptr, const std::vector<Case> &cases)
     {
-        uint32_t disc_size = size(discriminant_type(cases));
+        uint32_t disc_size = elem_size(discriminant_type(cases));
         uint32_t case_index = load_int<uint32_t>(cx, ptr, disc_size);
         ptr += disc_size;
         if (case_index >= cases.size())
@@ -128,13 +127,13 @@ namespace cmcpp
 
     std::map<std::string, bool> load_flags(const CallContext &cx, uint32_t ptr, const std::vector<std::string> &labels)
     {
-        uint32_t i = load_int<uint32_t>(cx, ptr, size_flags(labels));
+        uint32_t i = load_int<uint32_t>(cx, ptr, elem_size_flags(labels));
         return unpack_flags_from_int(i, labels);
     }
 
-    Val load(const CallContext &cx, uint32_t ptr, ValType t)
+    Val load(const CallContext &cx, uint32_t ptr, Val v)
     {
-        switch (t)
+        switch (v.t)
         {
         case ValType::Bool:
             return convert_int_to_bool(load_int<uint8_t>(cx, ptr, 1));
@@ -154,9 +153,9 @@ namespace cmcpp
             return load_int<int32_t>(cx, ptr, 4);
         case ValType::S64:
             return load_int<int64_t>(cx, ptr, 8);
-        case ValType::Float32:
+        case ValType::F32:
             return decode_i32_as_float(load_int<int32_t>(cx, ptr, 4));
-        case ValType::Float64:
+        case ValType::F64:
             return decode_i64_as_float(load_int<int64_t>(cx, ptr, 8));
         case ValType::Char:
             return convert_i32_to_char(load_int<int32_t>(cx, ptr, 4));

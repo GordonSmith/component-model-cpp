@@ -108,12 +108,12 @@ namespace cmcpp
             return 2;
         case ValType::S32:
         case ValType::U32:
-        case ValType::Float32:
+        case ValType::F32:
         case ValType::Char:
             return 4;
         case ValType::S64:
         case ValType::U64:
-        case ValType::Float64:
+        case ValType::F64:
             return 8;
         case ValType::String:
         case ValType::List:
@@ -172,13 +172,13 @@ namespace cmcpp
 
     uint32_t align_to(uint32_t ptr, uint32_t alignment);
 
-    int size_record(const std::vector<Field> &fields);
-    int size_variant(const std::vector<Case> &cases);
-    int size_flags(const std::vector<std::string> &labels);
+    int elem_size_record(const std::vector<Field> &fields);
+    int elem_size_variant(const std::vector<Case> &cases);
+    int elem_size_flags(const std::vector<std::string> &labels);
 
-    int size(ValType t)
+    int elem_size(ValType t)
     {
-        switch (t)
+        switch (despecialize(t))
         {
         case ValType::Bool:
         case ValType::S8:
@@ -189,48 +189,45 @@ namespace cmcpp
             return 2;
         case ValType::S32:
         case ValType::U32:
-        case ValType::Float32:
+        case ValType::F32:
         case ValType::Char:
             return 4;
         case ValType::S64:
         case ValType::U64:
-        case ValType::Float64:
+        case ValType::F64:
             return 8;
         case ValType::String:
         case ValType::List:
             return 8;
-            // case ValType::Own:
-            // case ValType::Borrow:
-            //     return 4;
         default:
             throw std::runtime_error("Invalid type");
         }
     }
 
-    int size(const Val &v)
+    int elem_size(const Val &v)
     {
         ValType kind = type(despecialize(v));
         switch (kind)
         {
         case ValType::Record:
-            return size_record(std::get<RecordPtr>(v)->fields);
+            return elem_size_record(std::get<RecordPtr>(v)->fields);
         case ValType::Variant:
-            return size_variant(std::get<VariantPtr>(v)->cases);
+            return elem_size_variant(std::get<VariantPtr>(v)->cases);
         // case ValType::Flags:
-        //     return size_flags(v.flags()->labels);
+        //     return elem_size_flags(v.flags()->labels);
         default:
-            return size(kind);
+            return elem_size(kind);
         }
         throw std::runtime_error("Invalid type");
     }
 
-    int size_record(const std::vector<Field> &fields)
+    int elem_size_record(const std::vector<Field> &fields)
     {
         int s = 0;
         for (const auto &f : fields)
         {
             s = align_to(s, alignment(f.v));
-            s += size(f.v);
+            s += elem_size(f.v);
         }
         assert(s > 0);
         return align_to(s, alignment_record(fields));
@@ -241,25 +238,23 @@ namespace cmcpp
         return (ptr + alignment - 1) & ~(alignment - 1);
     }
 
-    int size_variant(const std::vector<Case> &cases)
+    int elem_size_variant(const std::vector<Case> &cases)
     {
-        int s = size(discriminant_type(cases));
+        int s = elem_size(discriminant_type(cases));
         s = align_to(s, max_case_alignment(cases));
         int cs = 0;
         for (const auto &c : cases)
         {
             if (c.v.has_value())
             {
-                cs = std::max(cs, size(c.v.value()));
+                cs = std::max(cs, elem_size(c.v.value()));
             }
         }
         s += cs;
         return align_to(s, alignment_variant(cases));
     }
 
-    int num_i32_flags(const std::vector<std::string> &labels);
-
-    int size_flags(const std::vector<std::string> &labels)
+    int elem_size_flags(const std::vector<std::string> &labels)
     {
         int n = labels.size();
         assert(n > 0);
@@ -299,11 +294,11 @@ namespace cmcpp
         return f;
     }
 
-    float core_f32_reinterpret_i32(int32_t i);
-    float decode_i32_as_float(int32_t i) { return canonicalize_nan32(core_f32_reinterpret_i32(i)); }
+    float32_t core_f32_reinterpret_i32(int32_t i);
+    float32_t decode_i32_as_float(int32_t i) { return canonicalize_nan32(core_f32_reinterpret_i32(i)); }
 
-    double core_f64_reinterpret_i64(int64_t i);
-    double decode_i64_as_float(int64_t i) { return canonicalize_nan64(core_f64_reinterpret_i64(i)); }
+    float64_t core_f64_reinterpret_i64(int64_t i);
+    float64_t decode_i64_as_float(int64_t i) { return canonicalize_nan64(core_f64_reinterpret_i64(i)); }
 
     float32_t core_f32_reinterpret_i32(int32_t i)
     {
@@ -319,8 +314,9 @@ namespace cmcpp
         return d;
     }
 
-    char convert_i32_to_char(int32_t i)
+    char convert_i32_to_char(const CallContext &cx, int32_t i)
     {
+        assert(i >= 0);
         assert(i < 0x110000);
         assert(!(0xD800 <= i && i <= 0xDFFF));
         return static_cast<char>(i);

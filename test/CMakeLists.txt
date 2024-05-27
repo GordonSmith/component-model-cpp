@@ -25,7 +25,7 @@ include_directories(
 
 add_executable(${PROJECT_NAME} 
   main.cpp
-  # wasmtime.cpp
+  wasmtime.cpp
   val3.cpp
 )
 

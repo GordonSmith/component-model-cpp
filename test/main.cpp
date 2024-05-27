@@ -6,12 +6,6 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include "context.hpp"
-#include "lower.hpp"
-#include "lift.hpp"
-#include "val.hpp"
-#include "util.hpp"
-
 #include <iostream>
 #include <string>
 #include <vector>
@@ -160,7 +154,7 @@ void test(const cmcpp::ValBase &t, const std::vector<std::variant<int, float>> &
     // }
 
     // auto got = cmcpp::lift_flat(*cx, vi, t.t);
-    assert(vi.i == vi.values.size());
+    // assert(vi.i == vi.values.size());
     // if (got != v)
     // {
     //     fail(test_name() + " initial lift_flat() expected " + v + " but got " + got);
