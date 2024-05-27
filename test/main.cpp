@@ -160,7 +160,7 @@ void test(const cmcpp::ValBase &t, const std::vector<std::variant<int, float>> &
     // }
 
     // auto got = cmcpp::lift_flat(*cx, vi, t.t);
-    // assert(vi.i == vi.values.size());
+    assert(vi.i == vi.values.size());
     // if (got != v)
     // {
     //     fail(test_name() + " initial lift_flat() expected " + v + " but got " + got);
