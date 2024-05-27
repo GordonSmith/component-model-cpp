@@ -74,7 +74,7 @@ namespace cmcpp
         return v;
     }
 
-    std::vector<WasmVal> lower_values(const CallContext &cx, const std::vector<Val> &vs, std::optional<CoreValueIter &> out_param)
+    std::vector<WasmVal> lower_values(const CallContext &cx, const std::vector<Val> &vs, std::optional<CoreValueIter> out_param)
     {
         auto flat_types = flatten_types(vs);
         if (flat_types.size() > MAX_FLAT_PARAMS)

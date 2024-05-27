@@ -211,7 +211,9 @@ namespace cmcpp
             auto tuple_type = Tuple(ts);
             assert(ptr == align_to(ptr, alignment(tuple_type.t)));
             assert(ptr + elem_size(tuple_type.t) <= cx.opts->memory.size());
-            return load_tuple(cx, ptr, ts)->vs;
+            auto v = load(cx, ptr, tuple_type.t);
+            assert(false); //  What is v?
+            return {};
         }
         else
         {

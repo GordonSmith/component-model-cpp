@@ -113,6 +113,31 @@ namespace cmcpp
     return flat;
   }
 
+  std::vector<std::string> flatten_variant(const std::vector<Case> &cases)
+  {
+    std::vector<std::string> flat;
+    for (const auto &c : cases)
+    {
+      if (c.t.index() == std::variant_npos)
+      {
+        for (size_t i = 0; i < flatten_type(c.v.value()).size(); ++i)
+        {
+          if (i < flat.size())
+          {
+            flat[i] = join(flat[i], flatten_type(c.t.value())[i]);
+          }
+          else
+          {
+            flat.push_back(flatten_type(c.t.value())[i]);
+          }
+        }
+      }
+    }
+    std::vector<std::string> discriminantFlattened = flatten_type(discriminant_type(cases));
+    flat.insert(flat.begin(), discriminantFlattened.begin(), discriminantFlattened.end());
+    return flat;
+  }
+
   // std::string join(const std::string &a, const std::string &b);
   // std::vector<std::string> flatten_variant(const std::vector<Case> &cases)
   // {

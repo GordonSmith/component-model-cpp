@@ -9,7 +9,7 @@
 
 namespace cmcpp
 {
-    std::vector<WasmVal> lower_values(const CallContext &cx, const std::vector<Val> &vs, std::optional<CoreValueIter &> out_param = std::nullopt);
+    std::vector<WasmVal> lower_values(const CallContext &cx, const std::vector<Val> &vs, std::optional<CoreValueIter> out_param = std::nullopt);
 
     Val lower_hostVal(const CallContext &cx, std::string hostVal);
 
