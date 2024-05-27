@@ -10,10 +10,6 @@
 
 namespace cmcpp
 {
-
-  const int MAX_FLAT_PARAMS = 16;
-  const int MAX_FLAT_RESULTS = 1;
-
   std::vector<std::string> flatten_type(ValType kind);
 
   // CoreFuncType flatten_functype(FuncTypePtr ft, std::string context)
@@ -62,8 +58,6 @@ namespace cmcpp
     }
     return result;
   }
-
-  std::vector<std::string> flatten_record(const std::vector<Field> &fields);
 
   std::vector<std::string> flatten_type(ValType kind)
   {

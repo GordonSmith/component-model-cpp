@@ -228,6 +228,8 @@ namespace cmcpp
         CoreFuncType(const std::vector<std::string> &params, const std::vector<std::string> &results);
         virtual ~CoreFuncType() = default;
     };
+
+    using WasmVal = std::variant<int32_t, int64_t, float32_t, float64_t>;
 }
 
 #endif

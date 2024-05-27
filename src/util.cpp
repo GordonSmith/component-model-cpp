@@ -532,4 +532,12 @@ namespace cmcpp
         return result;
     }
 
+    CoreValueIter::CoreValueIter(const std::vector<std::variant<int32_t, int64_t, float32_t, float64_t>> &values) : values(values)
+    {
+    }
+
+    void CoreValueIter::skip()
+    {
+        ++i;
+    }
 }

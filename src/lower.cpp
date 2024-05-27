@@ -1,6 +1,7 @@
 #include "lower.hpp"
 #include "util.hpp"
 #include "store.hpp"
+#include "flatten.hpp"
 
 namespace cmcpp
 {
@@ -73,9 +74,10 @@ namespace cmcpp
         return v;
     }
 
-    std::vector<WasmVal> lower_values(const CallContext &cx, const std::vector<Val> &vs, size_t max_flat, int *out_param)
+    std::vector<WasmVal> lower_values(const CallContext &cx, const std::vector<Val> &vs, std::optional<CoreValueIter &> out_param)
     {
-        if (vs.size() > max_flat)
+        auto flat_types = flatten_types(vs);
+        if (flat_types.size() > MAX_FLAT_PARAMS)
         {
             TuplePtr tuple = std::make_shared<Tuple>();
             for (Val v : vs)
@@ -83,13 +85,13 @@ namespace cmcpp
                 tuple->vs.push_back(adapt(v));
             }
             uint32_t ptr;
-            if (out_param == nullptr)
+            if (!out_param.has_value())
             {
                 ptr = cx.opts->realloc(0, 0, alignment(tuple), elem_size(tuple->t));
             }
             else
             {
-                //  TODO:  ptr = out_param.next('i32');
+                ptr = out_param.value().next<int32_t>();
                 std::abort();
             }
             if (ptr != align_to(ptr, alignment(ValType::Tuple)) || ptr + elem_size(ValType::Tuple) > cx.opts->memory.size())

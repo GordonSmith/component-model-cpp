@@ -3,6 +3,7 @@
 #include "lift.hpp"
 #include "val.hpp"
 #include "util.hpp"
+#include "flatten.hpp"
 
 #include <doctest/doctest.h>
 
@@ -22,19 +23,15 @@ std::vector<uint8_t> readWasmBinaryToBuffer(const char *filename)
 
 wasmtime::Val val2WasmtimeVal(const cmcpp::WasmVal &val)
 {
-    switch (val.kind)
-    {
-    case cmcpp::WasmValType::I32:
-        return (int32_t)val;
-    case cmcpp::WasmValType::I64:
-        return (int64_t)val;
-    case cmcpp::WasmValType::F32:
-        return (float32_t)val;
-    case cmcpp::WasmValType::F64:
-        return (float64_t)val;
-    default:
-        throw std::runtime_error("Invalid WasmValType");
-    }
+    if (std::holds_alternative<int32_t>(val))
+        return wasmtime::Val(std::get<int32_t>(val));
+    if (std::holds_alternative<int64_t>(val))
+        return wasmtime::Val(std::get<int64_t>(val));
+    if (std::holds_alternative<cmcpp::float32_t>(val))
+        return wasmtime::Val(std::get<cmcpp::float32_t>(val));
+    if (std::holds_alternative<cmcpp::float64_t>(val))
+        return wasmtime::Val(std::get<cmcpp::float64_t>(val));
+    throw std::runtime_error("Invalid WasmValType");
 }
 
 std::vector<wasmtime::Val> vals2WasmtimeVals(const std::vector<cmcpp::WasmVal> &vals)
@@ -188,10 +185,10 @@ TEST_CASE("wasmtime")
     // CHECK(std::get<char>(std::get<cmcpp::ListPtr>(cmcppVals[0])->vs[3]) == 'd');
     // CHECK(std::get<char>(std::get<cmcpp::ListPtr>(cmcppVals[0])->vs[5]) == 'f');
 
-    auto lvs = cmcpp::lower_values(*cx, {"1234", "5678"});
+    auto lvs = cmcpp::lower_values(*cx, cmcpp::MAX_FLAT_PARAMS, {"1234", "5678"});
     auto ret = string_append.call(store, vals2WasmtimeVals(lvs)).unwrap();
     auto wret = wasmtimeVals2WasmVals(ret);
-    cmcppVals = cmcpp::lift_values(*cx, wret, {cmcpp::ValType::String});
+    cmcppVals = cmcpp::lift_values(*cx, cmcpp::MAX_FLAT_PARAMS, wret, {cmcpp::ValType::String});
     auto str = std::get<cmcpp::StringPtr>(cmcppVals[0]);
     CHECK(str->to_string().compare("12345678") == 0);
 

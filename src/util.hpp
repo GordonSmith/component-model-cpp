@@ -46,5 +46,26 @@ namespace cmcpp
     int elem_size_flags(const std::vector<std::string> &labels);
     std::map<std::string, bool> unpack_flags_from_int(int i, const std::vector<std::string> &labels);
     int num_i32_flags(const std::vector<std::string> &labels);
+
+    class CoreValueIter
+    {
+
+    public:
+        std::vector<std::variant<int32_t, int64_t, float32_t, float64_t>> values;
+        size_t i = 0;
+
+        CoreValueIter(const std::vector<std::variant<int32_t, int64_t, float32_t, float64_t>> &values);
+
+        template <typename T>
+        T next()
+        {
+            auto v = values[i];
+            i++;
+            // assert(std::holds_alternative<T>(v));
+            return std::get<T>(v);
+        }
+        void skip();
+    };
+
 }
 #endif

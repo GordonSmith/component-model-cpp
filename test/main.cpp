@@ -1,7 +1,8 @@
+#include "traits.hpp"
+#include "val.hpp"
 #include "context.hpp"
 #include "lower.hpp"
 #include "lift.hpp"
-#include "val.hpp"
 #include "util.hpp"
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
@@ -126,7 +127,7 @@ void fail(const std::string &msg)
     throw std::runtime_error(msg);
 }
 
-void test(const cmcpp::ValBase &t, const std::vector<std::variant<int, float>> &vals_to_lift, const std::string &v,
+void test(const cmcpp::ValBase &t, const std::vector<std::variant<int32_t, int64_t, cmcpp::float32_t, cmcpp::float64_t>> &vals_to_lift, const std::string &v,
           const cmcpp::CallContextPtr &cx = mk_cx()
           //   ,const auto &dst_encoding = std::string(),
           //   const auto &lower_t = std::optional<decltype(t)>(),

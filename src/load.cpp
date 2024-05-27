@@ -133,7 +133,7 @@ namespace cmcpp
 
     Val load(const CallContext &cx, uint32_t ptr, Val v)
     {
-        switch (v.t)
+        switch (type(v))
         {
         case ValType::Bool:
             return convert_int_to_bool(load_int<uint8_t>(cx, ptr, 1));
@@ -158,7 +158,7 @@ namespace cmcpp
         case ValType::F64:
             return decode_i64_as_float(load_int<int64_t>(cx, ptr, 8));
         case ValType::Char:
-            return convert_i32_to_char(load_int<int32_t>(cx, ptr, 4));
+            return convert_i32_to_char(cx, load_int<int32_t>(cx, ptr, 4));
         case ValType::String:
             return load_string(cx, ptr);
             // case ValType::Flags:

@@ -159,15 +159,6 @@ namespace cmcpp
         return unpack_flags_from_int(i, labels);
     }
 
-    CoreValueIter::CoreValueIter(const std::vector<std::variant<int32_t, int64_t, float32_t, float64_t>> &values) : values(values)
-    {
-    }
-
-    void CoreValueIter::skip()
-    {
-        ++i;
-    }
-
     Val lift_flat(const CallContext &cx, CoreValueIter &vi, const Val &v)
     {
         switch (despecialize(type(v)))
@@ -211,10 +202,10 @@ namespace cmcpp
         }
     }
 
-    std::vector<Val> lift_values(const CallContext &cx, int max_flat, CoreValueIter &vi, const std::vector<Val> &ts)
+    std::vector<Val> lift_values(const CallContext &cx, CoreValueIter &vi, const std::vector<Val> &ts)
     {
         auto flat_types = flatten_types(ts);
-        if (flat_types.size() > max_flat)
+        if (flat_types.size() > MAX_FLAT_PARAMS)
         {
             auto ptr = vi.next<int32_t>();
             auto tuple_type = Tuple(ts);
@@ -231,6 +222,11 @@ namespace cmcpp
             }
             return retVal;
         }
+    }
+    std::vector<Val> lift_values(const CallContext &cx, const std::vector<WasmVal> &vs, const std::vector<Val> &ts)
+    {
+        CoreValueIter vi(vs);
+        return lift_values(cx, vi, ts);
     }
 
     // std::vector<Val> lift_values(const CallContext &cx, const std::vector<WasmVal> &vs, const std::vector<std::pair<ValType, ValType>> &tps, int max_flat)
