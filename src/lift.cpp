@@ -74,38 +74,36 @@ namespace cmcpp
         return i;
     }
 
-    CoreValueIter::CoreValueIter(const std::vector<std::variant<int32_t, float32_t>> &values)
+    CoreValueIter::CoreValueIter(const std::vector<std::variant<int32_t, float32_t>> &values) : values(values)
     {
-        for (auto v : values)
-        {
-            WasmVal wv(std::holds_alternative<int32_t>(v) ? WasmValType::I32 : WasmValType::F32);
-            wv.v = WasmValVariant(v);
-            this->values.push_back(wv);
-        }
     }
 
-    std::variant<int, float> CoreValueIter::next(WasmValType t)
+    WasmVal CoreValueIter::next(WasmValType t)
     {
-        std::variant<int, float> v = values[i];
+        auto v = values[i];
         i++;
 
-        // switch (t)
-        // {
-        // case WasmValType::I32:
-        //     assert(std::holds_alternative<int>(v) && std::get<int>(v) >= 0 && std::get<int>(v) < (1UL << 32));
-        //     break;
-        // case WasmValType::I64:
-        //     assert(std::holds_alternative<int>(v) && std::get<int>(v) >= 0 && std::get<int>(v) < (1ULL << 64));
-        //     break;
-        // case WasmValType::F32:
-        // case WasmValType::F64:
-        //     assert(std::holds_alternative<int>(v) || std::holds_alternative<float>(v));
-        //     break;
-        // default:
-        //     assert(false);
-        // }
+        switch (t)
+        {
+        case WasmValType::I32:
+            assert(std::holds_alternative<int>(v) && std::get<int>(v) >= 0 && std::get<int>(v) < (1UL << 32));
+            break;
+        case WasmValType::I64:
+            assert(std::holds_alternative<int>(v) && std::get<int>(v) >= 0 && std::get<int>(v) < (1ULL << 64));
+            break;
+        case WasmValType::F32:
+        case WasmValType::F64:
+            assert(std::holds_alternative<int>(v) || std::holds_alternative<float>(v));
+            break;
+        default:
+            assert(false);
+        }
 
-        return v;
+        WasmVal wv(std::holds_alternative<int32_t>(v) ? std::get<int32_t>(v) : std::get<float32_t>(v));
+        wv.kind = std::holds_alternative<int32_t>(v) ? WasmValType::I32 : WasmValType::F32;
+        wv.v = std::holds_alternative<int32_t>(v) ? std::get<int32_t>(v) : std::get<float32_t>(v);
+
+        return wv;
     }
 
     Val lift_flat(const CallContext &cx, const WasmVal &v, const ValType &t, const ValType &lt)

@@ -14,12 +14,12 @@ namespace cmcpp
     {
 
     public:
-        std::vector<WasmVal> values;
+        std::vector<std::variant<int32_t, float32_t>> values;
         size_t i = 0;
 
         CoreValueIter(const std::vector<std::variant<int32_t, float32_t>> &values);
 
-        std::variant<int32_t, float32_t> next(WasmValType t);
+        WasmVal next(WasmValType t);
     };
 }
 
