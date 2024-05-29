@@ -131,9 +131,9 @@ namespace cmcpp
         return unpack_flags_from_int(i, labels);
     }
 
-    Val load(const CallContext &cx, uint32_t ptr, Val v)
+    Val load(const CallContext &cx, uint32_t ptr, ValType t)
     {
-        switch (type(v))
+        switch (t)
         {
         case ValType::Bool:
             return convert_int_to_bool(load_int<uint8_t>(cx, ptr, 1));
@@ -169,6 +169,21 @@ namespace cmcpp
             //     return lift_borrow(cx, load_int<uint32_t>(cx, ptr, 4), static_cast<const Borrow &>(t));
         default:
             throw std::runtime_error("Invalid type");
+        }
+    }
+
+    Val load(const CallContext &cx, uint32_t ptr, Val v)
+    {
+        switch (type(v))
+        {
+            // case ValType::Flags:
+            //     return load_flags(cx, ptr, std::get<3>(opt));
+            // case ValType::Own:
+            //     return lift_own(cx, load_int<uint32_t>(cx, ptr, 4), static_cast<const Own &>(t));
+            // case ValType::Borrow:
+            //     return lift_borrow(cx, load_int<uint32_t>(cx, ptr, 4), static_cast<const Borrow &>(t));
+        default:
+            return load(cx, ptr, type(v));
         }
     }
     Val load(const CallContext &cx, uint32_t ptr, ValType t, ValType lt)

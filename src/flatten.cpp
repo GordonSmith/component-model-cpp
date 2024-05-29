@@ -1,4 +1,5 @@
 #include "flatten.hpp"
+#include "util.hpp"
 
 // #include <any>
 // #include <cassert>
@@ -118,17 +119,18 @@ namespace cmcpp
     std::vector<std::string> flat;
     for (const auto &c : cases)
     {
-      if (c.t.index() == std::variant_npos)
+      if (c.v.has_value())
       {
-        for (size_t i = 0; i < flatten_type(c.v.value()).size(); ++i)
+        auto types = flatten_type(type(c.v.value()));
+        for (size_t i = 0; i < types.size(); ++i)
         {
           if (i < flat.size())
           {
-            flat[i] = join(flat[i], flatten_type(c.t.value())[i]);
+            flat[i] = join(flat[i], types[i]);
           }
           else
           {
-            flat.push_back(flatten_type(c.t.value())[i]);
+            flat.push_back(types[i]);
           }
         }
       }

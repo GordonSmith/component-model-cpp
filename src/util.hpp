@@ -47,6 +47,8 @@ namespace cmcpp
     std::map<std::string, bool> unpack_flags_from_int(int i, const std::vector<std::string> &labels);
     int num_i32_flags(const std::vector<std::string> &labels);
 
+    std::string join(const std::string &a, const std::string &b);
+
     class CoreValueIter
     {
 
