@@ -1,7 +1,7 @@
 #include "lift.hpp"
-#include "flatten.hpp"
-#include "load.hpp"
-#include "util.hpp"
+// #include "flatten.hpp"
+// #include "load.hpp"
+// #include "util.hpp"
 
 #include <vector>
 #include <variant>
@@ -160,7 +160,7 @@ namespace cmcpp
         return unpack_flags_from_int(i, labels);
     }
 
-    Val lift_flat(const CallContext &cx, CoreValueIter &vi, const Val &v)
+    Val lift_flat(const CallContext &cx, const CoreValueIter &vi, ValType t)
     {
         auto t = despecialize(type(v));
         if (t == typeid(Bool))

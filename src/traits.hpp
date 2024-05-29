@@ -5,7 +5,6 @@
 
 #include <optional>
 #include <variant>
-#include <map>
 
 namespace cmcpp
 {
@@ -160,142 +159,89 @@ namespace cmcpp
         }
     };
 
-    // template <>
-    // struct ValTrait<std::string>
-    // {
-    //     static ValType type()
-    //     {
-    //         return ValType::String;
-    //     }
-    // };
-    // template <typename LT>
-    // struct ValTrait<std::vector<LT>>
-    // {
-    //     static ValType type()
-    //     {
-    //         return ValType::List;
-    //     }
+    template <typename T>
+    struct ValTrait<std::optional<T>>
+    {
+        static ValType type()
+        {
+            return ValTrait<T>::type();
+        }
+    };
 
-    //     static ValType ltype()
-    //     {
-    //         return ValTrait<LT>::type();
-    //     }
-    // };
+    template <typename T>
+    ValType type(const T &v)
+    {
+        return ValTrait<T>::type();
+    }
 
-    // // template <typename RT1, typename MT2>
-    // // struct ValTrait<std::map<std::string, MT2>>
-    // // {
-    // //     static ValType type()
-    // //     {
-    // //         return ValType::Record;
-    // //     }
+    using Val = std::variant<bool, int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t, int64_t, uint64_t, float32_t, float64_t, char>;
 
-    // //     static std::pair<ValType, ValType> rtype()
-    // //     {
-    // //         return {ValTrait<MT1>::type(), ValTrait<MT2>::type()};
-    // //     }
-    // // };
+    using Bool = std::optional<bool>;
+    using S8 = std::optional<int8_t>;
+    using U8 = std::optional<uint8_t>;
+    using S16 = std::optional<int16_t>;
+    using U16 = std::optional<uint16_t>;
+    using S32 = std::optional<int32_t>;
+    using U32 = std::optional<uint32_t>;
+    using S64 = std::optional<int64_t>;
+    using U64 = std::optional<uint64_t>;
+    using F32 = std::optional<float32_t>;
+    using F64 = std::optional<float64_t>;
+    using Char = std::optional<char>;
+    using Ref = std::variant<Bool, S8, U8, S16, U16, S32, U32, S64, U64, F32, F64, Char>;
 
-    // template <typename T>
-    // struct HostVal
-    // {
-    //     T value;
+    template <typename T>
+    struct WasmValTrait
+    {
+        static const char *type()
+        {
+            throw std::runtime_error(typeid(T).name());
+        }
+    };
 
-    //     HostVal(const T &val) : value(val) {}
+    const char *const i32 = "i32";
+    const char *const i64 = "i64";
+    const char *const f32 = "f32";
+    const char *const f64 = "f64";
 
-    //     ValType type() const
-    //     {
-    //         return ValTrait<T>::type();
-    //     }
-    // };
+    template <>
+    struct WasmValTrait<int32_t>
+    {
+        static const char *type()
+        {
+            return i32;
+        }
+    };
 
-    // enum class WasmValType : uint8_t
-    // {
-    //     I32,
-    //     I64,
-    //     F32,
-    //     F64
-    // };
-    // using WasmValVariant = std::variant<int32_t, int64_t, float32_t, float64_t>;
+    template <>
+    struct WasmValTrait<int64_t>
+    {
+        static const char *type()
+        {
+            return i64;
+        }
+    };
 
-    // template <typename T>
-    // struct WasmValTrait
-    // {
-    //     static WasmValType name()
-    //     {
-    //         throw std::runtime_error("Unsupported Type");
-    //     }
-    // };
+    template <>
+    struct WasmValTrait<float32_t>
+    {
+        static const char *type()
+        {
+            return f32;
+        }
+    };
 
-    // template <>
-    // struct WasmValTrait<int32_t>
-    // {
-    //     static WasmValType name()
-    //     {
-    //         return WasmValType::I32;
-    //     }
+    template <>
+    struct WasmValTrait<float64_t>
+    {
+        static const char *type()
+        {
+            return f64;
+        }
+    };
 
-    //     static int32_t value(WasmValVariant v)
-    //     {
-    //         return std::get<int32_t>(v);
-    //     }
-    // };
-
-    // template <>
-    // struct WasmValTrait<int64_t>
-    // {
-    //     static WasmValType name()
-    //     {
-    //         return WasmValType::I64;
-    //     }
-
-    //     static int64_t value(WasmValVariant v)
-    //     {
-
-    //         return std::get<int64_t>(v);
-    //     }
-    // };
-
-    // template <>
-    // struct WasmValTrait<float32_t>
-    // {
-    //     static WasmValType name()
-    //     {
-    //         return WasmValType::F32;
-    //     }
-
-    //     static float32_t value(WasmValVariant v)
-    //     {
-    //         return std::get<float32_t>(v);
-    //     }
-    // };
-
-    // template <>
-    // struct WasmValTrait<float64_t>
-    // {
-    //     static WasmValType name()
-    //     {
-    //         return WasmValType::F64;
-    //     }
-
-    //     static float64_t value(WasmValVariant v)
-    //     {
-    //         return std::get<float64_t>(v);
-    //     }
-    // };
-
-    // // template <typename T>
-    // // struct WasmVal
-    // // {
-    // //     T value;
-
-    // //     WasmVal(const T &val) : value(val) {}
-
-    // //     WasmValType kind() const
-    // //     {
-    // //         return WasmValTrait<T>::name();
-    // //     }
-    // // };
+    using WasmVal = std::variant<int32_t, int64_t, float32_t, float64_t>;
+    using WasmRef = std::variant<S32, S64, F32, F64>;
 }
 
 #endif
