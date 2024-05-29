@@ -269,7 +269,7 @@ namespace cmcpp
         store_int(cx, length, ptr + 4, 4);
     }
 
-    void store_record(const CallContext &cx, RecordPtr record, uint32_t ptr)
+    void store_record(const CallContext &cx, const Record &record, uint32_t ptr)
     {
         for (const auto &f : record->fields)
         {
@@ -279,7 +279,7 @@ namespace cmcpp
         }
     }
 
-    void store_variant(const CallContext &cx, VariantPtr v, uint32_t ptr)
+    void store_variant(const CallContext &cx, const Variant &v, uint32_t ptr)
     {
         auto [case_index, case_value] = match_case(v);
         auto disc_size = elem_size(discriminant_type(v->cases));
@@ -345,7 +345,7 @@ namespace cmcpp
             store_record(cx, std::get<RecordPtr>(v), ptr);
             break;
         case ValType::Variant:
-            store_variant(cx, std::get<VariantPtr>(v), ptr);
+            store_variant(cx, std::get<const Variant &>(v), ptr);
             break;
         // case ValType::Flags:
         //     store_flags(cx, v.flags(), ptr);

@@ -134,7 +134,7 @@ namespace cmcpp
         case ValType::Record:
             return alignment_record(std::get<RecordPtr>(_v)->fields);
         case ValType::Variant:
-            return alignment_variant(std::get<VariantPtr>(_v)->cases);
+            return alignment_variant(std::get<const Variant &>(_v)->cases);
         // case ValType::Flags:
         //     return alignment_flags(_v.flags()->labels);
         default:
@@ -212,7 +212,7 @@ namespace cmcpp
         case ValType::Record:
             return elem_size_record(std::get<RecordPtr>(v)->fields);
         case ValType::Variant:
-            return elem_size_variant(std::get<VariantPtr>(v)->cases);
+            return elem_size_variant(std::get<const Variant &>(v)->cases);
         // case ValType::Flags:
         //     return elem_size_flags(v.flags()->labels);
         default:
@@ -434,7 +434,7 @@ namespace cmcpp
         return result;
     }
 
-    std::pair<int, Val> match_case(VariantPtr v)
+    std::pair<int, Val> match_case(const Variant &v)
     {
         assert(v->cases.size() == 1);
         auto key = v->cases[0].label;

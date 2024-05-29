@@ -53,7 +53,7 @@ namespace cmcpp
         case ValType::Record:
             // return lower_flat_record(cx, std::get<RecordPtr>(v));
         case ValType::Variant:
-            // return lower_flat_variant(cx, std::get<VariantPtr>(v));
+            // return lower_flat_variant(cx, std::get<const Variant &>(v));
         case ValType::Flags:
             // return lower_flat_flags(cx, std::get<FlagsPtr>(v));
         case ValType::Own:

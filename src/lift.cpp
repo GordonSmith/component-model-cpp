@@ -58,25 +58,26 @@ namespace cmcpp
         return i;
     }
 
-    StringPtr lift_flat_string(const CallContext &cx, CoreValueIter &vi)
+    String lift_flat_string(const CallContext &cx, CoreValueIter &vi)
     {
         auto ptr = vi.next<int32_t>();
         auto packed_length = vi.next<int32_t>();
         return load_string_from_range(cx, ptr, packed_length);
     }
 
-    ListPtr lift_flat_list(const CallContext &cx, CoreValueIter &vi, ValType elem_type)
+    List lift_flat_list(const CallContext &cx, CoreValueIter &vi, ValType elem_type)
     {
         auto ptr = vi.next<int32_t>();
         auto length = vi.next<int32_t>();
         return load_list_from_range(cx, ptr, length, elem_type);
     }
 
-    RecordPtr lift_flat_record(const CallContext &cx, CoreValueIter &vi, RecordPtr record)
+    Record lift_flat_record(const CallContext &cx, CoreValueIter &vi, const std::vector<Field> &fields)
     {
-        for (Field &f : record->fields)
+        Record record;
+        for (auto f : fields)
         {
-            f.v = lift_flat(cx, vi, &f);
+            record.fields.push_back({f.label, lift_flat(cx, vi, f.v)});
         }
         return record;
     }
@@ -161,45 +162,43 @@ namespace cmcpp
 
     Val lift_flat(const CallContext &cx, CoreValueIter &vi, const Val &v)
     {
-        switch (despecialize(type(v)))
-        {
-        case ValType::Bool:
-            return convert_int_to_bool(vi.next<int32_t>());
-        case ValType::U8:
-            return lift_flat_unsigned<uint32_t>(vi, 32, 8);
-        case ValType::U16:
-            return lift_flat_unsigned<uint32_t>(vi, 32, 16);
-        case ValType::U32:
-            return lift_flat_unsigned<uint32_t>(vi, 32, 32);
-        case ValType::U64:
-            return lift_flat_unsigned<uint64_t>(vi, 64, 64);
-        case ValType::S8:
-            return lift_flat_signed<int32_t>(vi, 32, 8);
-        case ValType::S16:
-            return lift_flat_signed<int32_t>(vi, 32, 16);
-        case ValType::S32:
-            return lift_flat_signed<int32_t>(vi, 32, 32);
-        case ValType::S64:
-            return lift_flat_signed<int64_t>(vi, 64, 64);
-        case ValType::F32:
-            return canonicalize_nan32(vi.next<float32_t>());
-        case ValType::F64:
-            return canonicalize_nan64(vi.next<float64_t>());
-        case ValType::Char:
-            return convert_i32_to_char(cx, vi.next<int32_t>());
-        case ValType::String:
+        auto t = despecialize(type(v));
+        if (t == typeid(Bool))
+            return Bool(convert_int_to_bool(vi.next<int32_t>()));
+        else if (t == typeid(U8))
+            return U8(lift_flat_unsigned<uint32_t>(vi, 32, 8));
+        else if (t == typeid(U16))
+            return U16(lift_flat_unsigned<uint32_t>(vi, 32, 16));
+        else if (t == typeid(U32))
+            return U32(lift_flat_unsigned<uint32_t>(vi, 32, 32));
+        else if (t == typeid(U64))
+            return U64(lift_flat_unsigned<uint64_t>(vi, 64, 64));
+        else if (t == typeid(S8))
+            return S8(lift_flat_signed<int32_t>(vi, 32, 8));
+        else if (t == typeid(S16))
+            return S16(lift_flat_signed<int32_t>(vi, 32, 16));
+        else if (t == typeid(S32))
+            return S32(lift_flat_signed<int32_t>(vi, 32, 32));
+        else if (t == typeid(S64))
+            return S64(lift_flat_signed<int64_t>(vi, 64, 64));
+        else if (t == typeid(F32))
+            return F32(canonicalize_nan32(vi.next<float32_t>()));
+        else if (t == typeid(F64))
+            return F64(canonicalize_nan64(vi.next<float64_t>()));
+        else if (t == typeid(Char))
+            return Char(convert_i32_to_char(cx, vi.next<int32_t>()));
+        else if (t == typeid(String))
             return lift_flat_string(cx, vi);
-        case ValType::List:
-            return lift_flat_list(cx, vi, std::get<ListPtr>(v)->lt);
-        case ValType::Record:
-            return lift_flat_record(cx, vi, std::get<RecordPtr>(v));
-        case ValType::Variant:
-            return lift_flat_variant(cx, vi, std::get<VariantPtr>(v)->cases);
-        // case ValType::Flags:
-        //     return lift_flat_flags(cx, vi, std::get<FlagsPtr>(v)->labels);
-        default:
+        else if (t == typeid(List))
+            return lift_flat_list(cx, vi, dynamic_cast<const List *>(&v)->lt);
+        else if (t == typeid(Record))
+            return lift_flat_record(cx, vi, dynamic_cast<const Record *>(&v)->fields);
+        else if (t == typeid(Variant))
+            return lift_flat_variant(cx, vi, dynamic_cast<const Variant *>(&v)->cases);
+        // else if (t == typeid(Flags))
+        //     return lift_flat_flags(vi, std::get<FlagsPtr>(v)->labels);
+        else
             throw std::runtime_error("Invalid type");
-        }
     }
 
     std::vector<Val> lift_values(const CallContext &cx, CoreValueIter &vi, const std::vector<Val> &ts)

@@ -7,18 +7,18 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(SRC
   context.hpp
   context.cpp
-  flatten.hpp
-  flatten.cpp
-  lift.hpp
-  lift.cpp
-  load.hpp
-  load.cpp
-  lower.hpp
-  lower.cpp
-  store.hpp
-  store.cpp
-  util.hpp
-  util.cpp
+  # flatten.hpp
+  # flatten.cpp
+  # lift.hpp
+  # lift.cpp
+  # load.hpp
+  # load.cpp
+  # lower.hpp
+  # lower.cpp
+  # store.hpp
+  # store.cpp
+  # util.hpp
+  # util.cpp
   val.hpp
   val.cpp
 )

@@ -160,142 +160,142 @@ namespace cmcpp
         }
     };
 
-    template <>
-    struct ValTrait<std::string>
-    {
-        static ValType type()
-        {
-            return ValType::String;
-        }
-    };
-    template <typename LT>
-    struct ValTrait<std::vector<LT>>
-    {
-        static ValType type()
-        {
-            return ValType::List;
-        }
-
-        static ValType ltype()
-        {
-            return ValTrait<LT>::type();
-        }
-    };
-
-    // template <typename RT1, typename MT2>
-    // struct ValTrait<std::map<std::string, MT2>>
+    // template <>
+    // struct ValTrait<std::string>
     // {
     //     static ValType type()
     //     {
-    //         return ValType::Record;
+    //         return ValType::String;
+    //     }
+    // };
+    // template <typename LT>
+    // struct ValTrait<std::vector<LT>>
+    // {
+    //     static ValType type()
+    //     {
+    //         return ValType::List;
     //     }
 
-    //     static std::pair<ValType, ValType> rtype()
+    //     static ValType ltype()
     //     {
-    //         return {ValTrait<MT1>::type(), ValTrait<MT2>::type()};
+    //         return ValTrait<LT>::type();
     //     }
     // };
 
-    template <typename T>
-    struct HostVal
-    {
-        T value;
+    // // template <typename RT1, typename MT2>
+    // // struct ValTrait<std::map<std::string, MT2>>
+    // // {
+    // //     static ValType type()
+    // //     {
+    // //         return ValType::Record;
+    // //     }
 
-        HostVal(const T &val) : value(val) {}
-
-        ValType type() const
-        {
-            return ValTrait<T>::type();
-        }
-    };
-
-    enum class WasmValType : uint8_t
-    {
-        I32,
-        I64,
-        F32,
-        F64
-    };
-    using WasmValVariant = std::variant<int32_t, int64_t, float32_t, float64_t>;
-
-    template <typename T>
-    struct WasmValTrait
-    {
-        static WasmValType name()
-        {
-            throw std::runtime_error("Unsupported Type");
-        }
-    };
-
-    template <>
-    struct WasmValTrait<int32_t>
-    {
-        static WasmValType name()
-        {
-            return WasmValType::I32;
-        }
-
-        static int32_t value(WasmValVariant v)
-        {
-            return std::get<int32_t>(v);
-        }
-    };
-
-    template <>
-    struct WasmValTrait<int64_t>
-    {
-        static WasmValType name()
-        {
-            return WasmValType::I64;
-        }
-
-        static int64_t value(WasmValVariant v)
-        {
-
-            return std::get<int64_t>(v);
-        }
-    };
-
-    template <>
-    struct WasmValTrait<float32_t>
-    {
-        static WasmValType name()
-        {
-            return WasmValType::F32;
-        }
-
-        static float32_t value(WasmValVariant v)
-        {
-            return std::get<float32_t>(v);
-        }
-    };
-
-    template <>
-    struct WasmValTrait<float64_t>
-    {
-        static WasmValType name()
-        {
-            return WasmValType::F64;
-        }
-
-        static float64_t value(WasmValVariant v)
-        {
-            return std::get<float64_t>(v);
-        }
-    };
+    // //     static std::pair<ValType, ValType> rtype()
+    // //     {
+    // //         return {ValTrait<MT1>::type(), ValTrait<MT2>::type()};
+    // //     }
+    // // };
 
     // template <typename T>
-    // struct WasmVal
+    // struct HostVal
     // {
     //     T value;
 
-    //     WasmVal(const T &val) : value(val) {}
+    //     HostVal(const T &val) : value(val) {}
 
-    //     WasmValType kind() const
+    //     ValType type() const
     //     {
-    //         return WasmValTrait<T>::name();
+    //         return ValTrait<T>::type();
     //     }
     // };
+
+    // enum class WasmValType : uint8_t
+    // {
+    //     I32,
+    //     I64,
+    //     F32,
+    //     F64
+    // };
+    // using WasmValVariant = std::variant<int32_t, int64_t, float32_t, float64_t>;
+
+    // template <typename T>
+    // struct WasmValTrait
+    // {
+    //     static WasmValType name()
+    //     {
+    //         throw std::runtime_error("Unsupported Type");
+    //     }
+    // };
+
+    // template <>
+    // struct WasmValTrait<int32_t>
+    // {
+    //     static WasmValType name()
+    //     {
+    //         return WasmValType::I32;
+    //     }
+
+    //     static int32_t value(WasmValVariant v)
+    //     {
+    //         return std::get<int32_t>(v);
+    //     }
+    // };
+
+    // template <>
+    // struct WasmValTrait<int64_t>
+    // {
+    //     static WasmValType name()
+    //     {
+    //         return WasmValType::I64;
+    //     }
+
+    //     static int64_t value(WasmValVariant v)
+    //     {
+
+    //         return std::get<int64_t>(v);
+    //     }
+    // };
+
+    // template <>
+    // struct WasmValTrait<float32_t>
+    // {
+    //     static WasmValType name()
+    //     {
+    //         return WasmValType::F32;
+    //     }
+
+    //     static float32_t value(WasmValVariant v)
+    //     {
+    //         return std::get<float32_t>(v);
+    //     }
+    // };
+
+    // template <>
+    // struct WasmValTrait<float64_t>
+    // {
+    //     static WasmValType name()
+    //     {
+    //         return WasmValType::F64;
+    //     }
+
+    //     static float64_t value(WasmValVariant v)
+    //     {
+    //         return std::get<float64_t>(v);
+    //     }
+    // };
+
+    // // template <typename T>
+    // // struct WasmVal
+    // // {
+    // //     T value;
+
+    // //     WasmVal(const T &val) : value(val) {}
+
+    // //     WasmValType kind() const
+    // //     {
+    // //         return WasmValTrait<T>::name();
+    // //     }
+    // // };
 }
 
 #endif

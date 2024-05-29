@@ -36,7 +36,7 @@ namespace cmcpp
 
     bool isAligned(uint32_t ptr, uint32_t alignment);
     int find_case(const std::string &label, const std::vector<Case> &cases);
-    std::pair<int, Val> match_case(VariantPtr v);
+    std::pair<int, Val> match_case(const Variant &v);
     float32_t maybe_scramble_nan32(float32_t f);
     float64_t maybe_scramble_nan64(float64_t f);
     int max_case_alignment(const std::vector<Case> &cases);

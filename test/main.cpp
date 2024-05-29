@@ -1,9 +1,9 @@
 #include "traits.hpp"
-#include "val.hpp"
-#include "context.hpp"
-#include "lower.hpp"
-#include "lift.hpp"
-#include "util.hpp"
+// #include "val.hpp"
+// #include "context.hpp"
+// #include "lower.hpp"
+// #include "lift.hpp"
+// #include "util.hpp"
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
@@ -190,7 +190,7 @@ TEST_CASE("run_tests.py")
 {
     std::cout << "run_tests.py" << std::endl;
     // cmcpp::Field('x', U8()), cmcpp::Field('y', U16()), cmcpp::Field('z', U32())}), cmcpp::List({1, 2, 3}), {'x' : 1, 'y' : 2, 'z' : 3}
-    cmcpp::Record r({cmcpp::Field("x", cmcpp::ValType::U8), cmcpp::Field("y", cmcpp::ValType::U16), cmcpp::Field("z", cmcpp::ValType::U32)});
+    cmcpp::Record r({cmcpp::FieldT<U8>("x"), cmcpp::Field("y", cmcpp::ValType::U16), cmcpp::Field("z", cmcpp::ValType::U32)});
     std::vector<std::variant<int, float>> vals_to_lift({1, 2, 3});
     test(r, {1, 2, 3}, "{'x': 1, 'y': 2, 'z': 3}");
 }

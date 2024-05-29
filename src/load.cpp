@@ -22,7 +22,7 @@ namespace cmcpp
         return retVal;
     }
 
-    StringPtr load_string_from_range(const CallContext &cx, uint32_t ptr, uint32_t tagged_code_units)
+    String load_string_from_range(const CallContext &cx, uint32_t ptr, uint32_t tagged_code_units)
     {
         GuestEncoding encoding;
         uint32_t byte_length = tagged_code_units;
@@ -56,50 +56,50 @@ namespace cmcpp
         assert(isAligned(ptr, alignment));
         assert(ptr + byte_length <= cx.opts->memory.size());
         auto [dec_str, dec_len] = decode(&cx.opts->memory[ptr], byte_length, encoding);
-        return std::make_shared<String>(dec_str, dec_len);
+        return {dec_str, dec_len};
     }
 
-    StringPtr load_string(const CallContext &cx, uint32_t ptr)
+    String load_string(const CallContext &cx, uint32_t ptr)
     {
         uint32_t begin = load_int<uint32_t>(cx, ptr, 4);
         uint32_t tagged_code_units = load_int<uint32_t>(cx, ptr + 4, 4);
         return load_string_from_range(cx, begin, tagged_code_units);
     }
 
-    ListPtr load_list_from_range(const CallContext &cx, uint32_t ptr, uint32_t length, ValType t)
+    List load_list_from_range(const CallContext &cx, uint32_t ptr, uint32_t length, ValType t)
     {
         assert(ptr == align_to(ptr, alignment(t)));
         assert(ptr + length * elem_size(t) <= cx.opts->memory.size());
-        auto list = std::make_shared<List>(t);
+        List list;
+        list.lt = t;
         for (uint32_t i = 0; i < length; ++i)
         {
-            list->vs.push_back(load(cx, ptr + i * elem_size(t), t));
+            list.vs.push_back(load(cx, ptr + i * elem_size(t), t));
         }
         return list;
     }
 
-    ListPtr load_list(const CallContext &cx, uint32_t ptr, ValType t)
+    List load_list(const CallContext &cx, uint32_t ptr, ValType t)
     {
         uint32_t begin = load_int<uint32_t>(cx, ptr, 4);
         uint32_t length = load_int<uint32_t>(cx, ptr + 4, 4);
         return load_list_from_range(cx, begin, length, t);
     }
 
-    RecordPtr load_record(const CallContext &cx, uint32_t ptr, const std::vector<Field> &fields)
+    Record load_record(const CallContext &cx, uint32_t ptr, const std::vector<Field> &fields)
     {
-        auto retVal = std::make_shared<Record>();
-        for (auto &field : fields)
+        Record retVal;
+        for (auto field : fields)
         {
             ptr = align_to(ptr, alignment(field.t));
-            Field f(field.label, field.t);
-            f.v = load(cx, ptr, field.t);
-            retVal->fields.push_back(f);
+            Field f = {field.label, load(cx, ptr, field.t)};
+            retVal.fields.push_back(f);
             ptr += elem_size(f.t);
         }
         return retVal;
     }
 
-    VariantPtr load_variant(const CallContext &cx, uint32_t ptr, const std::vector<Case> &cases)
+    Variant load_variant(const CallContext &cx, uint32_t ptr, const std::vector<Case> &cases)
     {
         uint32_t disc_size = elem_size(discriminant_type(cases));
         uint32_t case_index = load_int<uint32_t>(cx, ptr, disc_size);
@@ -113,15 +113,11 @@ namespace cmcpp
         std::string case_label = case_label_with_refinements(c, cases);
         if (!c.v.has_value())
         {
-            Case c2(case_label, std::nullopt, c.refines);
-            std::vector<Case> cases2 = {c2};
-            return std::make_shared<Variant>(cases2);
+            return Variant({{case_label, std::nullopt, c.refines}});
         }
         else
         {
-            Case c2(case_label, load(cx, ptr, type(c.v.value())), c.refines);
-            std::vector<Case> cases2 = {c2};
-            return std::make_shared<Variant>(cases2);
+            return Variant({{case_label, load(cx, ptr, type(c.v.value())), c.refines}});
         }
     }
 
@@ -133,87 +129,78 @@ namespace cmcpp
 
     Val load(const CallContext &cx, uint32_t ptr, ValType t)
     {
-        switch (t)
-        {
-        case ValType::Bool:
-            return convert_int_to_bool(load_int<uint8_t>(cx, ptr, 1));
-        case ValType::U8:
-            return load_int<uint8_t>(cx, ptr, 1);
-        case ValType::U16:
-            return load_int<uint16_t>(cx, ptr, 2);
-        case ValType::U32:
-            return load_int<uint32_t>(cx, ptr, 4);
-        case ValType::U64:
-            return load_int<uint64_t>(cx, ptr, 8);
-        case ValType::S8:
-            return load_int<int8_t>(cx, ptr, 1);
-        case ValType::S16:
-            return load_int<int16_t>(cx, ptr, 2);
-        case ValType::S32:
-            return load_int<int32_t>(cx, ptr, 4);
-        case ValType::S64:
-            return load_int<int64_t>(cx, ptr, 8);
-        case ValType::F32:
-            return decode_i32_as_float(load_int<int32_t>(cx, ptr, 4));
-        case ValType::F64:
-            return decode_i64_as_float(load_int<int64_t>(cx, ptr, 8));
-        case ValType::Char:
-            return convert_i32_to_char(cx, load_int<int32_t>(cx, ptr, 4));
-        case ValType::String:
+        if (t == typeid(Bool))
+            return Bool(convert_int_to_bool(load_int<uint8_t>(cx, ptr, 1)));
+        else if (t == typeid(U8))
+            return U8(load_int<uint8_t>(cx, ptr, 1));
+        else if (t == typeid(U16))
+            return U16(load_int<uint16_t>(cx, ptr, 2));
+        else if (t == typeid(U32))
+            return U32(load_int<uint32_t>(cx, ptr, 4));
+        else if (t == typeid(U64))
+            return U64(load_int<uint64_t>(cx, ptr, 8));
+        else if (t == typeid(S8))
+            return S8(load_int<int8_t>(cx, ptr, 1));
+        else if (t == typeid(S16))
+            return S16(load_int<int16_t>(cx, ptr, 2));
+        else if (t == typeid(S32))
+            return S32(load_int<int32_t>(cx, ptr, 4));
+        else if (t == typeid(S64))
+            return S64(load_int<int64_t>(cx, ptr, 8));
+        else if (t == typeid(F32))
+            return F32(decode_i32_as_float(load_int<int32_t>(cx, ptr, 4)));
+        else if (t == typeid(F64))
+            return F64(decode_i64_as_float(load_int<int64_t>(cx, ptr, 8)));
+        else if (t == typeid(Char))
+            return Char(convert_i32_to_char(cx, load_int<int32_t>(cx, ptr, 4)));
+        else if (t == typeid(String))
             return load_string(cx, ptr);
-            // case ValType::Flags:
-            //     return load_flags(cx, ptr, std::get<3>(opt));
-            // case ValType::Own:
-            //     return lift_own(cx, load_int<uint32_t>(cx, ptr, 4), static_cast<const Own &>(t));
-            // case ValType::Borrow:
-            //     return lift_borrow(cx, load_int<uint32_t>(cx, ptr, 4), static_cast<const Borrow &>(t));
-        default:
+        // case ValType::Flags:
+        //     return load_flags(cx, ptr, std::get<3>(opt));
+        // case ValType::Own:
+        //     return lift_own(cx, load_int<uint32_t>(cx, ptr, 4), static_cast<const Own &>(t));
+        // case ValType::Borrow:
+        //     return lift_borrow(cx, load_int<uint32_t>(cx, ptr, 4), static_cast<const Borrow &>(t));
+        else
             throw std::runtime_error("Invalid type");
-        }
     }
 
     Val load(const CallContext &cx, uint32_t ptr, Val v)
     {
-        switch (type(v))
-        {
-            // case ValType::Flags:
-            //     return load_flags(cx, ptr, std::get<3>(opt));
-            // case ValType::Own:
-            //     return lift_own(cx, load_int<uint32_t>(cx, ptr, 4), static_cast<const Own &>(t));
-            // case ValType::Borrow:
-            //     return lift_borrow(cx, load_int<uint32_t>(cx, ptr, 4), static_cast<const Borrow &>(t));
-        default:
-            return load(cx, ptr, type(v));
-        }
+        // switch (type(v))
+        // {
+        // case ValType::Flags:
+        //     return load_flags(cx, ptr, std::get<3>(opt));
+        // case ValType::Own:
+        //     return lift_own(cx, load_int<uint32_t>(cx, ptr, 4), static_cast<const Own &>(t));
+        // case ValType::Borrow:
+        //     return lift_borrow(cx, load_int<uint32_t>(cx, ptr, 4), static_cast<const Borrow &>(t));
+        // default:
+        return load(cx, ptr, type(v));
+        // }
     }
+
     Val load(const CallContext &cx, uint32_t ptr, ValType t, ValType lt)
     {
-        switch (t)
-        {
-        case ValType::List:
+        if (t == typeid(List))
             return load_list(cx, ptr, lt);
-        default:
+        else
             throw std::runtime_error("Invalid type");
-        }
     }
+
     Val load(const CallContext &cx, uint32_t ptr, ValType t, const std::vector<Field> &fields)
     {
-        switch (t)
-        {
-        case ValType::Record:
+        if (t == typeid(Record))
             return load_record(cx, ptr, fields);
-        default:
+        else
             throw std::runtime_error("Invalid type");
-        }
     }
+
     Val load(const CallContext &cx, uint32_t ptr, ValType t, const std::vector<Case> &cases)
     {
-        switch (t)
-        {
-        case ValType::Variant:
+        if (t == typeid(Variant))
             return load_variant(cx, ptr, cases);
-        default:
+        else
             throw std::runtime_error("Invalid type");
-        }
     }
 }

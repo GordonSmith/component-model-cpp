@@ -1,16 +1,21 @@
-#ifndef VAL_HPP
-#define VAL_HPP
+#ifndef VAL2_HPP
+#define VAL2_HPP
 
-#include "context.hpp"
 #include "traits.hpp"
 
+#include <functional>
+#include <cassert>
 #include <optional>
 #include <variant>
+#include <any>
+#include <iostream>
 #include <typeindex>
 
-namespace cmcpp
+namespace cmcpp2
 {
-    using ValType = std::type_index;
+    using float32_t = float;
+    using float64_t = double;
+
     struct None
     {
         virtual ~None() = default;
@@ -38,10 +43,6 @@ namespace cmcpp
     using U16 = ValT<uint16_t>;
     using U32 = ValT<uint32_t>;
     using U64 = ValT<uint64_t>;
-    using S8 = ValT<int8_t>;
-    using S16 = ValT<int16_t>;
-    using S32 = ValT<int32_t>;
-    using S64 = ValT<int64_t>;
     using F32 = ValT<float32_t>;
     using F64 = ValT<float64_t>;
     using Char = ValT<char>;
@@ -70,8 +71,7 @@ namespace cmcpp
         const std::string &label;
         ValT<T> v;
 
-        FieldT() : ValBase(typeid(FieldT)), label("") {}
-        FieldT(const std::string &label) : ValBase(typeid(FieldT)), label(label) {}
+        FieldT() : ValBase(typeid(FieldT)), label(""), v() {}
         FieldT(const std::string &label, const ValT<T> &v) : ValBase(typeid(FieldT)), label(label), v(v) {}
     };
     using Field = FieldT<ValBase>;
@@ -100,19 +100,18 @@ namespace cmcpp
     {
         const std::string &label;
         std::optional<ValT<T>> v;
-        std::optional<std::string> refines;
+        std::optional<std::string> refines = std::nullopt;
 
-        CaseT() : ValBase(typeid(CaseT)), label("") {}
-        CaseT(const std::string &label, const std::optional<ValT<T>> &v, const std::optional<std::string> &refines) : ValBase(typeid(CaseT)), label(label), v(v), refines(refines) {}
+        CaseT() : ValBase(typeid(CaseT)), label(""), v() {}
+        CaseT(const std::string &label, const ValT<T> &v) : ValBase(typeid(CaseT)), label(label), v(v) {}
     };
     using Case = CaseT<ValBase>;
 
     struct Variant : ValBase
     {
-        std::vector<Case> cases;
-
+        std::vector<CaseT<std::any>> cases;
         Variant() : ValBase(typeid(Variant)) {}
-        Variant(const std::vector<Case> &cases) : ValBase(typeid(Variant)), cases(cases) {}
+        Variant(const std::vector<CaseT<std::any>> &cases) : ValBase(typeid(Variant)), cases(cases) {}
     };
 
     struct Enum : ValBase
@@ -143,46 +142,33 @@ namespace cmcpp
 
     struct Flags : ValBase
     {
+    public:
         std::vector<std::string> labels;
 
         Flags() : ValBase(typeid(Flags)) {}
         Flags(const std::vector<std::string> &labels) : ValBase(typeid(Flags)), labels(labels) {}
     };
 
-    using Val = ValBase;
-
-    ValType type(const Val &v);
-    //  ----------------------------------------------------------------
-
-    class Type
-    {
-    public:
-        virtual ~Type() = default;
-    };
-
-    class ExternType : public Type
-    {
-    public:
-        virtual ~ExternType() = default;
-    };
-
-    class CoreExternType : public Type
-    {
-    public:
-        virtual ~CoreExternType() = default;
-    };
-
-    class CoreFuncType : public CoreExternType
-    {
-    public:
-        const std::vector<std::string> &params;
-        const std::vector<std::string> &results;
-
-        CoreFuncType(const std::vector<std::string> &params, const std::vector<std::string> &results);
-        virtual ~CoreFuncType() = default;
-    };
-
-    using WasmVal = std::variant<int32_t, int64_t, float32_t, float64_t>;
+    using Val = std::variant<std::reference_wrapper<ValT<None>>,
+                             std::reference_wrapper<Bool>,
+                             std::reference_wrapper<U8>,
+                             std::reference_wrapper<U16>,
+                             std::reference_wrapper<U32>,
+                             std::reference_wrapper<U64>,
+                             std::reference_wrapper<F32>,
+                             std::reference_wrapper<F64>,
+                             std::reference_wrapper<Char>,
+                             std::reference_wrapper<String>,
+                             std::reference_wrapper<List>,
+                             std::reference_wrapper<Field>,
+                             std::reference_wrapper<Record>,
+                             std::reference_wrapper<Tuple>,
+                             std::reference_wrapper<Case>,
+                             std::reference_wrapper<Variant>,
+                             std::reference_wrapper<Enum>,
+                             std::reference_wrapper<Option>,
+                             std::reference_wrapper<Result>,
+                             std::reference_wrapper<Flags>>;
 }
 
 #endif
