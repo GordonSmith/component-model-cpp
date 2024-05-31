@@ -16,6 +16,7 @@ else()
     PATHS ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}
   )
 endif()
+find_package(fmt CONFIG REQUIRED)
 
 include_directories(
     ../src
@@ -25,7 +26,7 @@ include_directories(
 
 add_executable(${PROJECT_NAME} 
   main.cpp
-  traits.cpp
+  val.cpp
   # wasmtime.cpp
   # val3.cpp
 )
@@ -34,6 +35,7 @@ target_link_libraries(${PROJECT_NAME}
   ${WASMTIME_LIB}
   doctest::doctest
   component-model-cpp
+  fmt::fmt
 )
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 20)
 add_test(

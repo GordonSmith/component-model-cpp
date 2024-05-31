@@ -2,7 +2,6 @@
 #define LIFT_HPP
 
 #include "context.hpp"
-#include "traits.hpp"
 #include "util.hpp"
 
 namespace cmcpp

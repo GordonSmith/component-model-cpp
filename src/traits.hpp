@@ -14,7 +14,6 @@ namespace cmcpp
 
     enum class ValType : uint8_t
     {
-        Unknown,
         Bool,
         S8,
         U8,
@@ -151,20 +150,11 @@ namespace cmcpp
     };
 
     template <>
-    struct ValTrait<char>
+    struct ValTrait<wchar_t>
     {
         static ValType type()
         {
             return ValType::Char;
-        }
-    };
-
-    template <typename T>
-    struct ValTrait<std::optional<T>>
-    {
-        static ValType type()
-        {
-            return ValTrait<T>::type();
         }
     };
 
@@ -174,21 +164,17 @@ namespace cmcpp
         return ValTrait<T>::type();
     }
 
-    using Val = std::variant<bool, int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t, int64_t, uint64_t, float32_t, float64_t, char>;
+    // Optionals
+    template <typename T>
+    struct ValTrait<std::optional<T>>
+    {
+        static ValType type()
+        {
+            return ValTrait<T>::type();
+        }
+    };
 
-    using Bool = std::optional<bool>;
-    using S8 = std::optional<int8_t>;
-    using U8 = std::optional<uint8_t>;
-    using S16 = std::optional<int16_t>;
-    using U16 = std::optional<uint16_t>;
-    using S32 = std::optional<int32_t>;
-    using U32 = std::optional<uint32_t>;
-    using S64 = std::optional<int64_t>;
-    using U64 = std::optional<uint64_t>;
-    using F32 = std::optional<float32_t>;
-    using F64 = std::optional<float64_t>;
-    using Char = std::optional<char>;
-    using Ref = std::variant<Bool, S8, U8, S16, U16, S32, U32, S64, U64, F32, F64, Char>;
+    //  --------------------------------------------------------------------
 
     template <typename T>
     struct WasmValTrait
@@ -239,9 +225,6 @@ namespace cmcpp
             return f64;
         }
     };
-
-    using WasmVal = std::variant<int32_t, int64_t, float32_t, float64_t>;
-    using WasmRef = std::variant<S32, S64, F32, F64>;
 }
 
 #endif
