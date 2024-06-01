@@ -29,7 +29,7 @@ namespace cmcpp
 
     Val despecialize(const Val &v)
     {
-        switch (type(v))
+        switch (valType(v))
         {
         // case ValType::Tuple:
         // {
@@ -81,9 +81,101 @@ namespace cmcpp
 
     bool isAligned(uint32_t ptr, uint32_t alignment) { return (ptr & (alignment - 1)) == 0; }
 
-    std::shared_ptr<Bool> convert_int_to_bool(uint8_t i)
+    bool convert_int_to_bool(uint8_t i)
     {
-        return std::make_shared<Bool>(i > 0);
+        return i > 0;
+    }
+
+    int alignment(ValType t)
+    {
+        switch (t)
+        {
+        case ValType::Bool:
+        case ValType::S8:
+        case ValType::U8:
+            return 1;
+        case ValType::S16:
+        case ValType::U16:
+            return 2;
+        case ValType::S32:
+        case ValType::U32:
+        case ValType::F32:
+        case ValType::Char:
+            return 4;
+        case ValType::S64:
+        case ValType::U64:
+        case ValType::F64:
+            return 8;
+        case ValType::String:
+        case ValType::List:
+            return 4;
+            // case ValType::Own:
+            // case ValType::Borrow:
+            //     return 4;
+        default:
+            throw std::runtime_error("Invalid type");
+        }
+    }
+
+    int alignment(const Val &_v)
+    {
+        auto v = despecialize(_v);
+        switch (valType(v))
+        {
+        // case ValType::Record:
+        //     return alignment_record(std::dynamic_pointer_cast<Record>(_v)->fields);
+        // case ValType::Variant:
+        //     return alignment_variant(std::dynamic_pointer_cast<Variant>(_v)->cases);
+        // case ValType::Flags:
+        //     return alignment_flags(_v.flags()->labels);
+        default:
+            return alignment(valType(v));
+        }
+    }
+
+    int elem_size(ValType t)
+    {
+        switch (despecialize(t))
+        {
+        case ValType::Bool:
+        case ValType::S8:
+        case ValType::U8:
+            return 1;
+        case ValType::S16:
+        case ValType::U16:
+            return 2;
+        case ValType::S32:
+        case ValType::U32:
+        case ValType::F32:
+        case ValType::Char:
+            return 4;
+        case ValType::S64:
+        case ValType::U64:
+        case ValType::F64:
+            return 8;
+        case ValType::String:
+        case ValType::List:
+            return 8;
+        default:
+            throw std::runtime_error("Invalid type");
+        }
+    }
+
+    int elem_size(const Val &v)
+    {
+        ValType kind = valType(despecialize(v));
+        switch (kind)
+        {
+        // case ValType::Record:
+        //     return elem_size_record(std::dynamic_pointer_cast<Record>(v)->fields);
+        // case ValType::Variant:
+        //     return elem_size_variant(std::dynamic_pointer_cast<Variant>(v)->cases);
+        // case ValType::Flags:
+        //     return elem_size_flags(v.flags()->labels);
+        default:
+            return elem_size(kind);
+        }
+        throw std::runtime_error("Invalid type");
     }
 
     float32_t canonicalize_nan32(float32_t f)
@@ -104,6 +196,18 @@ namespace cmcpp
             assert(std::isnan(f));
         }
         return f;
+    }
+
+    float32_t core_f32_reinterpret_i32(int32_t i);
+    float32_t decode_i32_as_float(int32_t i)
+    {
+        return canonicalize_nan32(core_f32_reinterpret_i32(i));
+    }
+
+    float64_t core_f64_reinterpret_i64(int64_t i);
+    float64_t decode_i64_as_float(int64_t i)
+    {
+        return canonicalize_nan64(core_f64_reinterpret_i64(i));
     }
 
     float32_t core_f32_reinterpret_i32(int32_t i)
@@ -163,6 +267,16 @@ namespace cmcpp
             assert(std::isnan(f));
         }
         return f;
+    }
+
+    uint32_t encode_float_as_i32(float32_t f)
+    {
+        return std::bit_cast<uint32_t>(maybe_scramble_nan32(f));
+    }
+
+    uint64_t encode_float_as_i64(float64_t f)
+    {
+        return std::bit_cast<uint64_t>(maybe_scramble_nan64(f));
     }
 
     std::pair<char8_t *, uint32_t> decode(void *src, uint32_t byte_len, HostEncoding encoding)

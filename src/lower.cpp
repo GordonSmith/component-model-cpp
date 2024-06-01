@@ -6,6 +6,12 @@
 namespace cmcpp
 {
 
+    std::vector<WasmVal> lower_flat_list(const CallContext &cx, list_ptr list)
+    {
+        auto [ptr, length] = store_list_into_range(cx, list);
+        return {(int32_t)ptr, (int32_t)length};
+    }
+
     std::vector<WasmVal> lower_flat_string(const CallContext &cx, const string_ptr &string)
     {
         auto [ptr, packed_length] = store_string_into_range(cx, string);
@@ -42,8 +48,8 @@ namespace cmcpp
             return {char_to_i32(std::get<wchar_t>(v))};
         case ValType::String:
             return lower_flat_string(cx, std::get<string_ptr>(v));
-        // case ValType::List:
-        //     return lower_flat_list(cx, std::dynamic_pointer_cast<List>(v));
+        case ValType::List:
+            return lower_flat_list(cx, std::get<list_ptr>(v));
         // case ValType::Record:
         //     return lower_flat_record(cx, reinterpret_cast<const Record &>(v)->fields);
         // case ValType::Variant:

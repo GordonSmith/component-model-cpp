@@ -11,6 +11,9 @@ namespace cmcpp
     class list_t;
     using list_ptr = std::shared_ptr<list_t>;
 
+    // class field_t;
+    // using field_ptr = std::shared_ptr<field_t>;
+
     //  Vals  ----------------------------------------------------------------
     using Val = std::variant<bool, int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t, int64_t, uint64_t, float32_t, float64_t, wchar_t, string_ptr, list_ptr>;
     bool operator==(const Val &lhs, const Val &rhs);
@@ -21,8 +24,8 @@ namespace cmcpp
         std::string str;
 
     public:
-        const char8_t *ptr;
-        size_t len;
+        const char8_t *ptr = nullptr;
+        size_t len = 0;
 
         string_t();
         string_t(const char8_t *ptr, size_t len);
@@ -41,11 +44,12 @@ namespace cmcpp
     class list_t
     {
     public:
-        ValType lt;
+        Val lt;
         std::vector<Val> vs;
 
         list_t();
-        list_t(const std::vector<Val> vs);
+        list_t(const Val &lt);
+        list_t(const Val &lt, const std::vector<Val> &vs);
         ~list_t() = default;
         bool operator==(const list_t &rhs) const;
     };
@@ -55,35 +59,49 @@ namespace cmcpp
         static ValType type() { return ValType::List; }
     };
 
+    // class Field : public Val
+    // {
+    // public:
+    //     const std::string &label;
+    //     ValType ft;
+    //     std::shared_ptr<Val> v;
+
+    //     Field(const std::string &label, ValType ft);
+    //     Field(const std::string &label, const std::shared_ptr<Val> &v);
+    //     Field(const Field &other);
+    // };
+
+    //  ---------------------------------------------------------------------
+
     ValType valType(const Val &v);
     const char *valTypeName(ValType type);
 
-    //  Refs  ----------------------------------------------------------------
-    using Bool = std::optional<bool>;
-    using S8 = std::optional<int8_t>;
-    using U8 = std::optional<uint8_t>;
-    using S16 = std::optional<int16_t>;
-    using U16 = std::optional<uint16_t>;
-    using S32 = std::optional<int32_t>;
-    using U32 = std::optional<uint32_t>;
-    using S64 = std::optional<int64_t>;
-    using U64 = std::optional<uint64_t>;
-    using F32 = std::optional<float32_t>;
-    using F64 = std::optional<float64_t>;
-    using Char = std::optional<wchar_t>;
-    using String = std::optional<string_ptr>;
-    using List = std::optional<list_ptr>;
+    //  Refs  ---------------------------------------------------------------
+    // using Bool = std::optional<bool>;
+    // using S8 = std::optional<int8_t>;
+    // using U8 = std::optional<uint8_t>;
+    // using S16 = std::optional<int16_t>;
+    // using U16 = std::optional<uint16_t>;
+    // using S32 = std::optional<int32_t>;
+    // using U32 = std::optional<uint32_t>;
+    // using S64 = std::optional<int64_t>;
+    // using U64 = std::optional<uint64_t>;
+    // using F32 = std::optional<float32_t>;
+    // using F64 = std::optional<float64_t>;
+    // using Char = std::optional<wchar_t>;
+    // using String = std::optional<string_t>;
+    // using List = std::optional<list_t>;
 
-    using Ref = std::variant<Bool, S8, U8, S16, U16, S32, U32, S64, U64, F32, F64, Char, String, List>;
-    ValType refType(const Ref &v);
+    // using Ref = std::variant<Bool, S8, U8, S16, U16, S32, U32, S64, U64, F32, F64, Char, String, List>;
+    // ValType refType(const Ref &v);
 
     // WasmVals  ------------------------------------------------------------
 
     using WasmVal = std::variant<int32_t, int64_t, float32_t, float64_t>;
     ValType wasmValType(const WasmVal &v);
 
-    using WasmRef = std::variant<S32, S64, F32, F64>;
-    ValType wasmRefType(const WasmRef &v);
+    // using WasmRef = std::variant<S32, S64, F32, F64>;
+    // ValType wasmRefType(const WasmRef &v);
 
     const char *wasmValTypeName(ValType type);
 }

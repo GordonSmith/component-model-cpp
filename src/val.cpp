@@ -14,7 +14,8 @@ const char *ValTypeNames[] = {
     "float64_t",
     "wchar_t",
     "string_ptr",
-    "unknown1", "unknown2", "unknown3", "unknown4", "unknown5", "unknown6"};
+    "list_ptr",
+    "unknown2", "unknown3", "unknown4", "unknown5", "unknown6"};
 
 namespace cmcpp
 {
@@ -33,13 +34,21 @@ namespace cmcpp
 
     bool string_t::operator==(const string_t &rhs) const
     {
+        if (this == nullptr)
+        {
+            return true;
+        }
         return std::string_view((const char *)ptr, len).compare(std::string_view((const char *)rhs.ptr, rhs.len)) == 0;
     }
 
     list_t::list_t() {}
-    list_t::list_t(const std::vector<Val> vs) : vs(vs) {}
+    list_t::list_t(const Val &lt) : lt(lt) {}
+    list_t::list_t(const Val &lt, const std::vector<Val> &vs) : lt(lt), vs(vs) {}
     bool list_t::operator==(const list_t &rhs) const
     {
+        if (lt != rhs.lt)
+            return false;
+
         if (vs.size() != rhs.vs.size())
             return false;
 
@@ -91,14 +100,14 @@ namespace cmcpp
                           v);
     }
 
-    ValType refType(const Ref &v)
-    {
-        return std::visit([](auto &&arg) -> ValType
-                          {
-            using T = std::decay_t<decltype(arg)>;
-            return ValTrait<T>::type(); },
-                          v);
-    }
+    // ValType refType(const Ref &v)
+    // {
+    //     return std::visit([](auto &&arg) -> ValType
+    //                       {
+    //         using T = std::decay_t<decltype(arg)>;
+    //         return ValTrait<T>::type(); },
+    //                       v);
+    // }
 
     ValType wasmValType(const WasmVal &v)
     {
@@ -109,12 +118,12 @@ namespace cmcpp
                           v);
     }
 
-    ValType wasmRefType(const WasmRef &v)
-    {
-        return std::visit([](auto &&arg) -> ValType
-                          {
-            using T = std::decay_t<decltype(arg)>;
-            return ValTrait<T>::type(); },
-                          v);
-    }
+    // ValType wasmRefType(const WasmRef &v)
+    // {
+    //     return std::visit([](auto &&arg) -> ValType
+    //                       {
+    //         using T = std::decay_t<decltype(arg)>;
+    //         return ValTrait<T>::type(); },
+    //                       v);
+    // }
 }

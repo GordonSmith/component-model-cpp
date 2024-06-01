@@ -52,9 +52,16 @@ namespace cmcpp
         return load_string_from_range(cx, ptr, packed_length);
     }
 
-    Val lift_flat(const CallContext &cx, const CoreValueIter &vi, ValType t)
+    std::shared_ptr<list_t> lift_flat_list(const CallContext &cx, const CoreValueIter &vi, const Val &elem_type)
     {
-        switch (t)
+        auto ptr = vi.next<int32_t>();
+        auto length = vi.next<int32_t>();
+        return load_list_from_range(cx, ptr, length, elem_type);
+    }
+
+    Val lift_flat(const CallContext &cx, const CoreValueIter &vi, const Val &t)
+    {
+        switch (valType(t))
         {
         case ValType::Bool:
             return convert_int_to_bool(vi.next<int32_t>());
@@ -82,8 +89,8 @@ namespace cmcpp
             return convert_i32_to_char(cx, vi.next<int32_t>());
         case ValType::String:
             return lift_flat_string(cx, vi);
-        // case ValType::List:
-        //     return lift_flat_list(cx, vi, std::dynamic_pointer_cast<List>(v)->lt);
+        case ValType::List:
+            return lift_flat_list(cx, vi, std::get<list_ptr>(t)->lt);
         // case ValType::Record:
         //     return lift_flat_record(cx, vi, std::dynamic_pointer_cast<Record>(v)->fields);
         // case ValType::Variant:
@@ -91,7 +98,7 @@ namespace cmcpp
         // case ValType::Flags:
         //     return lift_flat_flags(cx, vi, std::get<Flags>(v)->labels);
         default:
-            throw std::runtime_error(fmt::format("Invalid type:  {}", valTypeName(t)));
+            throw std::runtime_error(fmt::format("Invalid type:  {}", valTypeName(valType(t))));
         }
     }
 

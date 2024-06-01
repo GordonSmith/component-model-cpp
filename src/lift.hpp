@@ -6,7 +6,7 @@
 
 namespace cmcpp
 {
-    Val lift_flat(const CallContext &cx, const CoreValueIter &vi, ValType t);
+    Val lift_flat(const CallContext &cx, const CoreValueIter &vi, const Val &t);
 }
 
 #endif

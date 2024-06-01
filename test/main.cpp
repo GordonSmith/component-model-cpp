@@ -67,15 +67,15 @@ CallContextPtr mk_cx(std::vector<uint8_t> &memory = globalMemory(),
 {
     return createCallContext(memory, realloc, encodeTo, encoding, post_return);
 }
-void test(const Ref &t, std::vector<WasmVal> vals_to_lift, std::optional<Val> v = std::nullopt, std::optional<Ref> lower_t = std::nullopt, std::optional<Val> lower_v = std::nullopt, const CallContextPtr &cx = mk_cx())
+void test(const Val &t, std::vector<WasmVal> vals_to_lift, std::optional<Val> v = std::nullopt, std::optional<Val> lower_t = std::nullopt, std::optional<Val> lower_v = std::nullopt, const CallContextPtr &cx = mk_cx())
 {
     auto vi = CoreValueIter(vals_to_lift);
     if (!v.has_value())
     {
-        CHECK_THROWS(lift_flat(*cx, vi, type(t)));
+        CHECK_THROWS(lift_flat(*cx, vi, t));
     }
 
-    Val got = lift_flat(*cx, vi, refType(t));
+    Val got = lift_flat(*cx, vi, t);
     CHECK(vi.i == vi.values.size());
 
     const char *got_type = valTypeName(valType(got));
@@ -111,13 +111,13 @@ void test(const Ref &t, std::vector<WasmVal> vals_to_lift, std::optional<Val> v 
     CallContextPtr cx2 = createCallContext(heap.memory, realloc, encodeTo, cx->opts->string_encoding);
     auto lowered_vals = lower_flat(*cx2, v.value());
     auto vi2 = CoreValueIter(lowered_vals);
-    got = lift_flat(*cx2, vi2, refType(lower_t.value()));
-    CHECK(valType(got) == refType(lower_t.value()));
+    got = lift_flat(*cx2, vi2, lower_t.value());
+    CHECK(valType(got) == valType(lower_t.value()));
     CHECK(got == lower_v.value());
 }
 
 using WasmValValPair = std::pair<WasmVal, std::optional<Val>>;
-void test_pairs(const Ref &t, std::vector<WasmValValPair> pairs)
+void test_pairs(Val t, std::vector<WasmValValPair> pairs)
 {
     for (auto pair : pairs)
     {
@@ -168,19 +168,19 @@ void testVal(const Val &v, T expected)
 
 TEST_CASE("pairs")
 {
-    test_pairs(Bool(), {{0, false}, {1, true}, {2, true}, {(int32_t)4294967295, true}});
-    test_pairs(U8(), {{127, (uint8_t)127}, {128, (uint8_t)128}, {255, (uint8_t)255}, {256, (uint8_t)0}, {(int32_t)4294967295, (uint8_t)255}, {(int32_t)4294967168, (uint8_t)128}, {(int32_t)4294967167, (uint8_t)127}});
-    test_pairs(S8(), {{127, (int8_t)127}, {128, (int8_t)-128}, {255, (int8_t)-1}, {256, (int8_t)0}, {(int32_t)4294967295, (int8_t)-1}, {(int32_t)4294967168, (int8_t)-128}, {(int32_t)4294967167, (int8_t)127}});
-    test_pairs(U16(), {{32767, (uint16_t)32767}, {32768, (uint16_t)32768}, {65535, (uint16_t)65535}, {65536, (uint16_t)0}, {(1 << 32) - 1, (uint16_t)65535}, {(1 << 32) - 32768, (uint16_t)32768}, {(1 << 32) - 32769, (uint16_t)32767}});
-    test_pairs(S16(), {{32767, (int16_t)32767}, {32768, (int16_t)-32768}, {65535, (int16_t)-1}, {65536, (int16_t)0}, {(1 << 32) - 1, (int16_t)-1}, {(1 << 32) - 32768, (int16_t)-32768}, {(1 << 32) - 32769, (int16_t)32767}});
-    test_pairs(U32(), {{(1 << 31) - 1, (uint32_t)((1 << 31) - 1)}, {1 << 31, (uint32_t)(1 << 31)}, {((1 << 32) - 1), (uint32_t)((1 << 32) - 1)}});
-    test_pairs(S32(), {{(1 << 31) - 1, (1 << 31) - 1}, {1 << 31, -(1 << 31)}, {(1 << 32) - 1, -1}});
-    test_pairs(U64(), {{(int64_t)((1ULL << 63) - 1), (uint64_t)((1ULL << 63) - 1)}, {(int64_t)(1ULL << 63), (uint64_t)(1ULL << 63)}, {(int64_t)((1ULL << 64) - 1), (uint64_t)((1ULL << 64) - 1)}});
-    test_pairs(S64(), {{(int64_t)((1 << 63) - 1), (int64_t)((1 << 63) - 1)}, {(int64_t)(1 << 63), (int64_t) - (1 << 63)}, {(int64_t)((1 << 64) - 1), (int64_t)-1}});
-    test_pairs(F32(), {{(float32_t)3.14, (float32_t)3.14}});
-    test_pairs(F64(), {{3.14, 3.14}});
-    test_pairs(Char(), {{0, L'\x00'}, {65, L'A'}, {0xD7FF, L'\uD7FF'}});
-    test_pairs(Char(), {{0xE000, L'\uE000'}, {0x10FFFF, L'\U0010FFFF'}});
+    test_pairs(bool(), {{0, false}, {1, true}, {2, true}, {(int32_t)4294967295, true}});
+    test_pairs(uint8_t(), {{127, (uint8_t)127}, {128, (uint8_t)128}, {255, (uint8_t)255}, {256, (uint8_t)0}, {(int32_t)4294967295, (uint8_t)255}, {(int32_t)4294967168, (uint8_t)128}, {(int32_t)4294967167, (uint8_t)127}});
+    test_pairs(int8_t(), {{127, (int8_t)127}, {128, (int8_t)-128}, {255, (int8_t)-1}, {256, (int8_t)0}, {(int32_t)4294967295, (int8_t)-1}, {(int32_t)4294967168, (int8_t)-128}, {(int32_t)4294967167, (int8_t)127}});
+    test_pairs(uint16_t(), {{32767, (uint16_t)32767}, {32768, (uint16_t)32768}, {65535, (uint16_t)65535}, {65536, (uint16_t)0}, {(1 << 32) - 1, (uint16_t)65535}, {(1 << 32) - 32768, (uint16_t)32768}, {(1 << 32) - 32769, (uint16_t)32767}});
+    test_pairs(int16_t(), {{32767, (int16_t)32767}, {32768, (int16_t)-32768}, {65535, (int16_t)-1}, {65536, (int16_t)0}, {(1 << 32) - 1, (int16_t)-1}, {(1 << 32) - 32768, (int16_t)-32768}, {(1 << 32) - 32769, (int16_t)32767}});
+    test_pairs(uint32_t(), {{(1 << 31) - 1, (uint32_t)((1 << 31) - 1)}, {1 << 31, (uint32_t)(1 << 31)}, {((1 << 32) - 1), (uint32_t)((1 << 32) - 1)}});
+    test_pairs(int32_t(), {{(1 << 31) - 1, (1 << 31) - 1}, {1 << 31, -(1 << 31)}, {(1 << 32) - 1, -1}});
+    test_pairs(uint64_t(), {{(int64_t)((1ULL << 63) - 1), (uint64_t)((1ULL << 63) - 1)}, {(int64_t)(1ULL << 63), (uint64_t)(1ULL << 63)}, {(int64_t)((1ULL << 64) - 1), (uint64_t)((1ULL << 64) - 1)}});
+    test_pairs(int64_t(), {{(int64_t)((1 << 63) - 1), (int64_t)((1 << 63) - 1)}, {(int64_t)(1 << 63), (int64_t) - (1 << 63)}, {(int64_t)((1 << 64) - 1), (int64_t)-1}});
+    test_pairs(float32_t(), {{(float32_t)3.14, (float32_t)3.14}});
+    test_pairs(float64_t(), {{3.14, 3.14}});
+    test_pairs(wchar_t(), {{0, L'\x00'}, {65, L'A'}, {0xD7FF, L'\uD7FF'}});
+    test_pairs(wchar_t(), {{0xE000, L'\uE000'}, {0x10FFFF, L'\U0010FFFF'}});
 
     // test_pairs(Enum([ 'a', 'b' ]), {{0, {'a' : None}}, {1, {'b' : None}}, {2, None}});
 }
@@ -192,10 +192,10 @@ void test_string_internal(HostEncoding host_encoding, GuestEncoding guest_encodi
 
     auto cx = mk_cx(heap.memory, host_encoding);
 
-    test(String(), {0, (int32_t)guestS.length()}, std::make_shared<string_t>(expected), std::nullopt, std::nullopt, cx);
+    test(string_ptr(), {0, (int32_t)guestS.length()}, std::make_shared<string_t>(expected), std::nullopt, std::nullopt, cx);
 }
 
-TEST_CASE("Strings")
+TEST_CASE("String")
 {
     std::vector<HostEncoding> host_encodings = {HostEncoding::Utf8}; //, HostEncoding::Utf16, HostEncoding::Latin1_Utf16};
     std::vector<std::string> fun_strings = {"", "a", "hi", "\x00", "a\x00b", "\x80", "\x80b", "ab\xefc", "\u01ffy", "xy\u01ff", "a\ud7ffb", "a\u02ff\u03ff\u04ffbc", "\uf123", "\uf123\uf123abc", "abcdef\uf123"};
@@ -206,4 +206,56 @@ TEST_CASE("Strings")
             test_string_internal(h_enc, GuestEncoding::Utf8, s, s);
         }
     }
+}
+
+void test_heap(Val t, Val expected, std::vector<WasmVal> vals_to_lift, const std::vector<uint8_t> byte_array)
+{
+    Heap heap(byte_array.size());
+    memcpy(heap.memory.data(), byte_array.data(), byte_array.size());
+
+    auto cx = mk_cx(heap.memory);
+    test(t, vals_to_lift, expected, std::nullopt, std::nullopt, cx);
+}
+
+TEST_CASE("List")
+{
+    // test_heap(List(Bool()), [True,False,True], [0,3], [1,0,1])
+    // test_heap(List(Bool()), [True,False,True], [0,3], [1,0,2])
+    // test_heap(List(Bool()), [True,False,True], [3,3], [0xff,0xff,0xff, 1,0,1])
+    // test_heap(List(U8()), [1,2,3], [0,3], [1,2,3])
+    // test_heap(List(U16()), [1,2,3], [0,3], [1,0, 2,0, 3,0 ])
+    // test_heap(List(U16()), None, [1,3], [0, 1,0, 2,0, 3,0 ])
+    // test_heap(List(U32()), [1,2,3], [0,3], [1,0,0,0, 2,0,0,0, 3,0,0,0])
+    // test_heap(List(U64()), [1,2], [0,2], [1,0,0,0,0,0,0,0, 2,0,0,0,0,0,0,0])
+    // test_heap(List(S8()), [-1,-2,-3], [0,3], [0xff,0xfe,0xfd])
+    // test_heap(List(S16()), [-1,-2,-3], [0,3], [0xff,0xff, 0xfe,0xff, 0xfd,0xff])
+    // test_heap(List(S32()), [-1,-2,-3], [0,3], [0xff,0xff,0xff,0xff, 0xfe,0xff,0xff,0xff, 0xfd,0xff,0xff,0xff])
+    // test_heap(List(S64()), [-1,-2], [0,2], [0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff, 0xfe,0xff,0xff,0xff,0xff,0xff,0xff,0xff])
+    // test_heap(List(Char()), ['A','B','c'], [0,3], [65,00,00,00, 66,00,00,00, 99,00,00,00])
+    // test_heap(List(String()), [mk_str("hi"),mk_str("wat")], [0,2],[16,0,0,0, 2,0,0,0, 21,0,0,0, 3,0,0,0, ord('h'), ord('i'),   0xf,0xf,0xf,   ord('w'), ord('a'), ord('t')])
+    // test_heap(List(List(U8())), [[3,4,5],[],[6,7]], [0,3], [24,0,0,0, 3,0,0,0, 0,0,0,0, 0,0,0,0, 27,0,0,0, 2,0,0,0, 3,4,5,  6,7])
+    // test_heap(List(List(U16())), [[5,6]], [0,1], [8,0,0,0, 2,0,0,0, 5,0, 6,0])
+    // test_heap(List(List(U16())), None, [0,1], [9,0,0,0, 2,0,0,0, 0, 5,0, 6,0])
+    // test_heap(List(Tuple([U8(),U8(),U16(),U32()])), [mk_tup(6,7,8,9),mk_tup(4,5,6,7)], [0,2],
+    //           [6, 7, 8,0, 9,0,0,0,   4, 5, 6,0, 7,0,0,0])
+    // test_heap(List(Tuple([U8(),U16(),U8(),U32()])), [mk_tup(6,7,8,9),mk_tup(4,5,6,7)], [0,2],
+    //           [6,0xff, 7,0, 8,0xff,0xff,0xff, 9,0,0,0,   4,0xff, 5,0, 6,0xff,0xff,0xff, 7,0,0,0])
+    // test_heap(List(Tuple([U16(),U8()])), [mk_tup(6,7),mk_tup(8,9)], [0,2],
+    //           [6,0, 7, 0x0ff, 8,0, 9, 0xff])
+    // test_heap(List(Tuple([Tuple([U16(),U8()]),U8()])), [mk_tup([4,5],6),mk_tup([7,8],9)], [0,2],
+    //           [4,0, 5,0xff, 6,0xff,  7,0, 8,0xff, 9,0xff])
+
+    test_heap(std::make_shared<list_t>(bool()), std::make_shared<list_t>(bool(), std::vector<Val>{true, false, true}), {0, 3}, {1, 0, 1});
+    test_heap(std::make_shared<list_t>(bool()), std::make_shared<list_t>(bool(), std::vector<Val>{true, false, true}), {0, 3}, {1, 0, 2});
+    test_heap(std::make_shared<list_t>(bool()), std::make_shared<list_t>(bool(), std::vector<Val>{true, false, true}), {3, 3}, {0xff, 0xff, 0xff, 1, 0, 1});
+    test_heap(std::make_shared<list_t>(uint8_t()), std::make_shared<list_t>(uint8_t(), std::vector<Val>{(uint8_t)1, (uint8_t)2, (uint8_t)3}), {0, 3}, {1, 2, 3});
+    test_heap(std::make_shared<list_t>(uint16_t()), std::make_shared<list_t>(uint16_t(), std::vector<Val>{(uint16_t)1, (uint16_t)2, (uint16_t)3}), {0, 3}, {1, 0, 2, 0, 3, 0});
+    test_heap(std::make_shared<list_t>(uint32_t()), std::make_shared<list_t>(uint32_t(), std::vector<Val>{(uint32_t)1, (uint32_t)2, (uint32_t)3}), {0, 3}, {1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0});
+    test_heap(std::make_shared<list_t>(uint64_t()), std::make_shared<list_t>(uint64_t(), std::vector<Val>{(uint64_t)1, (uint64_t)2}), {0, 2}, {1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0});
+    test_heap(std::make_shared<list_t>(int8_t()), std::make_shared<list_t>(int8_t(), std::vector<Val>{(int8_t)-1, (int8_t)-2, (int8_t)-3}), {0, 3}, {0xff, 0xfe, 0xfd});
+    test_heap(std::make_shared<list_t>(int16_t()), std::make_shared<list_t>(int16_t(), std::vector<Val>{(int16_t)-1, (int16_t)-2, (int16_t)-3}), {0, 3}, {0xff, 0xff, 0xfe, 0xff, 0xfd, 0xff});
+    test_heap(std::make_shared<list_t>(int32_t()), std::make_shared<list_t>(int32_t(), std::vector<Val>{(int32_t)-1, (int32_t)-2, (int32_t)-3}), {0, 3}, {0xff, 0xff, 0xff, 0xff, 0xfe, 0xff, 0xff, 0xff, 0xfd, 0xff, 0xff, 0xff});
+    test_heap(std::make_shared<list_t>(int64_t()), std::make_shared<list_t>(int64_t(), std::vector<Val>{(int64_t)-1, (int64_t)-2}), {0, 2}, {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff});
+    test_heap(std::make_shared<list_t>(wchar_t()), std::make_shared<list_t>(wchar_t(), std::vector<Val>{L'A', L'B', L'c'}), {0, 3}, {65, 0, 0, 0, 66, 0, 0, 0, 99, 0, 0, 0});
+    test_heap(std::make_shared<list_t>(string_ptr()), std::make_shared<list_t>(string_ptr(), std::vector<Val>{std::make_shared<string_t>("hi"), std::make_shared<string_t>("wat")}), {0, 2}, {16, 0, 0, 0, 2, 0, 0, 0, 21, 0, 0, 0, 3, 0, 0, 0, 'h', 'i', 0xf, 0xf, 0xf, 'w', 'a', 't'});
 }
