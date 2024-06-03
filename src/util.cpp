@@ -8,6 +8,8 @@
 #include <limits>
 #include <codecvt>
 
+#include <fmt/core.h>
+
 namespace cmcpp
 {
 
@@ -31,31 +33,32 @@ namespace cmcpp
     {
         switch (valType(v))
         {
-        // case ValType::Tuple:
-        // {
-        //     auto r = std::make_shared<Record>();
-        //     for (size_t i = 0; i < reinterpret_cast<const Tuple &>(v).vs.size(); ++i)
-        //     {
-        //         auto f = std::make_shared<Field>(fmt::format("{}", i), despecialize(v->t));
-        //         f->v = reinterpret_cast<const Tuple &>(v).vs[i];
-        //         r->fields.push_back(f);
-        //     }
-        //     return r;
-        // }
-        // case ValType::Enum:
-        // {
-        //     std::vector<std::shared_ptr<Case>> cases;
-        //     for (const auto &label : reinterpret_cast<const Enum &>(v).labels)
-        //     {
-        //         auto c = std::make_shared<Case>(label);
-        //         cases.push_back(c);
-        //     }
-        //     return std::make_shared<Variant>(cases);
-        // }
-        // case ValType::Option:
-        //     return std::make_shared<Variant>(std::vector<std::shared_ptr<Case>>({std::make_shared<Case>("None"), std::make_shared<Case>("Some", std::dynamic_pointer_cast<Option>(v)->v)}));
-        // case ValType::Result:
-        //     return std::make_shared<Variant>(std::vector<std::shared_ptr<Case>>({std::make_shared<Case>("Ok", std::dynamic_pointer_cast<Result>(v)->ok), std::make_shared<Case>("Error", std::dynamic_pointer_cast<Result>(v)->error)}));
+        case ValType::Tuple:
+        {
+            auto r = std::make_shared<record_t>();
+            auto vars = std::get<tuple_ptr>(v)->vs;
+            for (size_t i = 0; i < vars.size(); ++i)
+            {
+                auto var = vars[i];
+                auto f = std::make_shared<field_t>(fmt::format("{}", i), despecialize(var));
+                r->fields.push_back(f);
+            }
+            return r;
+        }
+        case ValType::Enum:
+        {
+            std::vector<case_ptr> cases;
+            for (auto label : std::get<enum_ptr>(v)->labels)
+            {
+                auto c = std::make_shared<case_t>(label);
+                cases.push_back(c);
+            }
+            return std::make_shared<variant_t>(cases);
+        }
+        case ValType::Option:
+            return std::make_shared<variant_t>(std::vector<case_ptr>({std::make_shared<case_t>("None"), std::make_shared<case_t>("Some", std::get<option_ptr>(v)->v)}));
+        case ValType::Result:
+            return std::make_shared<variant_t>(std::vector<case_ptr>({std::make_shared<case_t>("Ok", std::get<result_ptr>(v)->ok), std::make_shared<case_t>("Error", std::get<result_ptr>(v)->error)}));
         default:
             return v;
         }
@@ -74,6 +77,27 @@ namespace cmcpp
         return static_cast<uint32_t>(i);
     }
 
+    ValType discriminant_type(const std::vector<case_ptr> &cases)
+    {
+        size_t n = cases.size();
+
+        assert(0 < n && n < std::numeric_limits<unsigned int>::max());
+        int match = std::ceil(std::log2(n) / 8);
+        switch (match)
+        {
+        case 0:
+            return ValType::U8;
+        case 1:
+            return ValType::U8;
+        case 2:
+            return ValType::U16;
+        case 3:
+            return ValType::U32;
+        default:
+            throw std::runtime_error("Invalid match value");
+        }
+    }
+
     uint32_t align_to(uint32_t ptr, uint32_t alignment)
     {
         return (ptr + alignment - 1) & ~(alignment - 1);
@@ -84,6 +108,44 @@ namespace cmcpp
     bool convert_int_to_bool(uint8_t i)
     {
         return i > 0;
+    }
+
+    int alignment_record(const std::vector<field_ptr> &fields)
+    {
+        int a = 1;
+        for (auto f : fields)
+        {
+            a = std::max(a, alignment(f->v));
+        }
+        return a;
+    }
+
+    int max_case_alignment(const std::vector<case_ptr> &cases)
+    {
+        int a = 1;
+        for (auto c : cases)
+        {
+            if (c->v.has_value())
+            {
+                a = std::max(a, alignment(c->v.value()));
+            }
+        }
+        return a;
+    }
+
+    int alignment_variant(const std::vector<case_ptr> &cases)
+    {
+        return std::max(alignment(discriminant_type(cases)), max_case_alignment(cases));
+    }
+
+    int alignment_flags(const std::vector<std::string> &labels)
+    {
+        int n = labels.size();
+        if (n <= 8)
+            return 1;
+        if (n <= 16)
+            return 2;
+        return 4;
     }
 
     int alignment(ValType t)
@@ -117,19 +179,19 @@ namespace cmcpp
         }
     }
 
-    int alignment(const Val &_v)
+    int alignment(const Val &_t)
     {
-        auto v = despecialize(_v);
-        switch (valType(v))
+        auto t = despecialize(_t);
+        switch (valType(t))
         {
-        // case ValType::Record:
-        //     return alignment_record(std::dynamic_pointer_cast<Record>(_v)->fields);
-        // case ValType::Variant:
-        //     return alignment_variant(std::dynamic_pointer_cast<Variant>(_v)->cases);
-        // case ValType::Flags:
-        //     return alignment_flags(_v.flags()->labels);
+        case ValType::Record:
+            return alignment_record(std::get<record_ptr>(t)->fields);
+        case ValType::Variant:
+            return alignment_variant(std::get<variant_ptr>(t)->cases);
+        case ValType::Flags:
+            return alignment_flags(std::get<flags_ptr>(t)->labels);
         default:
-            return alignment(valType(v));
+            return alignment(valType(t));
         }
     }
 
@@ -161,17 +223,62 @@ namespace cmcpp
         }
     }
 
-    int elem_size(const Val &v)
+    int elem_size_record(const std::vector<field_ptr> &fields)
     {
-        ValType kind = valType(despecialize(v));
+        int s = 0;
+        for (auto f : fields)
+        {
+            s = align_to(s, alignment(f->v));
+            s += elem_size(f->v);
+        }
+        assert(s > 0);
+        return align_to(s, alignment_record(fields));
+    }
+
+    int elem_size_variant(const std::vector<case_ptr> &cases)
+    {
+        int s = elem_size(discriminant_type(cases));
+        s = align_to(s, max_case_alignment(cases));
+        int cs = 0;
+        for (auto c : cases)
+        {
+            if (c->v.has_value())
+            {
+                cs = std::max(cs, elem_size(c->v.value()));
+            }
+        }
+        s += cs;
+        return align_to(s, alignment_variant(cases));
+    }
+
+    int num_i32_flags(const std::vector<std::string> &labels)
+    {
+        return std::ceil(static_cast<double>(labels.size()) / 32);
+    }
+
+    int elem_size_flags(const std::vector<std::string> &labels)
+    {
+        int n = labels.size();
+        assert(n > 0);
+        if (n <= 8)
+            return 1;
+        if (n <= 16)
+            return 2;
+        return 4 * num_i32_flags(labels);
+    }
+
+    int elem_size(const Val &_t)
+    {
+        auto t = despecialize(_t);
+        ValType kind = valType(t);
         switch (kind)
         {
-        // case ValType::Record:
-        //     return elem_size_record(std::dynamic_pointer_cast<Record>(v)->fields);
-        // case ValType::Variant:
-        //     return elem_size_variant(std::dynamic_pointer_cast<Variant>(v)->cases);
-        // case ValType::Flags:
-        //     return elem_size_flags(v.flags()->labels);
+        case ValType::Record:
+            return elem_size_record(std::get<record_ptr>(t)->fields);
+        case ValType::Variant:
+            return elem_size_variant(std::get<variant_ptr>(t)->cases);
+        case ValType::Flags:
+            return elem_size_flags(std::get<flags_ptr>(t)->labels);
         default:
             return elem_size(kind);
         }
@@ -222,6 +329,20 @@ namespace cmcpp
         double d;
         std::memcpy(&d, &i, sizeof d);
         return d;
+    }
+
+    int find_case(const std::string &label, const std::vector<case_ptr> &cases)
+    {
+        auto it = std::find_if(cases.begin(), cases.end(),
+                               [&label](auto c)
+                               { return c->label == label; });
+
+        if (it != cases.end())
+        {
+            return std::distance(cases.begin(), it);
+        }
+
+        return -1;
     }
 
     int32_t char_to_i32(wchar_t c) { return static_cast<uint32_t>(c); }
@@ -279,6 +400,45 @@ namespace cmcpp
         return std::bit_cast<uint64_t>(maybe_scramble_nan64(f));
     }
 
+    std::vector<std::string> split(const std::string &input, char delimiter)
+    {
+        std::vector<std::string> result;
+        std::string token;
+        std::istringstream stream(input);
+
+        while (std::getline(stream, token, delimiter))
+        {
+            result.push_back(token);
+        }
+
+        return result;
+    }
+
+    std::pair<int, case_ptr> match_case(const variant_ptr &v, const std::vector<case_ptr> &cases)
+    {
+        assert(v->cases.size() == 1);
+        auto key = v->cases[0]->label;
+        auto value = v->cases[0];
+        for (auto label : split(key, '|'))
+        {
+            auto case_index = find_case(label, v->cases);
+            if (case_index != -1)
+            {
+                return {case_index, value};
+            }
+        }
+        throw std::runtime_error("Case not found");
+    }
+
+    std::string join(const std::string &a, const std::string &b)
+    {
+        if (a == b)
+            return a;
+        if ((a == "i32" && b == "f32") || (a == "f32" && b == "i32"))
+            return "i32";
+        return "i64";
+    }
+
     std::pair<char8_t *, uint32_t> decode(void *src, uint32_t byte_len, HostEncoding encoding)
     {
         switch (encoding)
@@ -312,7 +472,7 @@ namespace cmcpp
 
     CoreValueIter::CoreValueIter(const std::vector<WasmVal> &values) : values(values) {}
 
-    void CoreValueIter::skip()
+    void CoreValueIter::skip() const
     {
         ++i;
     }

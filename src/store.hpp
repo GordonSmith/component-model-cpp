@@ -6,8 +6,8 @@
 
 namespace cmcpp
 {
-    void store(const CallContext &cx, const Val &v, uint32_t ptr);
-    std::pair<uint32_t, uint32_t> store_list_into_range(const CallContext &cx, const list_ptr &list);
+    void store(const CallContext &cx, const Val &v, const Val &t, uint32_t ptr);
+    std::pair<uint32_t, uint32_t> store_list_into_range(const CallContext &cx, const list_ptr &v, const Val &elem_type);
     std::pair<uint32_t, uint32_t> store_string_into_range(const CallContext &cx, const string_ptr &v, HostEncoding src_encoding = HostEncoding::Utf8);
 }
 #endif

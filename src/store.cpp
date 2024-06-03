@@ -238,16 +238,16 @@ namespace cmcpp
         store_int(cx, tagged_code_units, ptr + 4, 4);
     }
 
-    std::pair<uint32_t, uint32_t> store_list_into_range(const CallContext &cx, const list_ptr &list)
+    std::pair<uint32_t, uint32_t> store_list_into_range(const CallContext &cx, const list_ptr &v, const Val &elem_type)
     {
-        size_t nbytes = elem_size(list->lt);
-        auto byte_length = list->vs.size() * nbytes;
+        size_t nbytes = elem_size(elem_type);
+        auto byte_length = v->vs.size() * nbytes;
         if (byte_length >= std::numeric_limits<uint32_t>::max())
         {
             throw std::runtime_error("byte_length exceeds limit");
         }
-        uint32_t ptr = cx.opts->realloc(0, 0, alignment(list->lt), byte_length);
-        if (ptr != align_to(ptr, alignment(list->lt)))
+        uint32_t ptr = cx.opts->realloc(0, 0, alignment(elem_type), byte_length);
+        if (ptr != align_to(ptr, alignment(elem_type)))
         {
             throw std::runtime_error("ptr not aligned");
         }
@@ -255,16 +255,16 @@ namespace cmcpp
         {
             throw std::runtime_error("memory overflow");
         }
-        for (size_t i = 0; i < list->vs.size(); ++i)
+        for (size_t i = 0; i < v->vs.size(); ++i)
         {
-            store(cx, list->vs[i], ptr + i * nbytes);
+            store(cx, v->vs[i], elem_type, ptr + i * nbytes);
         }
-        return {ptr, list->vs.size()};
+        return {ptr, v->vs.size()};
     }
 
-    void store_list(const CallContext &cx, const list_ptr &list, uint32_t ptr)
+    void store_list(const CallContext &cx, const list_ptr &list, uint32_t ptr, const Val &elem_type)
     {
-        auto [begin, length] = store_list_into_range(cx, list);
+        auto [begin, length] = store_list_into_range(cx, list, elem_type);
         store_int(cx, begin, ptr, 4);
         store_int(cx, length, ptr + 4, 4);
     }
@@ -293,7 +293,7 @@ namespace cmcpp
     //     }
     // }
 
-    void store(const CallContext &cx, const Val &v, uint32_t ptr)
+    void store(const CallContext &cx, const Val &v, const Val &t, uint32_t ptr)
     {
         assert(ptr == align_to(ptr, alignment(valType(v))));
         assert(ptr + elem_size(v) <= cx.opts->memory.size());
@@ -339,7 +339,7 @@ namespace cmcpp
             store_string(cx, std::get<string_ptr>(v), ptr);
             break;
         case ValType::List:
-            store_list(cx, std::get<list_ptr>(v), ptr);
+            store_list(cx, std::get<list_ptr>(v), ptr, std::get<list_ptr>(t)->lt);
             break;
         // case ValType::Record:
         //     store_record(cx, std::get<Record>(v), ptr);

@@ -5,18 +5,16 @@
 
 namespace cmcpp
 {
-    class string_t;
-    using string_ptr = std::shared_ptr<string_t>;
-
-    class list_t;
-    using list_ptr = std::shared_ptr<list_t>;
-
-    // class field_t;
-    // using field_ptr = std::shared_ptr<field_t>;
 
     //  Vals  ----------------------------------------------------------------
-    using Val = std::variant<bool, int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t, int64_t, uint64_t, float32_t, float64_t, wchar_t, string_ptr, list_ptr>;
+
+    using Val = std::variant<bool, int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t, int64_t, uint64_t, float32_t, float64_t, wchar_t, string_ptr, list_ptr, field_ptr, record_ptr, tuple_ptr, case_ptr, variant_ptr, enum_ptr, option_ptr, result_ptr, flags_ptr>;
+
+    ValType valType(const Val &v);
+    const char *valTypeName(ValType type);
     bool operator==(const Val &lhs, const Val &rhs);
+
+    //  ----------------------------------------------------------------------
 
     class string_t
     {
@@ -35,11 +33,6 @@ namespace cmcpp
 
         std::string to_string() const;
     };
-    template <>
-    struct ValTrait<string_ptr>
-    {
-        static ValType type() { return ValType::String; }
-    };
 
     class list_t
     {
@@ -53,55 +46,116 @@ namespace cmcpp
         ~list_t() = default;
         bool operator==(const list_t &rhs) const;
     };
-    template <>
-    struct ValTrait<list_ptr>
+
+    class field_t
     {
-        static ValType type() { return ValType::List; }
+    public:
+        std::string label;
+        Val v;
+
+        field_t();
+        field_t(const std::string &label, const Val &v);
+        ~field_t() = default;
+        bool operator==(const field_t &rhs) const;
     };
 
-    // class Field : public Val
-    // {
-    // public:
-    //     const std::string &label;
-    //     ValType ft;
-    //     std::shared_ptr<Val> v;
+    class record_t
+    {
+    public:
+        std::vector<field_ptr> fields;
 
-    //     Field(const std::string &label, ValType ft);
-    //     Field(const std::string &label, const std::shared_ptr<Val> &v);
-    //     Field(const Field &other);
-    // };
+        record_t();
+        record_t(const std::vector<field_ptr> &fields);
+        ~record_t() = default;
+        bool operator==(const record_t &rhs) const;
 
-    //  ---------------------------------------------------------------------
+        Val find(const std::string &label) const;
+    };
 
-    ValType valType(const Val &v);
-    const char *valTypeName(ValType type);
+    class tuple_t
+    {
+    public:
+        std::vector<Val> vs;
 
-    //  Refs  ---------------------------------------------------------------
-    // using Bool = std::optional<bool>;
-    // using S8 = std::optional<int8_t>;
-    // using U8 = std::optional<uint8_t>;
-    // using S16 = std::optional<int16_t>;
-    // using U16 = std::optional<uint16_t>;
-    // using S32 = std::optional<int32_t>;
-    // using U32 = std::optional<uint32_t>;
-    // using S64 = std::optional<int64_t>;
-    // using U64 = std::optional<uint64_t>;
-    // using F32 = std::optional<float32_t>;
-    // using F64 = std::optional<float64_t>;
-    // using Char = std::optional<wchar_t>;
-    // using String = std::optional<string_t>;
-    // using List = std::optional<list_t>;
+        tuple_t();
+        tuple_t(const std::vector<Val> &vs);
+        ~tuple_t() = default;
+        bool operator==(const tuple_t &rhs) const;
+    };
 
-    // using Ref = std::variant<Bool, S8, U8, S16, U16, S32, U32, S64, U64, F32, F64, Char, String, List>;
-    // ValType refType(const Ref &v);
+    class case_t
+    {
+    public:
+        std::string label;
+        std::optional<Val> v;
+        std::optional<std::string> refines = std::nullopt;
+
+        case_t();
+        case_t(const std::string &label, const std::optional<Val> &v = std::nullopt, const std::optional<std::string> &refines = std::nullopt);
+        ~case_t() = default;
+        bool operator==(const case_t &rhs) const;
+    };
+
+    class variant_t
+    {
+    public:
+        std::vector<case_ptr> cases;
+
+        variant_t();
+        variant_t(const std::vector<case_ptr> &cases);
+        ~variant_t() = default;
+        bool operator==(const variant_t &rhs) const;
+    };
+
+    class enum_t
+    {
+    public:
+        std::vector<std::string> labels;
+
+        enum_t();
+        enum_t(const std::vector<std::string> &labels);
+        ~enum_t() = default;
+        bool operator==(const enum_t &rhs) const;
+    };
+
+    class option_t
+    {
+    public:
+        Val v;
+
+        option_t();
+        option_t(const Val &v);
+        ~option_t() = default;
+        bool operator==(const option_t &rhs) const;
+    };
+
+    class result_t
+    {
+    public:
+        Val ok;
+        Val error;
+
+        result_t();
+        result_t(const Val &ok, const Val &error);
+        ~result_t() = default;
+        bool operator==(const result_t &rhs) const;
+    };
+
+    class flags_t
+    {
+    public:
+        std::vector<std::string> labels;
+
+        flags_t();
+        flags_t(const std::vector<std::string> &labels);
+        ~flags_t() = default;
+        bool operator==(const flags_t &rhs) const;
+    };
 
     // WasmVals  ------------------------------------------------------------
 
     using WasmVal = std::variant<int32_t, int64_t, float32_t, float64_t>;
     ValType wasmValType(const WasmVal &v);
-
-    // using WasmRef = std::variant<S32, S64, F32, F64>;
-    // ValType wasmRefType(const WasmRef &v);
 
     const char *wasmValTypeName(ValType type);
 }

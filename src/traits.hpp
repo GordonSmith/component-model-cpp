@@ -158,21 +158,100 @@ namespace cmcpp
         }
     };
 
+    class string_t;
+    using string_ptr = std::shared_ptr<string_t>;
+    template <>
+    struct ValTrait<string_ptr>
+    {
+        static ValType type() { return ValType::String; }
+    };
+
+    class list_t;
+    using list_ptr = std::shared_ptr<list_t>;
+    template <>
+    struct ValTrait<list_ptr>
+    {
+        static ValType type() { return ValType::List; }
+    };
+
+    class field_t;
+    using field_ptr = std::shared_ptr<field_t>;
+    template <>
+    struct ValTrait<field_ptr>
+    {
+        static ValType type() { return ValType::Field; }
+    };
+
+    class record_t;
+    using record_ptr = std::shared_ptr<record_t>;
+    template <>
+    struct ValTrait<record_ptr>
+    {
+        static ValType type() { return ValType::Record; }
+    };
+
+    class tuple_t;
+    using tuple_ptr = std::shared_ptr<tuple_t>;
+    template <>
+    struct ValTrait<tuple_ptr>
+    {
+        static ValType type() { return ValType::Tuple; }
+    };
+
+    class case_t;
+    using case_ptr = std::shared_ptr<case_t>;
+    template <>
+    struct ValTrait<case_ptr>
+    {
+        static ValType type() { return ValType::Case; }
+    };
+
+    class variant_t;
+    using variant_ptr = std::shared_ptr<variant_t>;
+    template <>
+    struct ValTrait<variant_ptr>
+    {
+        static ValType type() { return ValType::Variant; }
+    };
+
+    class enum_t;
+    using enum_ptr = std::shared_ptr<enum_t>;
+    template <>
+    struct ValTrait<enum_ptr>
+    {
+        static ValType type() { return ValType::Enum; }
+    };
+
+    class option_t;
+    using option_ptr = std::shared_ptr<option_t>;
+    template <>
+    struct ValTrait<option_ptr>
+    {
+        static ValType type() { return ValType::Option; }
+    };
+
+    class result_t;
+    using result_ptr = std::shared_ptr<result_t>;
+    template <>
+    struct ValTrait<result_ptr>
+    {
+        static ValType type() { return ValType::Result; }
+    };
+
+    class flags_t;
+    using flags_ptr = std::shared_ptr<flags_t>;
+    template <>
+    struct ValTrait<flags_ptr>
+    {
+        static ValType type() { return ValType::Flags; }
+    };
+
+    //  --------------------------------------------------------------------
     template <typename T>
     ValType type(const T &v)
     {
         return ValTrait<T>::type();
     }
-
-    // Optionals
-    template <typename T>
-    struct ValTrait<std::optional<T>>
-    {
-        static ValType type()
-        {
-            return ValTrait<T>::type();
-        }
-    };
 
     //  --------------------------------------------------------------------
 

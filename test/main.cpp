@@ -109,11 +109,58 @@ void test(const Val &t, std::vector<WasmVal> vals_to_lift, std::optional<Val> v 
         return reinterpret_cast<std::intptr_t>(retVal);
     };
     CallContextPtr cx2 = createCallContext(heap.memory, realloc, encodeTo, cx->opts->string_encoding);
-    auto lowered_vals = lower_flat(*cx2, v.value());
+    auto lowered_vals = lower_flat(*cx2, v.value(), t);
     auto vi2 = CoreValueIter(lowered_vals);
     got = lift_flat(*cx2, vi2, lower_t.value());
-    CHECK(valType(got) == valType(lower_t.value()));
+    CHECK(valType(got) == valType(lower_v.value()));
     CHECK(got == lower_v.value());
+}
+
+TEST_CASE("Record")
+{
+    auto rt = std::make_shared<record_t>(std::vector<field_ptr>{std::make_shared<field_t>("x", uint8_t()), std::make_shared<field_t>("y", uint16_t()), std::make_shared<field_t>("z", uint32_t())});
+    auto r = std::make_shared<record_t>(std::vector<field_ptr>{std::make_shared<field_t>("x", (uint8_t)1), std::make_shared<field_t>("y", (uint16_t)2), std::make_shared<field_t>("z", (uint32_t)3)});
+    test(rt, {1, 2, 3}, r);
+}
+
+TEST_CASE("Tuple")
+{
+    auto tt = std::make_shared<tuple_t>(std::vector<Val>{std::make_shared<tuple_t>(std::vector<Val>{uint8_t(), uint8_t()}),
+                                                         uint8_t()});
+
+    auto r = std::make_shared<record_t>(std::vector<field_ptr>{std::make_shared<field_t>("0", std::make_shared<record_t>(std::vector<field_ptr>{
+                                                                                                  std::make_shared<field_t>("0", (uint8_t)1),
+                                                                                                  std::make_shared<field_t>("1", (uint8_t)2)})),
+                                                               std::make_shared<field_t>("1", (uint8_t)3)});
+    test(tt, {1, 2, 3}, r);
+}
+
+TEST_CASE("Flags")
+{
+    auto f = std::make_shared<flags_t>(std::vector<std::string>{"a", "b"});
+    test(f, {0}, std::make_shared<flags_t>(std::vector<std::string>{}));
+    test(f, {1}, std::make_shared<flags_t>(std::vector<std::string>{"a"}));
+    test(f, {2}, std::make_shared<flags_t>(std::vector<std::string>{"b"}));
+    test(f, {3}, std::make_shared<flags_t>(std::vector<std::string>{"a", "b"}));
+    test(f, {4}, std::make_shared<flags_t>(std::vector<std::string>{}));
+
+    std::vector<std::string> strVec(33);
+    std::vector<std::string> strVec2(33);
+    for (int i = 0; i < 33; i++)
+    {
+        strVec[i] = std::to_string(i + 1);
+        strVec2[i] = std::to_string(i + 1);
+    }
+    test(std::make_shared<flags_t>(strVec), {(int32_t)0xffffffff, (int32_t)0x0}, std::make_shared<flags_t>(strVec2));
+}
+
+TEST_CASE("Variant")
+{
+    auto t = std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("x", uint8_t()), std::make_shared<case_t>("y", float64_t()), std::make_shared<case_t>("z", bool())});
+    // test(t, {0, (uint8_t)42}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("x", (uint8_t)42)}));
+    // test(t, {0, 256}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("x", (uint8_t)0)}));
+    // test(t, {1, 0x4048f5c3}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("y", (float64_t)3.140000104904175)}));
+    // test(t, {2, false}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("z", false)}));
 }
 
 using WasmValValPair = std::pair<WasmVal, std::optional<Val>>;
@@ -219,32 +266,6 @@ void test_heap(Val t, Val expected, std::vector<WasmVal> vals_to_lift, const std
 
 TEST_CASE("List")
 {
-    // test_heap(List(Bool()), [True,False,True], [0,3], [1,0,1])
-    // test_heap(List(Bool()), [True,False,True], [0,3], [1,0,2])
-    // test_heap(List(Bool()), [True,False,True], [3,3], [0xff,0xff,0xff, 1,0,1])
-    // test_heap(List(U8()), [1,2,3], [0,3], [1,2,3])
-    // test_heap(List(U16()), [1,2,3], [0,3], [1,0, 2,0, 3,0 ])
-    // test_heap(List(U16()), None, [1,3], [0, 1,0, 2,0, 3,0 ])
-    // test_heap(List(U32()), [1,2,3], [0,3], [1,0,0,0, 2,0,0,0, 3,0,0,0])
-    // test_heap(List(U64()), [1,2], [0,2], [1,0,0,0,0,0,0,0, 2,0,0,0,0,0,0,0])
-    // test_heap(List(S8()), [-1,-2,-3], [0,3], [0xff,0xfe,0xfd])
-    // test_heap(List(S16()), [-1,-2,-3], [0,3], [0xff,0xff, 0xfe,0xff, 0xfd,0xff])
-    // test_heap(List(S32()), [-1,-2,-3], [0,3], [0xff,0xff,0xff,0xff, 0xfe,0xff,0xff,0xff, 0xfd,0xff,0xff,0xff])
-    // test_heap(List(S64()), [-1,-2], [0,2], [0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff, 0xfe,0xff,0xff,0xff,0xff,0xff,0xff,0xff])
-    // test_heap(List(Char()), ['A','B','c'], [0,3], [65,00,00,00, 66,00,00,00, 99,00,00,00])
-    // test_heap(List(String()), [mk_str("hi"),mk_str("wat")], [0,2],[16,0,0,0, 2,0,0,0, 21,0,0,0, 3,0,0,0, ord('h'), ord('i'),   0xf,0xf,0xf,   ord('w'), ord('a'), ord('t')])
-    // test_heap(List(List(U8())), [[3,4,5],[],[6,7]], [0,3], [24,0,0,0, 3,0,0,0, 0,0,0,0, 0,0,0,0, 27,0,0,0, 2,0,0,0, 3,4,5,  6,7])
-    // test_heap(List(List(U16())), [[5,6]], [0,1], [8,0,0,0, 2,0,0,0, 5,0, 6,0])
-    // test_heap(List(List(U16())), None, [0,1], [9,0,0,0, 2,0,0,0, 0, 5,0, 6,0])
-    // test_heap(List(Tuple([U8(),U8(),U16(),U32()])), [mk_tup(6,7,8,9),mk_tup(4,5,6,7)], [0,2],
-    //           [6, 7, 8,0, 9,0,0,0,   4, 5, 6,0, 7,0,0,0])
-    // test_heap(List(Tuple([U8(),U16(),U8(),U32()])), [mk_tup(6,7,8,9),mk_tup(4,5,6,7)], [0,2],
-    //           [6,0xff, 7,0, 8,0xff,0xff,0xff, 9,0,0,0,   4,0xff, 5,0, 6,0xff,0xff,0xff, 7,0,0,0])
-    // test_heap(List(Tuple([U16(),U8()])), [mk_tup(6,7),mk_tup(8,9)], [0,2],
-    //           [6,0, 7, 0x0ff, 8,0, 9, 0xff])
-    // test_heap(List(Tuple([Tuple([U16(),U8()]),U8()])), [mk_tup([4,5],6),mk_tup([7,8],9)], [0,2],
-    //           [4,0, 5,0xff, 6,0xff,  7,0, 8,0xff, 9,0xff])
-
     test_heap(std::make_shared<list_t>(bool()), std::make_shared<list_t>(bool(), std::vector<Val>{true, false, true}), {0, 3}, {1, 0, 1});
     test_heap(std::make_shared<list_t>(bool()), std::make_shared<list_t>(bool(), std::vector<Val>{true, false, true}), {0, 3}, {1, 0, 2});
     test_heap(std::make_shared<list_t>(bool()), std::make_shared<list_t>(bool(), std::vector<Val>{true, false, true}), {3, 3}, {0xff, 0xff, 0xff, 1, 0, 1});
@@ -258,4 +279,11 @@ TEST_CASE("List")
     test_heap(std::make_shared<list_t>(int64_t()), std::make_shared<list_t>(int64_t(), std::vector<Val>{(int64_t)-1, (int64_t)-2}), {0, 2}, {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff});
     test_heap(std::make_shared<list_t>(wchar_t()), std::make_shared<list_t>(wchar_t(), std::vector<Val>{L'A', L'B', L'c'}), {0, 3}, {65, 0, 0, 0, 66, 0, 0, 0, 99, 0, 0, 0});
     test_heap(std::make_shared<list_t>(string_ptr()), std::make_shared<list_t>(string_ptr(), std::vector<Val>{std::make_shared<string_t>("hi"), std::make_shared<string_t>("wat")}), {0, 2}, {16, 0, 0, 0, 2, 0, 0, 0, 21, 0, 0, 0, 3, 0, 0, 0, 'h', 'i', 0xf, 0xf, 0xf, 'w', 'a', 't'});
+    // test_heap(List(List(U8())), [[3,4,5],[],[6,7]], [0,3], [24,0,0,0, 3,0,0,0, 0,0,0,0, 0,0,0,0, 27,0,0,0, 2,0,0,0, 3,4,5,  6,7])
+    // test_heap(List(List(U16())), [[5,6]], [0,1], [8,0,0,0, 2,0,0,0, 5,0, 6,0])
+    // test_heap(List(List(U16())), None, [0,1], [9,0,0,0, 2,0,0,0, 0, 5,0, 6,0])
+    // test_heap(List(Tuple([U8(),U8(),U16(),U32()])), [mk_tup(6,7,8,9),mk_tup(4,5,6,7)], [0,2], [6, 7, 8,0, 9,0,0,0,   4, 5, 6,0, 7,0,0,0])
+    // test_heap(List(Tuple([U8(),U16(),U8(),U32()])), [mk_tup(6,7,8,9),mk_tup(4,5,6,7)], [0,2], [6,0xff, 7,0, 8,0xff,0xff,0xff, 9,0,0,0,   4,0xff, 5,0, 6,0xff,0xff,0xff, 7,0,0,0])
+    // test_heap(List(Tuple([U16(),U8()])), [mk_tup(6,7),mk_tup(8,9)], [0,2], [6,0, 7, 0x0ff, 8,0, 9, 0xff])
+    // test_heap(List(Tuple([Tuple([U16(),U8()]),U8()])), [mk_tup([4,5],6),mk_tup([7,8],9)], [0,2], [4,0, 5,0xff, 6,0xff,  7,0, 8,0xff, 9,0xff])
 }
