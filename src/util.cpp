@@ -414,11 +414,11 @@ namespace cmcpp
         return result;
     }
 
-    std::pair<int, case_ptr> match_case(const variant_ptr &v, const std::vector<case_ptr> &cases)
+    std::pair<int, Val> match_case(const variant_ptr &v, const std::vector<case_ptr> &cases)
     {
         assert(v->cases.size() == 1);
         auto key = v->cases[0]->label;
-        auto value = v->cases[0];
+        auto value = v->cases[0]->v.value();
         for (auto label : split(key, '|'))
         {
             auto case_index = find_case(label, v->cases);

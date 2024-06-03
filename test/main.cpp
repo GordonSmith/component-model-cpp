@@ -157,10 +157,13 @@ TEST_CASE("Flags")
 TEST_CASE("Variant")
 {
     auto t = std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("x", uint8_t()), std::make_shared<case_t>("y", float64_t()), std::make_shared<case_t>("z", bool())});
-    // test(t, {0, (uint8_t)42}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("x", (uint8_t)42)}));
-    // test(t, {0, 256}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("x", (uint8_t)0)}));
-    // test(t, {1, 0x4048f5c3}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("y", (float64_t)3.140000104904175)}));
-    // test(t, {2, false}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("z", false)}));
+    std::vector<WasmVal> vals_to_lift = {0, 42};
+    auto zero = vals_to_lift[0].index();
+    auto one = vals_to_lift[1].index();
+    test(t, {0, (int64_t)42}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("x", (uint8_t)42)}));
+    test(t, {0, (int64_t)256}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("x", (uint8_t)0)}));
+    test(t, {1, (int64_t)0x4048f5c3}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("y", (float64_t)3.140000104904175)}));
+    test(t, {2, (int64_t) false}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("z", false)}));
 }
 
 using WasmValValPair = std::pair<WasmVal, std::optional<Val>>;

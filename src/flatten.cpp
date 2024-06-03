@@ -49,7 +49,7 @@ namespace cmcpp
     std::vector<std::string> flatten_variant(const std::vector<case_ptr> &cases)
     {
         std::vector<std::string> flat;
-        for (const auto &c : cases)
+        for (auto &c : cases)
         {
             if (c->v.has_value())
             {
@@ -106,21 +106,29 @@ namespace cmcpp
         }
     }
 
-    std::vector<std::string> flatten_type(const Val &v)
+    std::vector<std::string> flatten_type(const Val &_t)
     {
-        switch (valType(v))
+        auto t = despecialize(_t);
+        switch (valType(t))
         {
         case ValType::Record:
-            return flatten_record(std::get<record_ptr>(v)->fields);
+            return flatten_record(std::get<record_ptr>(t)->fields);
         case ValType::Variant:
-            return flatten_variant(std::get<variant_ptr>(v)->cases);
-        // case ValType::Flags:
-        //   return std::vector<std::string>(num_i32_flags(reinterpret_cast<const Flags &>(v).labels), "i32");
+            return flatten_variant(std::get<variant_ptr>(t)->cases);
+        case ValType::Flags:
+        {
+            std::vector<std::string> retVal = {};
+            for (int i = 0; i < num_i32_flags(std::get<flags_ptr>(t)->labels); ++i)
+            {
+                retVal.push_back("i32");
+            }
+            return retVal;
+        }
         // case ValType::Own:
         // case ValType::Borrow:
         //     return {"i32"};
         default:
-            return flatten_type(valType(v));
+            return flatten_type(valType(t));
         }
     }
 
