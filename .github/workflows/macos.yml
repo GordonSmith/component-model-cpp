@@ -3,11 +3,11 @@ name: MacOS
 on:
   push:
     branches:
-      - master
+      - trunk
       - main
   pull_request:
     branches:
-      - master
+      - trunk
       - main
 
 env:
@@ -20,19 +20,27 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+        with:
+          submodules: recursive
 
       - uses: actions/cache@v3
         with:
           path: "**/cpm_modules"
           key: ${{ github.workflow }}-cpm-modules-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake') }}
 
+      - name: install dependencies
+        run: |
+          brew install ninja
+
       - name: configure
-        run: cmake -Stest -Bbuild -DCMAKE_BUILD_TYPE=Debug
+        run: |
+          cmake -G Ninja -S . -B build -DCMAKE_BUILD_TYPE=Debug
 
       - name: build
-        run: cmake --build build -j4
+        run: cmake --build build --parallel
 
       - name: test
+        working-directory: build/test
         run: |
-          cd build
-          ctest --build-config Debug
+          ctest
+

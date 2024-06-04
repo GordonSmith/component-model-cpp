@@ -3,11 +3,11 @@ name: Windows
 on:
   push:
     branches:
-      - master
+      - trunk
       - main
   pull_request:
     branches:
-      - master
+      - trunk
       - main
 
 env:
@@ -20,6 +20,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+        with:
+          submodules: recursive
 
       - uses: actions/cache@v3
         with:
@@ -27,12 +29,14 @@ jobs:
           key: ${{ github.workflow }}-cpm-modules-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake') }}
 
       - name: configure
-        run: cmake -Stest -Bbuild
+        run: |
+          cmake -S . -B build
 
       - name: build
-        run: cmake --build build --config Debug -j4
+        run: cmake --build build --config Debug --parallel
 
       - name: test
+        working-directory: build/test
         run: |
-          cd build
-          ctest --build-config Debug
+          ctest
+

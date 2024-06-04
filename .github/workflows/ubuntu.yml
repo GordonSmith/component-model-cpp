@@ -3,11 +3,11 @@ name: Ubuntu
 on:
   push:
     branches:
-      - master
+      - trunk
       - main
   pull_request:
     branches:
-      - master
+      - trunk
       - main
 
 env:
@@ -21,22 +21,34 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+        with:
+          submodules: recursive
 
       - uses: actions/cache@v3
         with:
           path: "**/cpm_modules"
           key: ${{ github.workflow }}-cpm-modules-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake') }}
 
+      - name: install dependencies
+        run: |
+          sudo apt-get install ninja-build
+
       - name: configure
-        run: cmake -Stest -Bbuild -DENABLE_TEST_COVERAGE=1 -DCMAKE_BUILD_TYPE=Debug
+        run: |
+          cmake -G Ninja -S . -B build -DENABLE_TEST_COVERAGE=1 -DCMAKE_BUILD_TYPE=Debug
+
+      - name: build-wasm
+        run: ./test/wasm/build.sh
 
       - name: build
-        run: cmake --build build -j4
+        run: cmake --build build --parallel
 
       - name: test
         run: |
-          cd build
-          ctest --build-config Debug
+          ctest --test-dir ./build/test
 
-      - name: collect code coverage
-        run: bash <(curl -s https://codecov.io/bash) || echo "Codecov did not collect coverage reports"
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4.0.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+  
