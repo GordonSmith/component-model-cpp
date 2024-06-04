@@ -54,11 +54,15 @@ namespace cmcpp
     class CoreValueIter
     {
 
+    private:
+        std::size_t _i = 0;
+
     public:
-        std::vector<WasmVal> values;
-        mutable size_t i = 0;
+        const std::vector<WasmVal> values;
+        size_t &i;
 
         CoreValueIter(const std::vector<WasmVal> &values);
+        CoreValueIter(const std::vector<WasmVal> &values, std::size_t &i);
 
         virtual int32_t next(int32_t _) const;
         virtual int64_t next(int64_t _) const;

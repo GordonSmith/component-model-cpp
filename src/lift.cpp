@@ -92,37 +92,37 @@ namespace cmcpp
     class CoerceValueIter : public CoreValueIter
     {
     public:
-        mutable std::vector<std::string> flat_types;
+        std::vector<std::string> &flat_types;
 
-        CoerceValueIter(const CoreValueIter &vi, const std::vector<std::string> &flat_types) : CoreValueIter(vi), flat_types(flat_types)
+        CoerceValueIter(const CoreValueIter &vi, std::vector<std::string> &flat_types) : CoreValueIter(vi.values, vi.i), flat_types(flat_types)
         {
         }
 
         template <typename T>
         T _next() const
         {
-            auto have = flat_types[0];
             flat_types.erase(flat_types.begin());
-
-            if (have == "i32" && std::is_same<T, float32_t>())
+            auto have = wasmValType(values[i]);
+            auto want = wasmValType(T());
+            if (have == ValType::S32 && want == ValType::F32)
             {
                 return decode_i32_as_float(CoreValueIter::next(int32_t()));
             }
-            else if (have == "i64" && std::is_same<T, int32_t>())
+            else if (have == ValType::S64 && want == ValType::S32)
             {
                 return wrap_i64_to_i32(CoreValueIter::next(int64_t()));
             }
-            else if (have == "i64" && std::is_same<T, float32_t>())
+            else if (have == ValType::S64 && want == ValType::F32)
             {
                 return decode_i32_as_float(wrap_i64_to_i32(CoreValueIter::next(int64_t())));
             }
-            else if (have == "i64" && std::is_same<T, float64_t>())
+            else if (have == ValType::S64 && want == ValType::F64)
             {
                 return decode_i64_as_float(CoreValueIter::next(int64_t()));
             }
             else
             {
-                assert(have == wasmValTypeName(wasmValType(T())));
+                assert(want == have);
                 return CoreValueIter::next(T());
             }
         }

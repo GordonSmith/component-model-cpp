@@ -470,7 +470,13 @@ namespace cmcpp
         }
     }
 
-    CoreValueIter::CoreValueIter(const std::vector<WasmVal> &values) : values(values) {}
+    CoreValueIter::CoreValueIter(const std::vector<WasmVal> &values) : values(values), i(_i)
+    {
+    }
+
+    CoreValueIter::CoreValueIter(const std::vector<WasmVal> &values, std::size_t &i) : values(values), i(i)
+    {
+    }
 
     int32_t CoreValueIter::next(int32_t _) const
     {
