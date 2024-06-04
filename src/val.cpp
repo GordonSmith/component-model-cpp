@@ -1,5 +1,7 @@
 #include "val.hpp"
 
+#include <cassert>
+
 const char *ValTypeNames[] = {
     "bool",
     "int8_t",
@@ -208,11 +210,15 @@ namespace cmcpp
     {
         for (auto c : cases)
         {
-            if (c->v.has_value())
+            for (auto c2 : cases)
             {
-                for (auto c2 : cases)
+                if (c->label == c2->label)
                 {
-                    if (c->label == c2->label && c2->v.has_value() && c->v.value() == c2->v.value())
+                    if (!c->v.has_value() && !c2->v.has_value())
+                    {
+                        return true;
+                    }
+                    else if (c->v.has_value() && c2->v.has_value() && c->v.value() == c2->v.value())
                     {
                         return true;
                     }
@@ -280,4 +286,28 @@ namespace cmcpp
                           v);
     }
 
+    const char *ValTypeNames[] = {
+        "i32",
+        "i64",
+        "f32",
+        "f64",
+        "unknown1", "unknown2", "unknown3", "unknown4", "unknown5", "unknown6"};
+
+    const char *wasmValTypeName(ValType type)
+    {
+        switch (type)
+        {
+        case ValType::S32:
+            return ValTypeNames[0];
+        case ValType::S64:
+            return ValTypeNames[1];
+        case ValType::F32:
+            return ValTypeNames[2];
+        case ValType::F64:
+            return ValTypeNames[3];
+        default:
+            assert(false);
+            return ValTypeNames[4];
+        }
+    }
 }

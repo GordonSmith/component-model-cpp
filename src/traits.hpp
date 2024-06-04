@@ -264,46 +264,6 @@ namespace cmcpp
         }
     };
 
-    const char *const i32 = "i32";
-    const char *const i64 = "i64";
-    const char *const f32 = "f32";
-    const char *const f64 = "f64";
-
-    template <>
-    struct WasmValTrait<int32_t>
-    {
-        static const char *type()
-        {
-            return i32;
-        }
-    };
-
-    template <>
-    struct WasmValTrait<int64_t>
-    {
-        static const char *type()
-        {
-            return i64;
-        }
-    };
-
-    template <>
-    struct WasmValTrait<float32_t>
-    {
-        static const char *type()
-        {
-            return f32;
-        }
-    };
-
-    template <>
-    struct WasmValTrait<float64_t>
-    {
-        static const char *type()
-        {
-            return f64;
-        }
-    };
 }
 
 #endif

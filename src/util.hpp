@@ -38,9 +38,10 @@ namespace cmcpp
 
     bool isAligned(uint32_t ptr, uint32_t alignment);
     int find_case(const std::string &label, const std::vector<case_ptr> &cases);
-    std::pair<int, Val> match_case(const variant_ptr &v, const std::vector<case_ptr> &cases);
+    std::pair<int, std::optional<Val>> match_case(const variant_ptr &v, const std::vector<case_ptr> &cases);
     float32_t maybe_scramble_nan32(float32_t f);
     float64_t maybe_scramble_nan64(float64_t f);
+    int max_case_alignment(const std::vector<case_ptr> &cases);
 
     int elem_size(ValType t);
     int elem_size(const Val &v);
@@ -59,25 +60,10 @@ namespace cmcpp
 
         CoreValueIter(const std::vector<WasmVal> &values);
 
-        virtual int32_t next(int32_t _) const
-        {
-            return std::get<int32_t>(values[i++]);
-        }
-
-        virtual int64_t next(int64_t _) const
-        {
-            return std::get<int64_t>(values[i++]);
-        }
-
-        virtual float32_t next(float32_t _) const
-        {
-            return std::get<float32_t>(values[i++]);
-        }
-
-        virtual float64_t next(float64_t _) const
-        {
-            return std::get<float64_t>(values[i++]);
-        }
+        virtual int32_t next(int32_t _) const;
+        virtual int64_t next(int64_t _) const;
+        virtual float32_t next(float32_t _) const;
+        virtual float64_t next(float64_t _) const;
 
         void skip() const;
     };

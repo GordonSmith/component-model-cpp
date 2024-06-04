@@ -414,14 +414,14 @@ namespace cmcpp
         return result;
     }
 
-    std::pair<int, Val> match_case(const variant_ptr &v, const std::vector<case_ptr> &cases)
+    std::pair<int, std::optional<Val>> match_case(const variant_ptr &v, const std::vector<case_ptr> &cases)
     {
         assert(v->cases.size() == 1);
         auto key = v->cases[0]->label;
-        auto value = v->cases[0]->v.value();
+        auto value = v->cases[0]->v;
         for (auto label : split(key, '|'))
         {
-            auto case_index = find_case(label, v->cases);
+            auto case_index = find_case(label, cases);
             if (case_index != -1)
             {
                 return {case_index, value};
@@ -471,6 +471,26 @@ namespace cmcpp
     }
 
     CoreValueIter::CoreValueIter(const std::vector<WasmVal> &values) : values(values) {}
+
+    int32_t CoreValueIter::next(int32_t _) const
+    {
+        return std::get<int32_t>(values[i++]);
+    }
+
+    int64_t CoreValueIter::next(int64_t _) const
+    {
+        return std::get<int64_t>(values[i++]);
+    }
+
+    float32_t CoreValueIter::next(float32_t _) const
+    {
+        return std::get<float32_t>(values[i++]);
+    }
+
+    float64_t CoreValueIter::next(float64_t _) const
+    {
+        return std::get<float64_t>(values[i++]);
+    }
 
     void CoreValueIter::skip() const
     {

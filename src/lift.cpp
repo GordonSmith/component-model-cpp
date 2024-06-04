@@ -70,7 +70,7 @@ namespace cmcpp
         return r;
     }
 
-    flags_ptr unpack_flags_from_int(int i, const std::vector<std::string> &labels)
+    flags_ptr unpack_flags_from_int(uint64_t i, const std::vector<std::string> &labels)
     {
         std::vector<std::string> flags;
         for (const auto &l : labels)
@@ -92,17 +92,18 @@ namespace cmcpp
     class CoerceValueIter : public CoreValueIter
     {
     public:
-        mutable std::vector<std::string>::const_iterator flat_types_iter;
+        mutable std::vector<std::string> flat_types;
 
-        CoerceValueIter(const CoreValueIter &vi, std::vector<std::string>::const_iterator flat_types_iter) : CoreValueIter(vi), flat_types_iter(flat_types_iter)
+        CoerceValueIter(const CoreValueIter &vi, const std::vector<std::string> &flat_types) : CoreValueIter(vi), flat_types(flat_types)
         {
         }
 
         template <typename T>
         T _next() const
         {
-            const std::string have = *flat_types_iter;
-            ++flat_types_iter;
+            auto have = flat_types[0];
+            flat_types.erase(flat_types.begin());
+
             if (have == "i32" && std::is_same<T, float32_t>())
             {
                 return decode_i32_as_float(CoreValueIter::next(int32_t()));
@@ -121,6 +122,7 @@ namespace cmcpp
             }
             else
             {
+                assert(have == wasmValTypeName(wasmValType(T())));
                 return CoreValueIter::next(T());
             }
         }
@@ -149,21 +151,23 @@ namespace cmcpp
     variant_ptr lift_flat_variant(const CallContext &cx, const CoreValueIter &vi, const std::vector<case_ptr> &cases)
     {
         std::vector<std::string> flat_types = flatten_variant(cases);
-        auto flat_types_iter = flat_types.begin();
-        const std::string top = *flat_types_iter;
-        assert(top == "i32");
-        ++flat_types_iter;
+        assert(flat_types[0] == "i32");
+        flat_types.erase(flat_types.begin());
         int32_t case_index = vi.next(int32_t());
         assert(case_index < cases.size());
         auto c = cases[case_index];
         auto v = std::make_shared<variant_t>();
-        if (c->v.has_value())
+        if (!c->v.has_value())
         {
-            CoerceValueIter cvi(vi, flat_types_iter);
+            v->cases.push_back(std::make_shared<case_t>(c->label, std::nullopt));
+        }
+        else
+        {
+            CoerceValueIter cvi(vi, flat_types);
             auto val = lift_flat(cx, cvi, c->v.value());
             v->cases.push_back(std::make_shared<case_t>(c->label, val));
         }
-        for (; flat_types_iter != flat_types.end(); flat_types_iter++)
+        for (auto have : flat_types)
         {
             vi.skip();
         }
@@ -172,9 +176,10 @@ namespace cmcpp
 
     flags_ptr lift_flat_flags(const CoreValueIter &vi, const std::vector<std::string> &labels)
     {
-        int32_t i = 0;
-        int32_t shift = 0;
-        for (size_t _ = 0; _ < num_i32_flags(labels); ++_)
+        uint64_t i = 0;
+        uint32_t shift = 0;
+        size_t numFlags = num_i32_flags(labels);
+        for (size_t _ = 0; _ < numFlags; ++_)
         {
             i |= (vi.next(int32_t()) << shift);
             shift += 32;
@@ -225,5 +230,4 @@ namespace cmcpp
             throw std::runtime_error(fmt::format("Invalid type:  {}", valTypeName(valType(t))));
         }
     }
-
 }

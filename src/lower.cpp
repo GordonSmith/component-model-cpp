@@ -89,19 +89,25 @@ namespace cmcpp
         std::vector<WasmVal> payload;
         if (c->v.has_value())
         {
-            payload = lower_flat(cx, case_value, c->v.value());
+            payload = lower_flat(cx, case_value.value(), c->v.value());
+            auto vTypes = flatten_type(c->v.value());
             for (size_t i = 0; i < payload.size(); ++i)
             {
                 auto fv = payload[i];
-                auto have = flatten_type(c->v.value())[i];
-                auto want = flat_types[i];
+                auto have = vTypes[i];
+                auto want = flat_types[0];
+                flat_types.erase(flat_types.begin());
                 if (have == "f32" && want == "i32")
                 {
                     payload[i] = encode_float_as_i32(std::get<float32_t>(fv));
                 }
                 else if (have == "i32" && want == "i64")
                 {
-                    // do nothing
+                    payload[i] = fv;
+                }
+                else if (have == "f32" && want == "i64")
+                {
+                    payload[i] = encode_float_as_i32(std::get<float32_t>(fv));
                 }
                 else if (have == "f64" && want == "i64")
                 {
