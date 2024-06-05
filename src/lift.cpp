@@ -171,6 +171,7 @@ namespace cmcpp
         {
             vi.skip();
         }
+        v->cases[0]->label = case_label_with_refinements(c, cases);
         return v;
     }
 
