@@ -17,10 +17,6 @@ world tests {
   export bool-and: func(a: bool, b: bool) -> bool;
   export bool-or: func(a: bool, b: bool) -> bool;
   export bool-xor: func(a: bool, b: bool) -> bool;
-  export float32-add: func(a: float32, b: float32) -> float32;
-  export float32-sub: func(a: float32, b: float32) -> float32;
-  export float64-add: func(a: float64, b: float64) -> float64;
-  export float64-sub: func(a: float64, b: float64) -> float64;
   export u8-add: func(a: u8, b: u8) -> u8;
   export u8-sub: func(a: u8, b: u8) -> u8;
   export u16-add: func(a: u16, b: u16) -> u16;
@@ -37,7 +33,29 @@ world tests {
   export s32-sub: func(a: s32, b: s32) -> s32;
   export s64-add: func(a: s64, b: s64) -> s64;
   export s64-sub: func(a: s64, b: s64) -> s64;
+  export f32-add: func(a: f32, b: f32) -> f32;
+  export f32-sub: func(a: f32, b: f32) -> f32;
+  export f64-add: func(a: f64, b: f64) -> f64;
+  export f64-sub: func(a: f64, b: f64) -> f64;
+  
+  
   export list-char-append: func(a: list<char>, b: list<char>) -> list<char>;
   export list-list-string-append: func(a: list<list<string>>, b: list<list<string>>) -> string;
   export string-append: func(a: string, b: string) -> string;
+  export utf8-string: func(a: string, b: string) -> string;
+  
+  export list-bool: func() -> list<bool>;
+  export list-bool-bool: func(a: list<bool>) -> list<bool>;
+
+  export list-u32: func() -> list<u32>;
+  export list-u32-u32: func(a: list<u32>) -> list<u32>;
+
+  export list-f32: func() -> list<f32>;
+  export list-f32-f32: func(a: list<f32>) -> list<f32>;
+
+  export list-string: func() -> list<string>;
+  export list-string-string: func(a: list<string>) -> list<string>;
+
+  export list-list: func() -> list<list<string>>;
+  // export list-list-list: func(a: list<list<string>>) -> list<list<string>>;
 }

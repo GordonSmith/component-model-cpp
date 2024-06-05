@@ -1,5 +1,6 @@
 /build*
-/.vscode
+/.vscode/settings.json
 /cpm_modules
 /vcpkg_installed
+/test/wasm/build*
 .DS_Store

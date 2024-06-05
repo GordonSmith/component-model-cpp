@@ -273,7 +273,7 @@ def num_i32_flags(labels):
 
 ### Runtime State
 
-class CallContext:
+class LiftLowerContext:
   opts: CanonicalOptions
   inst: ComponentInstance
   lenders: list[HandleElem]
@@ -322,7 +322,7 @@ class ResourceType(Type):
 class HandleElem:
   rep: int
   own: bool
-  scope: Optional[CallContext]
+  scope: Optional[LiftLowerContext]
   lend_count: int
 
   def __init__(self, rep, own, scope = None):
@@ -1100,7 +1100,7 @@ def lower_values(cx, max_flat, vs, ts, out_param = None):
 ### `canon lift`
 
 def canon_lift(opts, inst, callee, ft, args):
-  cx = CallContext(opts, inst)
+  cx = LiftLowerContext(opts, inst)
   trap_if(not inst.may_enter)
 
   assert(inst.may_leave)
@@ -1125,7 +1125,7 @@ def canon_lift(opts, inst, callee, ft, args):
 ### `canon lower`
 
 def canon_lower(opts, inst, callee, calling_import, ft, flat_args):
-  cx = CallContext(opts, inst)
+  cx = LiftLowerContext(opts, inst)
   trap_if(not inst.may_leave)
 
   assert(inst.may_enter)

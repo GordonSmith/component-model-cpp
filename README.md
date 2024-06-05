@@ -1,8 +1,6 @@
 [![Actions Status](https://github.com/GordonSmith/component-model-cpp/workflows/MacOS/badge.svg)](https://github.com/GordonSmith/component-model-cpp/actions)
 [![Actions Status](https://github.com/GordonSmith/component-model-cpp/workflows/Windows/badge.svg)](https://github.com/GordonSmith/component-model-cpp/actions)
 [![Actions Status](https://github.com/GordonSmith/component-model-cpp/workflows/Ubuntu/badge.svg)](https://github.com/GordonSmith/component-model-cpp/actions)
-[![Actions Status](https://github.com/GordonSmith/component-model-cpp/workflows/Style/badge.svg)](https://github.com/GordonSmith/component-model-cpp/actions)
-[![Actions Status](https://github.com/GordonSmith/component-model-cpp/workflows/Install/badge.svg)](https://github.com/GordonSmith/component-model-cpp/actions)
 [![codecov](https://codecov.io/gh/GordonSmith/component-model-cpp/graph/badge.svg?token=CORP310T92)](https://codecov.io/gh/GordonSmith/component-model-cpp)
 
 <p align="center">
@@ -17,9 +15,11 @@ This repository contains a C++ ABI implementation of the WebAssembly Component M
 ## Features
 
 ### OS
-- [x] Linux
-- [ ] MacOS
-- [ ] Windows
+- [x] Ubuntu 24.04
+- [x] MacOS 13
+- [x] MacOS 14 (Arm)
+- [x] Windows 2019
+- [x] Windows 2022
 
 ### Host Data Types
 - [x] Bool
@@ -31,22 +31,23 @@ This repository contains a C++ ABI implementation of the WebAssembly Component M
 - [x] U32
 - [x] S64
 - [x] U64
-- [x] Float32
-- [x] Float64
+- [x] F32
+- [x] F64
 - [x] Char
 - [x] String
 - [x] utf8 String
-- [ ] utf16 String
+- [x] utf16 String
+- [x] latin1+utf16 String
 - [x] List
-- [x] Field
-- [x] Record
-- [x] Tuple
-- [x] Case
-- [x] Variant
-- [x] Enum
-- [x] Option
-- [x] Result
-- [x] Flags
+- [ ] Field
+- [ ] Record
+- [ ] Tuple
+- [ ] Case
+- [ ] Variant
+- [ ] Enum
+- [ ] Option
+- [ ] Result
+- [ ] Flags
 - [ ] Own
 - [ ] Borrow
 

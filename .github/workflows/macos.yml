@@ -12,35 +12,47 @@ on:
 
 env:
   CTEST_OUTPUT_ON_FAILURE: 1
-  CPM_SOURCE_CACHE: ${{ github.workspace }}/cpm_modules
 
 jobs:
   build:
-    runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - os: "macos-13"
+          - os: "macos-14"
+      fail-fast: false
 
+    runs-on: ${{ matrix.os }}
     steps:
+      - name: Set up C++20 
+        uses: aminya/setup-cpp@v0.44.0
+        with: 
+          compiler: gcc 
+          cmake: true 
+          ninja: true 
+      
       - uses: actions/checkout@v3
         with:
           submodules: recursive
 
       - uses: actions/cache@v3
         with:
-          path: "**/cpm_modules"
-          key: ${{ github.workflow }}-cpm-modules-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake') }}
+          path: "build/vcpkg_installed/**/*"
+          key: ${{ matrix.os }}-vcpkg_installed
 
       - name: install dependencies
         run: |
-          brew install ninja
+          brew install autoconf autoconf-archive automake coreutils libtool ninja
 
       - name: configure
         run: |
-          cmake -G Ninja -S . -B build -DCMAKE_BUILD_TYPE=Debug
+          cmake --preset linux-ninja-Debug
 
       - name: build
-        run: cmake --build build --parallel
+        run: |
+          cmake --build --preset linux-ninja-Debug
 
       - name: test
-        working-directory: build/test
+        working-directory: build
         run: |
-          ctest
-
+          ctest -VV

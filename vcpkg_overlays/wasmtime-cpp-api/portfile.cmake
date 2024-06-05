@@ -1,7 +1,7 @@
 vcpkg_download_distfile(ARCHIVE
-    URLS "https://codeload.github.com/bytecodealliance/wasmtime-cpp/zip/da579e78f799aca0a472875b7e348f74b3a04145"
-    FILENAME "wasmome-cpp-da579e78f799acaoa472875b7e348f74b3a04145.zip"
-    SHA512 917da1e41ea3e62c4167e1e42afe1d26537bb8351acddbd59cfe24d5ab535d11ce0e0980d38b5fbfca008303b50d552d042f1db835d8d13d59757b269c4f3887
+    URLS "https://github.com/bytecodealliance/wasmtime-cpp/archive/refs/tags/v${VERSION}.tar.gz"
+    FILENAME "v${VERSION}.tar.gz"
+    SHA512 6440472084198572b2f00f455e100c9cc0f8a6c76f5f6278432756335f4a340e1af347d6a88ad2e06e0d22a5b84f240a210a9ecfcab1699c1b0fa21cedb8574d
 )
 
 vcpkg_extract_source_archive_ex(

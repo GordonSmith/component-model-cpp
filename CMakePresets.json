@@ -15,41 +15,46 @@
             "toolchainFile": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
             "binaryDir": "${sourceDir}/build",
             "installDir": "${sourceDir}/build/stage",
-            "cacheVariables": {},
+            "cacheVariables": {
+                "VCPKG_INSTALLED_DIR": "${sourceDir}/build/vcpkg_installed",
+                "VCPKG_INSTALL_OPTIONS": "--x-abi-tools-use-exact-versions;--downloads-root=${sourceDir}/build/vcpkg_downloads;--x-buildtrees-root=${sourceDir}/build/vcpkg_buildtrees;--x-packages-root=${sourceDir}/build/vcpkg_packages"
+            },
             "hidden": true
         },
         {
-            "name": "ninja",
-            "generator": "Ninja",
-            "hidden": true
-        },
-        {
-            "name": "debug",
+            "name": "Debug",
+            "installDir": "${sourceDir}/build/stage/Debug",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug"
             },
             "hidden": true
         },
         {
-            "name": "release",
-            "binaryDir": "${sourceDir}/build/Release",
-            "installDir": "${sourceDir}/build/Release/stage",
+            "name": "Release",
+            "installDir": "${sourceDir}/build/stage/Release",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
             },
             "hidden": true
         },
         {
-            "name": "relwithdebinfo",
-            "binaryDir": "${sourceDir}/build/RelWithDebInfo",
-            "installDir": "${sourceDir}/build/RelWithDebInfo/stage",
+            "name": "RelWithDebInfo",
+            "installDir": "${sourceDir}/build/stage/RelWithDebInfo",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "RelWithDebInfo"
             },
             "hidden": true
         },
         {
-            "name": "ubuntu",
+            "name": "MinSizeRel",
+            "installDir": "${sourceDir}/build/stage/MinSizeRel",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "MinSizeRel"
+            },
+            "hidden": true
+        },
+        {
+            "name": "linux",
             "cacheVariables": {},
             "hidden": true
         },
@@ -59,41 +64,9 @@
             "hidden": true
         },
         {
-            "name": "ubuntu-ninja",
-            "inherits": [
-                "vcpkg",
-                "ninja",
-                "ubuntu"
-            ]
-        },
-        {
-            "name": "ubuntu-ninja-debug",
-            "inherits": [
-                "ubuntu-ninja",
-                "debug"
-            ]
-        },
-        {
-            "name": "ubuntu-ninja-debug-minimal",
-            "inherits": [
-                "ubuntu-ninja",
-                "debug"
-            ],
-            "cacheVariables": {}
-        },
-        {
-            "name": "ubuntu-ninja-release",
-            "inherits": [
-                "ubuntu-ninja",
-                "release"
-            ]
-        },
-        {
-            "name": "ubuntu-ninja-relwithdebinfo",
-            "inherits": [
-                "ubuntu-ninja",
-                "relwithdebinfo"
-            ]
+            "name": "ninja",
+            "generator": "Ninja",
+            "hidden": true
         },
         {
             "name": "VS-16",
@@ -118,42 +91,62 @@
             "hidden": true
         },
         {
+            "name": "linux-ninja-Debug",
+            "inherits": [
+                "linux",
+                "ninja",
+                "vcpkg",
+                "Debug"
+            ]
+        },
+        {
+            "name": "linux-ninja-Release",
+            "inherits": [
+                "linux",
+                "ninja",
+                "vcpkg",
+                "Release"
+            ]
+        },
+        {
+            "name": "linux-ninja-RelWithDebInfo",
+            "inherits": [
+                "linux",
+                "ninja",
+                "vcpkg",
+                "RelWithDebInfo"
+            ]
+        },
+        {
+            "name": "linux-ninja-MinSizeRel",
+            "inherits": [
+                "linux",
+                "ninja",
+                "vcpkg",
+                "MinSizeRel"
+            ]
+        },
+        {
             "name": "vcpkg-VS-16",
             "inherits": [
-                "vcpkg",
                 "windows",
+                "vcpkg",
                 "VS-16"
             ]
         },
         {
             "name": "vcpkg-VS-17",
             "inherits": [
-                "vcpkg",
                 "windows",
+                "vcpkg",
                 "VS-17"
             ]
         }
     ],
     "buildPresets": [
         {
-            "name": "ninja-linux",
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Linux"
-            },
-            "hidden": true,
-            "nativeToolOptions": []
-        },
-        {
-            "name": "Ninja-Linux-Debug",
-            "inherits": "Ninja-Linux",
-            "configuration": "Debug"
-        },
-        {
-            "name": "Ninja-Linux-Release",
-            "inherits": "Ninja-Linux",
-            "configuration": "Release"
+            "name": "linux-ninja-Debug",
+            "configurePreset": "linux-ninja-Debug"
         },
         {
             "name": "VS-16-Debug",
@@ -201,11 +194,5 @@
             ]
         }
     ],
-    "testPresets": [
-        {
-            "name": "xxx",
-            "description": "",
-            "displayName": ""
-        }
-    ]
+    "testPresets": []
 }

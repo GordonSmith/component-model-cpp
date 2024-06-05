@@ -42,7 +42,7 @@ def mk_opts(memory = bytearray(), encoding = 'utf8', realloc = None, post_return
 
 def mk_cx(memory = bytearray(), encoding = 'utf8', realloc = None, post_return = None):
   opts = mk_opts(memory, encoding, realloc, post_return)
-  return CallContext(opts, ComponentInstance())
+  return LiftLowerContext(opts, ComponentInstance())
 
 def mk_str(s):
   return (s, 'utf8', len(s.encode('utf-8')))
@@ -346,7 +346,7 @@ def test_roundtrip(t, v):
   caller_heap = Heap(1000)
   caller_opts = mk_opts(caller_heap.memory, 'utf8', caller_heap.realloc)
   caller_inst = ComponentInstance()
-  caller_cx = CallContext(caller_opts, caller_inst)
+  caller_cx = LiftLowerContext(caller_opts, caller_inst)
 
   flat_args = lower_flat(caller_cx, v, t)
   flat_results = canon_lower(caller_opts, caller_inst, lifted_callee, True, ft, flat_args)

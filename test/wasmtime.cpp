@@ -145,7 +145,7 @@ TEST_CASE("wasmtime")
     auto list3 = std::get<cmcpp::ListPtr>(v);
     CHECK(list3->vs.size() == 3);
 
-    cmcpp::CallContextPtr cx = cmcpp::createCallContext(data, realloc, cmcpp::encodeTo);
+    cmcpp::CallContextPtr cx = cmcpp::createCallContext(data, realloc, cmcpp::encodeTo, cmcpp::decodeFrom);
     std::vector<wasmtime::Val> wasmtimeVals;
     std::vector<cmcpp::Val> cmcppVals;
     std::vector<cmcpp::WasmVal> cmcppWasmVals;

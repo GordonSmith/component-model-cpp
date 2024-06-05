@@ -13,11 +13,17 @@ on:
 env:
   CTEST_OUTPUT_ON_FAILURE: 1
   CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-  CPM_SOURCE_CACHE: ${{ github.workspace }}/cpm_modules
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: "ubuntu-22.04"
+          - os: "ubuntu-24.04"
+      fail-fast: false
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v3
@@ -26,26 +32,30 @@ jobs:
 
       - uses: actions/cache@v3
         with:
-          path: "**/cpm_modules"
-          key: ${{ github.workflow }}-cpm-modules-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake') }}
+          path: "build/vcpkg_installed/**/*"
+          key: ${{ matrix.os }}-vcpkg_installed
 
       - name: install dependencies
         run: |
-          sudo apt-get install ninja-build
+          sudo apt-get install -y \
+          autoconf \
+          autoconf-archive \
+          automake \
+          build-essential \
+          ninja-build
 
       - name: configure
         run: |
-          cmake -G Ninja -S . -B build -DENABLE_TEST_COVERAGE=1 -DCMAKE_BUILD_TYPE=Debug
-
-      - name: build-wasm
-        run: ./test/wasm/build.sh
+          cmake --preset linux-ninja-Debug
 
       - name: build
-        run: cmake --build build --parallel
+        run: |
+          cmake --build --preset linux-ninja-Debug
 
       - name: test
+        working-directory: build
         run: |
-          ctest --test-dir ./build/test
+          ctest -VV
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4.0.1

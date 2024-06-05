@@ -1,5 +1,5 @@
-#ifndef CMCPP_HPP
-#define CMCPP_HPP
+#ifndef CMCPP_CONTEXT_HPP
+#define CMCPP_CONTEXT_HPP
 
 #if __has_include(<span>)
 #include <span>
@@ -8,57 +8,41 @@
 #include <sstream>
 #endif
 
-#include <string>
+#include "traits.hpp"
+
 #include <functional>
 #include <memory>
+#include <optional>
 
 namespace cmcpp
 {
-
-    enum class HostEncoding
-    {
-        Utf8,
-        Utf16,
-        Latin1,
-        Latin1_Utf16
-    };
-
-    enum class GuestEncoding
-    {
-        Utf8,
-        Utf16le,
-        Latin1
-    };
-
-    using GuestMemory = std::span<uint8_t, std::dynamic_extent>;
+    using HostTrap = std::function<void(const char *msg) noexcept(false)>;
     using GuestRealloc = std::function<int(int ptr, int old_size, int align, int new_size)>;
+    using GuestMemory = std::span<uint8_t>;
     using GuestPostReturn = std::function<void()>;
-    using HostEncodeTo = std::function<size_t(void *dest, const char8_t *src, uint32_t byte_len, GuestEncoding encoding)>;
+    using HostUnicodeConversion = std::function<std::pair<void *, size_t>(void *dest, uint32_t dest_byte_len, const void *src, uint32_t src_byte_len, Encoding from_encoding, Encoding to_encoding)>;
 
-    class CanonicalOptions
+    struct CallContext
     {
-    public:
-        virtual ~CanonicalOptions() = default;
-
+        HostTrap trap;
+        GuestRealloc realloc;
         GuestMemory memory;
-        HostEncoding string_encoding;
-
-        virtual int realloc(int ptr, int old_size, int align, int new_size) = 0;
-        virtual size_t encodeTo(void *dest, const char8_t *src, uint32_t byte_len, GuestEncoding encoding) = 0;
-        virtual void post_return() = 0;
+        Encoding guest_encoding;
+        HostUnicodeConversion convert;
+        std::optional<GuestPostReturn> post_return;
+        bool sync = true;
+        bool always_task_return = false;
     };
-    using CanonicalOptionsPtr = std::shared_ptr<CanonicalOptions>;
-    CanonicalOptionsPtr createCanonicalOptions(const GuestMemory &memory, const GuestRealloc &realloc, const HostEncodeTo &encodeTo, HostEncoding encoding, const GuestPostReturn &post_return);
 
-    class CallContext
+    struct InstanceContext
     {
-    public:
-        virtual ~CallContext() = default;
-
-        CanonicalOptionsPtr opts;
+        HostTrap trap;
+        HostUnicodeConversion convert;
+        GuestRealloc realloc;
+        std::unique_ptr<CallContext> createCallContext(const GuestMemory &memory, const Encoding &encoding = Encoding::Utf8, const GuestPostReturn &post_return = nullptr);
     };
-    using CallContextPtr = std::shared_ptr<CallContext>;
-    CallContextPtr createCallContext(const GuestMemory &memory, const GuestRealloc &realloc, const HostEncodeTo &encodeTo, HostEncoding encoding = HostEncoding::Utf8, const GuestPostReturn &post_return = nullptr);
+
+    std::unique_ptr<InstanceContext> createInstanceContext(const HostTrap &trap, HostUnicodeConversion convert, const GuestRealloc &realloc);
 }
 
 #endif
