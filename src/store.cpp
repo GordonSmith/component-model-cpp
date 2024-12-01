@@ -31,7 +31,7 @@ namespace cmcpp
         if (enc_len < worst_case_size)
         {
             assert(enc_len <= MAX_STRING_BYTE_LENGTH);
-            ptr = cx.opts->realloc(ptr, src_code_units, 1, enc_len);
+            ptr = cx.opts->realloc(ptr, src_code_units, 1, (int)enc_len);
         }
         return std::make_pair(ptr, enc_len);
     }

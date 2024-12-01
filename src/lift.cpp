@@ -18,12 +18,7 @@ namespace cmcpp
     R lift_flat_unsigned(const CoreValueIter &vi, int core_width, int t_width)
     {
         using SignedT = std::make_signed_t<T>;
-        auto xxx = wasmValType(SignedT());
         T i = vi.next(SignedT());
-        if (t_width == 64)
-        {
-            return (R)i;
-        }
         assert(0 <= i && i < (1ULL << core_width));
         return R(i % (1ULL << t_width));
     }
@@ -33,10 +28,6 @@ namespace cmcpp
     {
         using UnsignedT = std::make_unsigned_t<T>;
         T i = vi.next(T());
-        if (t_width == 64)
-        {
-            return (R)i;
-        }
         assert(0 <= (UnsignedT)i && (UnsignedT)i < (1LL << 32));
         i %= (1LL << t_width);
         if (i >= (1LL << (t_width - 1)))
@@ -106,19 +97,19 @@ namespace cmcpp
             auto want = wasmValType(T());
             if (have == ValType::S32 && want == ValType::F32)
             {
-                return decode_i32_as_float(CoreValueIter::next(int32_t()));
+                return (T)decode_i32_as_float(CoreValueIter::next(int32_t()));
             }
             else if (have == ValType::S64 && want == ValType::S32)
             {
-                return wrap_i64_to_i32(CoreValueIter::next(int64_t()));
+                return (T)wrap_i64_to_i32(CoreValueIter::next(int64_t()));
             }
             else if (have == ValType::S64 && want == ValType::F32)
             {
-                return decode_i32_as_float(wrap_i64_to_i32(CoreValueIter::next(int64_t())));
+                return (T)decode_i32_as_float(wrap_i64_to_i32(CoreValueIter::next(int64_t())));
             }
             else if (have == ValType::S64 && want == ValType::F64)
             {
-                return decode_i64_as_float(CoreValueIter::next(int64_t()));
+                return (T)decode_i64_as_float(CoreValueIter::next(int64_t()));
             }
             else
             {
@@ -127,22 +118,22 @@ namespace cmcpp
             }
         }
 
-        virtual int32_t next(int32_t _) const
+        virtual int32_t next(int32_t) const
         {
             return _next<int32_t>();
         }
 
-        virtual int64_t next(int64_t _) const
+        virtual int64_t next(int64_t) const
         {
             return _next<int64_t>();
         }
 
-        virtual float32_t next(float32_t _) const
+        virtual float32_t next(float32_t) const
         {
             return _next<float32_t>();
         }
 
-        virtual float64_t next(float64_t _) const
+        virtual float64_t next(float64_t) const
         {
             return _next<float64_t>();
         }

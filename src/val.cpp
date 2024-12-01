@@ -210,7 +210,7 @@ namespace cmcpp
     {
         for (auto c : cases)
         {
-            for (auto c2 : cases)
+            for (auto c2 : rhs.cases)
             {
                 if (c->label == c2->label)
                 {

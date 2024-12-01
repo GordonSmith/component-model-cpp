@@ -2,7 +2,7 @@ if (WIN32)
     vcpkg_download_distfile(ARCHIVE
         URLS "https://github.com/bytecodealliance/wasmtime/releases/download/v${VERSION}/wasmtime-v${VERSION}-x86_64-windows-c-api.zip"
         FILENAME "wasmtime-v${VERSION}-x86_64-windows-c-api.zip"
-        SHA512 0
+        SHA512 d9487345536158f5446175efea44e0b1526f662e9fce79a528d67686b64293ce427c4931c486eb43717a0d5eadb7186156c65f000359c43daa35bbdcd292f377
     )
 elseif (APPLE)
     vcpkg_download_distfile(ARCHIVE

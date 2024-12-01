@@ -136,7 +136,7 @@
     ],
     "buildPresets": [
         {
-            "name": "ninja-linux",
+            "name": "Ninja-Linux",
             "condition": {
                 "type": "equals",
                 "lhs": "${hostSystemName}",

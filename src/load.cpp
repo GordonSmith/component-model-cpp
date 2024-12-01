@@ -9,8 +9,9 @@ namespace cmcpp
 {
 
     template <typename T>
-    T load_int(const CallContext &cx, uint32_t ptr, uint8_t)
+    T load_int(const CallContext &cx, uint32_t ptr, uint8_t nbytes)
     {
+        assert(nbytes == sizeof(T));
         T retVal = 0;
         for (size_t i = 0; i < sizeof(T); ++i)
         {

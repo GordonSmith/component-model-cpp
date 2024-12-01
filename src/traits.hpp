@@ -5,6 +5,7 @@
 
 #include <optional>
 #include <variant>
+#include <stdexcept>
 
 namespace cmcpp
 {

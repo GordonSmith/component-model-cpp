@@ -69,12 +69,12 @@ namespace cmcpp
         return i != 0;
     }
 
-    wchar_t convert_i32_to_char(const CallContext &cx, int32_t i)
+    wchar_t convert_i32_to_char(const CallContext &, int32_t i)
     {
         // assert(i >= 0);
         // assert(i < 0x110000);
         // assert(!(0xD800 <= i && i <= 0xDFFF));
-        return static_cast<uint32_t>(i);
+        return static_cast<wchar_t>(i);
     }
 
     ValType discriminant_type(const std::vector<case_ptr> &cases)
@@ -82,7 +82,7 @@ namespace cmcpp
         size_t n = cases.size();
 
         assert(0 < n && n < std::numeric_limits<unsigned int>::max());
-        int match = std::ceil(std::log2(n) / 8);
+        int match = std::ceil<int>(std::log2(n) / 8);
         switch (match)
         {
         case 0:
@@ -195,7 +195,7 @@ namespace cmcpp
         }
     }
 
-    int elem_size(ValType t)
+    uint8_t elem_size(ValType t)
     {
         switch (despecialize(t))
         {
@@ -223,7 +223,7 @@ namespace cmcpp
         }
     }
 
-    int elem_size_record(const std::vector<field_ptr> &fields)
+    uint8_t elem_size_record(const std::vector<field_ptr> &fields)
     {
         int s = 0;
         for (auto f : fields)
