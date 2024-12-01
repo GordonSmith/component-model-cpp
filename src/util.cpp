@@ -235,11 +235,11 @@ namespace cmcpp
         return align_to(s, alignment_record(fields));
     }
 
-    int elem_size_variant(const std::vector<case_ptr> &cases)
+    uint8_t elem_size_variant(const std::vector<case_ptr> &cases)
     {
         int s = elem_size(discriminant_type(cases));
         s = align_to(s, max_case_alignment(cases));
-        int cs = 0;
+        uint8_t cs = 0;
         for (auto c : cases)
         {
             if (c->v.has_value())
@@ -267,7 +267,7 @@ namespace cmcpp
         return 4 * num_i32_flags(labels);
     }
 
-    int elem_size(const Val &_t)
+    uint8_t elem_size(const Val &_t)
     {
         auto t = despecialize(_t);
         ValType kind = valType(t);

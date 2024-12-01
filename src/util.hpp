@@ -43,8 +43,8 @@ namespace cmcpp
     float64_t maybe_scramble_nan64(float64_t f);
     int max_case_alignment(const std::vector<case_ptr> &cases);
 
-    int elem_size(ValType t);
-    int elem_size(const Val &v);
+    uint8_t elem_size(ValType t);
+    uint8_t elem_size(const Val &v);
 
     int elem_size_flags(const std::vector<std::string> &labels);
     int num_i32_flags(const std::vector<std::string> &labels);
