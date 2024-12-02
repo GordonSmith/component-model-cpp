@@ -12,9 +12,26 @@ using namespace cmcpp;
 #include <iostream>
 #include <vector>
 #include <utility>
+#include <cassert>
 #include <fmt/core.h>
 
 using namespace cmcpp;
+
+std::pair<char8_t *, size_t> encodeTo(void *dest, const char8_t *src, uint32_t byte_len, GuestEncoding encoding)
+{
+    switch (encoding)
+    {
+    case GuestEncoding::Utf8:
+    case GuestEncoding::Latin1:
+        std::memcpy(dest, src, byte_len);
+        return std::make_pair(reinterpret_cast<char8_t *>(dest), byte_len);
+    case GuestEncoding::Utf16le:
+        assert(false);
+        break;
+    default:
+        throw std::runtime_error("Invalid encoding");
+    }
+}
 
 class Heap
 {

@@ -17,23 +17,31 @@ namespace cmcpp
         uint32_t ptr = cx.opts->realloc(0, 0, dst_alignment, dst_byte_length);
         assert(ptr == align_to(ptr, dst_alignment));
         assert(ptr + dst_byte_length <= cx.opts->memory.size());
-        auto enc_len = encodeTo(&cx.opts->memory[ptr], src, src_code_units, dst_encoding);
-        assert(dst_byte_length == enc_len);
+        auto encoded = cx.opts->encodeTo(&cx.opts->memory[ptr], src, src_code_units, dst_encoding);
+        assert(dst_byte_length == encoded.second);
         return std::make_pair(ptr, src_code_units);
     }
 
     std::pair<uint32_t, uint32_t> store_string_to_utf8(const CallContext &cx, const char8_t *src, uint32_t src_code_units, uint32_t worst_case_size)
     {
         assert(worst_case_size <= MAX_STRING_BYTE_LENGTH);
-        uint32_t ptr = cx.opts->realloc(0, 0, 1, worst_case_size);
+        uint32_t ptr = cx.opts->realloc(0, 0, 1, src_code_units);
         assert(ptr + src_code_units <= cx.opts->memory.size());
-        auto enc_len = encodeTo(&cx.opts->memory[ptr], src, worst_case_size, GuestEncoding::Utf8);
-        if (enc_len < worst_case_size)
+        auto encoded = cx.opts->encodeTo(&cx.opts->memory[ptr], src, src_code_units, GuestEncoding::Utf8);
+        // std::memcpy(&cx.opts->memory[0], &encoded[0], src_code_units);
+        if (src_code_units < encoded.second)
         {
-            assert(enc_len <= MAX_STRING_BYTE_LENGTH);
-            ptr = cx.opts->realloc(ptr, src_code_units, 1, (int)enc_len);
+            assert(worst_case_size <= MAX_STRING_BYTE_LENGTH);
+            ptr = cx.opts->realloc(ptr, src_code_units, 1, worst_case_size);
+            assert(ptr + worst_case_size <= cx.opts->memory.size());
+            std::memcpy(&cx.opts->memory[ptr + src_code_units], &encoded.first[ptr], encoded.second);
+            if (worst_case_size > encoded.second)
+            {
+                ptr = cx.opts->realloc(ptr, worst_case_size, 1, encoded.second);
+                assert(ptr + encoded.second <= cx.opts->memory.size());
+            }
         }
-        return std::make_pair(ptr, enc_len);
+        return std::make_pair(ptr, encoded.second);
     }
 
     std::pair<uint32_t, uint32_t> store_utf16_to_utf8(const CallContext &cx, const char8_t *src, uint32_t src_code_units)
@@ -51,25 +59,18 @@ namespace cmcpp
     std::pair<uint32_t, uint32_t> store_utf8_to_utf16(const CallContext &cx, const char8_t *src, uint32_t src_code_units)
     {
         uint32_t worst_case_size = 2 * src_code_units;
-        if (worst_case_size > MAX_STRING_BYTE_LENGTH)
-            throw std::runtime_error("Worst case size exceeds maximum string byte length");
+        assert(worst_case_size <= MAX_STRING_BYTE_LENGTH);
         uint32_t ptr = cx.opts->realloc(0, 0, 2, worst_case_size);
-        if (ptr != align_to(ptr, 2))
-            throw std::runtime_error("Pointer misaligned");
-        if (ptr + worst_case_size > cx.opts->memory.size())
-            throw std::runtime_error("Out of bounds access");
-        auto enc_len = encodeTo(&cx.opts->memory[ptr], src, src_code_units, GuestEncoding::Utf16le);
-        if (enc_len < worst_case_size)
+        assert(ptr == align_to(ptr, 2));
+        assert(ptr + worst_case_size <= cx.opts->memory.size());
+        auto encoded = cx.opts->encodeTo(&cx.opts->memory[ptr], src, src_code_units, GuestEncoding::Utf16le);
+        if (encoded.second < worst_case_size)
         {
-            uint32_t cleanup_ptr = ptr;
-            ptr = cx.opts->realloc(ptr, worst_case_size, 2, enc_len);
-            std::memcpy(&cx.opts->memory[ptr], &cx.opts->memory[ptr], enc_len);
-            if (ptr != align_to(ptr, 2))
-                throw std::runtime_error("Pointer misaligned");
-            if (ptr + enc_len > cx.opts->memory.size())
-                throw std::runtime_error("Out of bounds access");
+            ptr = cx.opts->realloc(ptr, worst_case_size, 2, encoded.second);
+            assert(ptr == align_to(ptr, 2));
+            assert(ptr + encoded.second <= cx.opts->memory.size());
         }
-        uint32_t code_units = static_cast<uint32_t>(enc_len / 2);
+        uint32_t code_units = static_cast<uint32_t>(encoded.second / 2);
         return std::make_pair(ptr, code_units);
     }
 
@@ -105,17 +106,16 @@ namespace cmcpp
                     cx.opts->memory[ptr + 2 * j] = cx.opts->memory[ptr + j];
                     cx.opts->memory[ptr + 2 * j + 1] = 0;
                 }
-                auto enc_len = encodeTo(&cx.opts->memory[ptr + 2 * dst_byte_length], src, src_code_units, GuestEncoding::Utf16le);
-                if (worst_case_size > enc_len)
+                auto encoded = cx.opts->encodeTo(&cx.opts->memory[ptr + 2 * dst_byte_length], src, src_code_units, GuestEncoding::Utf16le);
+                if (worst_case_size > encoded.second)
                 {
-                    //  TODO - skipping the truncation for now...
-                    // ptr = cx.opts->realloc(ptr, worst_case_size, 2, enc_len);
-                    // if (ptr != align_to(ptr, 2))
-                    //     throw std::runtime_error("Pointer misaligned");
-                    // if (ptr + enc_len > cx.opts->memory.size())
-                    //     throw std::runtime_error("Out of bounds access");
+                    ptr = cx.opts->realloc(ptr, worst_case_size, 2, encoded.second);
+                    if (ptr != align_to(ptr, 2))
+                        throw std::runtime_error("Pointer misaligned");
+                    if (ptr + encoded.second > cx.opts->memory.size())
+                        throw std::runtime_error("Out of bounds access");
                 }
-                uint32_t tagged_code_units = static_cast<uint32_t>(enc_len / 2) | UTF16_TAG;
+                uint32_t tagged_code_units = static_cast<uint32_t>(encoded.second / 2) | UTF16_TAG;
                 return std::make_pair(ptr, tagged_code_units);
             }
         }
@@ -143,16 +143,16 @@ namespace cmcpp
         if (ptr + src_byte_length > cx.opts->memory.size())
             throw std::runtime_error("Not enough memory");
 
-        auto enc_len = encodeTo(&cx.opts->memory[ptr], src, src_code_units, GuestEncoding::Utf16le);
+        auto encoded = cx.opts->encodeTo(&cx.opts->memory[ptr], src, src_code_units, GuestEncoding::Utf16le);
         const uint8_t *enc_src_ptr = &cx.opts->memory[ptr];
-        if (std::any_of(enc_src_ptr, enc_src_ptr + enc_len, [](uint8_t c)
+        if (std::any_of(enc_src_ptr, enc_src_ptr + encoded.second, [](uint8_t c)
                         { return static_cast<unsigned char>(c) >= (1 << 8); }))
         {
-            uint32_t tagged_code_units = static_cast<uint32_t>(enc_len / 2) | UTF16_TAG;
+            uint32_t tagged_code_units = static_cast<uint32_t>(encoded.second / 2) | UTF16_TAG;
             return std::make_pair(ptr, tagged_code_units);
         }
 
-        uint32_t latin1_size = static_cast<uint32_t>(enc_len / 2);
+        uint32_t latin1_size = static_cast<uint32_t>(encoded.second / 2);
         for (uint32_t i = 0; i < latin1_size; ++i)
             cx.opts->memory[ptr + i] = cx.opts->memory[ptr + 2 * i];
 

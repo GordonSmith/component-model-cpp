@@ -6,6 +6,7 @@
 #include <random>
 #include <sstream>
 #include <limits>
+#include <locale>
 #include <codecvt>
 
 #include <fmt/core.h>
@@ -454,21 +455,35 @@ namespace cmcpp
         }
     }
 
-    size_t encodeTo(void *dest, const char8_t *src, uint32_t byte_len, GuestEncoding encoding)
-    {
-        switch (encoding)
-        {
-        case GuestEncoding::Utf8:
-        case GuestEncoding::Latin1:
-            std::memcpy(dest, src, byte_len);
-            return byte_len;
-        case GuestEncoding::Utf16le:
-            assert(false);
-            break;
-        default:
-            throw std::runtime_error("Invalid encoding");
-        }
-    }
+    // std::u32string encode(const char8_t *src, uint32_t code_units, GuestEncoding encoding)
+    // {
+    //     std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
+    //     switch (encoding)
+    //     {
+    //     case GuestEncoding::Utf8:
+    //     case GuestEncoding::Latin1:
+    //     case GuestEncoding::Utf16le:
+    //         return conv.from_bytes(reinterpret_cast<const char *>(src), reinterpret_cast<const char *>(src + byte_len));
+    //     default:
+    //         throw std::runtime_error("Invalid encoding");
+    //     }
+    // }
+
+    // size_t encodeTo(void *dest, const char8_t *src, uint32_t byte_len, GuestEncoding encoding)
+    // {
+    //     switch (encoding)
+    //     {
+    //     case GuestEncoding::Utf8:
+    //     case GuestEncoding::Latin1:
+    //         std::memcpy(dest, src, byte_len);
+    //         return byte_len;
+    //     case GuestEncoding::Utf16le:
+    //         assert(false);
+    //         break;
+    //     default:
+    //         throw std::runtime_error("Invalid encoding");
+    //     }
+    // }
 
     CoreValueIter::CoreValueIter(const std::vector<WasmVal> &values) : values(values), i(_i)
     {

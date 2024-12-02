@@ -27,7 +27,7 @@ namespace cmcpp
             return _realloc(ptr, old_size, align, new_size);
         }
 
-        virtual size_t encodeTo(void *dest, const char8_t *src, uint32_t byte_len, GuestEncoding encoding)
+        virtual std::pair<char8_t *, size_t> encodeTo(void *dest, const char8_t *src, uint32_t byte_len, GuestEncoding encoding)
         {
             return _encodeTo(dest, src, byte_len, encoding);
         }

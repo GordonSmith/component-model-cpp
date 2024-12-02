@@ -32,7 +32,8 @@ namespace cmcpp
     Val despecialize(const Val &v);
     ValType discriminant_type(const std::vector<case_ptr> &cases);
 
-    size_t encodeTo(void *, const char8_t *src, uint32_t byte_len, GuestEncoding encoding);
+    // std::u32string encode(const char8_t *src, uint32_t byte_len, GuestEncoding encoding);
+    // size_t encodeTo(void *, const char8_t *src, uint32_t byte_len, GuestEncoding encoding);
     uint32_t encode_float_as_i32(float32_t f);
     uint64_t encode_float_as_i64(float64_t f);
 
