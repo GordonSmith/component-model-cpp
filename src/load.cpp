@@ -20,7 +20,7 @@ namespace cmcpp
         return retVal;
     }
 
-    string_t load_string_from_range(const LiftLowerContext &cx, uint32_t ptr, uint32_t tagged_code_units)
+    string_ptr load_string_from_range(const LiftLowerContext &cx, uint32_t ptr, uint32_t tagged_code_units)
     {
         HostEncoding encoding;
         uint32_t byte_length = tagged_code_units;
@@ -54,10 +54,10 @@ namespace cmcpp
         assert(isAligned(ptr, alignment));
         assert(ptr + byte_length <= cx.opts->memory.size());
         auto [dec_str, dec_len] = cx.opts->decodeFrom(&cx.opts->memory[ptr], byte_length, encoding);
-        return string_t(dec_str, dec_len);
+        return std::make_shared<string_t>(dec_str, dec_len);
     }
 
-    string_t load_string(const LiftLowerContext &cx, uint32_t ptr)
+    string_ptr load_string(const LiftLowerContext &cx, uint32_t ptr)
     {
         uint32_t begin = load_int<uint32_t>(cx, ptr, 4);
         uint32_t tagged_code_units = load_int<uint32_t>(cx, ptr + 4, 4);

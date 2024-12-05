@@ -163,10 +163,10 @@ namespace cmcpp
         return std::make_pair(ptr, latin1_size);
     }
 
-    std::pair<uint32_t, uint32_t> store_string_into_range(const LiftLowerContext &cx, const string_t &v, HostEncoding src_encoding)
+    std::pair<uint32_t, uint32_t> store_string_into_range(const LiftLowerContext &cx, const string_ptr &v, HostEncoding src_encoding)
     {
-        const char *src = v.ptr;
-        const size_t src_tagged_code_units = v.len;
+        const char *src = v->ptr;
+        const size_t src_tagged_code_units = v->len;
         HostEncoding src_simple_encoding;
         uint32_t src_code_units;
 
@@ -231,7 +231,7 @@ namespace cmcpp
         }
     }
 
-    void store_string(const LiftLowerContext &cx, const string_t &v, uint32_t ptr)
+    void store_string(const LiftLowerContext &cx, const string_ptr &v, uint32_t ptr)
     {
         auto [begin, tagged_code_units] = store_string_into_range(cx, v);
         store_int(cx, begin, ptr, 4);
@@ -336,7 +336,7 @@ namespace cmcpp
             store_int(cx, char_to_i32(std::get<wchar_t>(v)), ptr, 4);
             break;
         case ValType::String:
-            store_string(cx, std::get<string_t>(v), ptr);
+            store_string(cx, std::get<string_ptr>(v), ptr);
             break;
         case ValType::List:
             store_list(cx, std::get<list_ptr>(v), ptr, std::get<list_ptr>(t)->lt);

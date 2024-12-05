@@ -37,7 +37,7 @@ namespace cmcpp
         return i;
     }
 
-    string_t lift_flat_string(const LiftLowerContext &cx, const CoreValueIter &vi)
+    string_ptr lift_flat_string(const LiftLowerContext &cx, const CoreValueIter &vi)
     {
         auto ptr = vi.next(int32_t());
         auto packed_length = vi.next(int32_t());

@@ -88,8 +88,8 @@ void test(const Val &t, std::vector<WasmVal> vals_to_lift, std::optional<Val> v 
     auto expected32 = valType(got) == ValType::U32 ? std::get<uint32_t>(v.value()) : 0;
     auto gotChar = valType(got) == ValType::Char ? std::get<wchar_t>(got) : 0;
     auto expectedChar = valType(got) == ValType::Char ? std::get<wchar_t>(v.value()) : 0;
-    // auto gotString = valType(got) == ValType::String ? std::get<string_t>(got).to_string() : "";
-    // auto expectedString = valType(got) == ValType::String ? std::get<string_t>(v.value()).to_string() : "";
+    // auto gotString = valType(got) == ValType::String ? std::get<string_ptr>(got).to_string() : "";
+    // auto expectedString = valType(got) == ValType::String ? std::get<string_ptr>(v.value()).to_string() : "";
 
     CHECK(got == v.value());
 
@@ -219,13 +219,13 @@ void test_string_internal(HostEncoding host_encoding, GuestEncoding guest_encodi
 
     CallContextPtr cx = mk_cx(heap.memory, host_encoding);
 
-    test(string_t(), {0, (int32_t)guestS.length()}, string_t(expected), std::nullopt, std::nullopt, cx);
+    test(string_ptr(), {0, (int32_t)guestS.length()}, std::make_shared<string_t>(expected), std::nullopt, std::nullopt, cx);
 }
 
 TEST_CASE("String")
 {
     std::vector<HostEncoding> host_encodings = {HostEncoding::Utf8}; //, HostEncoding::Utf16, HostEncoding::Latin1_Utf16};
-    std::vector<std::string> fun_strings = {"xxx", "a", "hi", "\x00", "a\x00b", "\x80", "\x80b", "ab\xefc", "\u01ffy", "xy\u01ff", "a\ud7ffb", "a\u02ff\u03ff\u04ffbc", "\uf123", "\uf123\uf123abc", "abcdef\uf123"};
+    std::vector<std::string> fun_strings = {"", "a", "hi", "\x00", "a\x00b", "\x80", "\x80b", "ab\xefc", "\u01ffy", "xy\u01ff", "a\ud7ffb", "a\u02ff\u03ff\u04ffbc", "\uf123", "\uf123\uf123abc", "abcdef\uf123"};
     for (auto s : fun_strings)
     {
         for (auto h_enc : host_encodings)
@@ -258,7 +258,7 @@ TEST_CASE("List")
     test_heap(std::make_shared<list_t>(int32_t()), std::make_shared<list_t>(int32_t(), std::vector<Val>{(int32_t)-1, (int32_t)-2, (int32_t)-3}), {0, 3}, {0xff, 0xff, 0xff, 0xff, 0xfe, 0xff, 0xff, 0xff, 0xfd, 0xff, 0xff, 0xff});
     test_heap(std::make_shared<list_t>(int64_t()), std::make_shared<list_t>(int64_t(), std::vector<Val>{(int64_t)-1, (int64_t)-2}), {0, 2}, {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff});
     test_heap(std::make_shared<list_t>(wchar_t()), std::make_shared<list_t>(wchar_t(), std::vector<Val>{L'A', L'B', L'c'}), {0, 3}, {65, 0, 0, 0, 66, 0, 0, 0, 99, 0, 0, 0});
-    test_heap(std::make_shared<list_t>(string_t()), std::make_shared<list_t>(string_t(), std::vector<Val>{string_t("hi"), string_t("wat")}), {0, 2}, {16, 0, 0, 0, 2, 0, 0, 0, 21, 0, 0, 0, 3, 0, 0, 0, 'h', 'i', 0xf, 0xf, 0xf, 'w', 'a', 't'});
+    test_heap(std::make_shared<list_t>(string_ptr()), std::make_shared<list_t>(string_ptr(), std::vector<Val>{std::make_shared<string_t>("hi"), std::make_shared<string_t>("wat")}), {0, 2}, {16, 0, 0, 0, 2, 0, 0, 0, 21, 0, 0, 0, 3, 0, 0, 0, 'h', 'i', 0xf, 0xf, 0xf, 'w', 'a', 't'});
     // test_heap(List(List(U8())), [[3,4,5],[],[6,7]], [0,3], [24,0,0,0, 3,0,0,0, 0,0,0,0, 0,0,0,0, 27,0,0,0, 2,0,0,0, 3,4,5,  6,7])
     // test_heap(List(List(U16())), [[5,6]], [0,1], [8,0,0,0, 2,0,0,0, 5,0, 6,0])
     // test_heap(List(List(U16())), None, [0,1], [9,0,0,0, 2,0,0,0, 0, 5,0, 6,0])

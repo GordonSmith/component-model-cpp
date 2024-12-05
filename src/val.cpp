@@ -15,7 +15,7 @@ const char *ValTypeNames[] = {
     "float32_t",
     "float64_t",
     "wchar_t",
-    "string_t",
+    "string_ptr",
     "list_ptr",
     "field_ptr",
     "record_ptr",
@@ -55,9 +55,9 @@ namespace cmcpp
             {
                 return arg1 == arg2;
             }
-            else if constexpr (std::is_same_v<T, string_t>)
+            else if constexpr (std::is_same_v<T, string_ptr>)
             {
-                return arg1 == std::get<string_t>(rhs);
+                return *arg1 ==(*std::get<string_ptr>(rhs));
             }
             else if constexpr (std::is_same_v<T, list_ptr>)
             {
@@ -106,6 +106,24 @@ namespace cmcpp
     }
 
     //  ----------------------------------------------------------------------
+
+    string_t::string_t() {}
+    string_t::string_t(const char *ptr, size_t len) : ptr(ptr), len(len) {}
+    string_t::string_t(const std::string &_str)
+    {
+        str = _str;
+        ptr = str.c_str();
+        len = str.size();
+    }
+    std::string string_t::to_string() const
+    {
+        return std::string((const char *)ptr, len);
+    }
+
+    bool string_t::operator==(const string_t &rhs) const
+    {
+        return std::string_view((const char *)ptr, len).compare(std::string_view((const char *)rhs.ptr, rhs.len)) == 0;
+    }
 
     list_t::list_t() {}
     list_t::list_t(const Val &lt) : lt(lt) {}

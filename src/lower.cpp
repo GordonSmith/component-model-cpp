@@ -9,7 +9,7 @@
 namespace cmcpp
 {
 
-    std::vector<WasmVal> lower_flat_string(const LiftLowerContext &cx, const string_t &string)
+    std::vector<WasmVal> lower_flat_string(const LiftLowerContext &cx, const string_ptr &string)
     {
         auto [ptr, packed_length] = store_string_into_range(cx, string);
         return {(int32_t)ptr, (int32_t)packed_length};
@@ -157,7 +157,7 @@ namespace cmcpp
         case ValType::Char:
             return {char_to_i32(std::get<wchar_t>(v))};
         case ValType::String:
-            return lower_flat_string(cx, std::get<string_t>(v));
+            return lower_flat_string(cx, std::get<string_ptr>(v));
         case ValType::List:
             return lower_flat_list(cx, std::get<list_ptr>(v), std::get<list_ptr>(t)->lt);
         case ValType::Record:

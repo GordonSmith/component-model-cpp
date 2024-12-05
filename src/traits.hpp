@@ -160,8 +160,9 @@ namespace cmcpp
     };
 
     class string_t;
+    using string_ptr = std::shared_ptr<string_t>;
     template <>
-    struct ValTrait<string_t>
+    struct ValTrait<string_ptr>
     {
         static ValType type() { return ValType::String; }
     };
