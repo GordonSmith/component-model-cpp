@@ -7,7 +7,7 @@
 
 namespace cmcpp
 {
-    std::vector<WasmVal> lower_flat(const CallContext &cx, const Val &v, const Val &t);
+    std::vector<WasmVal> lower_flat(const LiftLowerContext &cx, const Val &v, const Val &t);
 }
 
 #endif

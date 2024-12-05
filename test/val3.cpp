@@ -203,11 +203,11 @@ namespace cmcpp3
     // Val::Val(const char *s) : val{}
     // {
     //     val.kind = ValType::String;
-    //     val.of.s.ptr = (const char8_t *)s;
+    //     val.of.s.ptr = (const char *)s;
     //     val.of.s.len = strlen(s);
     // }
 
-    // Val::Val(const char8_t *s, size_t len) : val{}
+    // Val::Val(const char *s, size_t len) : val{}
     // {
     //     val.kind = ValType::String;
     //     val.of.s.ptr = s;

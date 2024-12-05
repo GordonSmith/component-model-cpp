@@ -37,21 +37,21 @@ namespace cmcpp
         return i;
     }
 
-    string_ptr lift_flat_string(const CallContext &cx, const CoreValueIter &vi)
+    string_t lift_flat_string(const LiftLowerContext &cx, const CoreValueIter &vi)
     {
         auto ptr = vi.next(int32_t());
         auto packed_length = vi.next(int32_t());
         return load_string_from_range(cx, ptr, packed_length);
     }
 
-    list_ptr lift_flat_list(const CallContext &cx, const CoreValueIter &vi, const Val &elem_type)
+    list_ptr lift_flat_list(const LiftLowerContext &cx, const CoreValueIter &vi, const Val &elem_type)
     {
         auto ptr = vi.next(int32_t());
         auto length = vi.next(int32_t());
         return load_list_from_range(cx, ptr, length, elem_type);
     }
 
-    record_ptr lift_flat_record(const CallContext &cx, const CoreValueIter &vi, const std::vector<field_ptr> fields)
+    record_ptr lift_flat_record(const LiftLowerContext &cx, const CoreValueIter &vi, const std::vector<field_ptr> fields)
     {
         auto r = std::make_shared<record_t>();
         for (auto f : fields)
@@ -139,7 +139,7 @@ namespace cmcpp
         }
     };
 
-    variant_ptr lift_flat_variant(const CallContext &cx, const CoreValueIter &vi, const std::vector<case_ptr> &cases)
+    variant_ptr lift_flat_variant(const LiftLowerContext &cx, const CoreValueIter &vi, const std::vector<case_ptr> &cases)
     {
         std::vector<std::string> flat_types = flatten_variant(cases);
         assert(flat_types[0] == "i32");
@@ -179,7 +179,7 @@ namespace cmcpp
         return unpack_flags_from_int(i, labels);
     }
 
-    Val lift_flat(const CallContext &cx, const CoreValueIter &vi, const Val &_t)
+    Val lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi, const Val &_t)
     {
         auto t = despecialize(_t);
         switch (valType(t))

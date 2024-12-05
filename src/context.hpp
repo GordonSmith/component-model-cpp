@@ -33,7 +33,8 @@ namespace cmcpp
     using GuestMemory = std::span<uint8_t, std::dynamic_extent>;
     using GuestRealloc = std::function<int(int ptr, int old_size, int align, int new_size)>;
     using GuestPostReturn = std::function<void()>;
-    using HostEncodeTo = std::function<std::pair<char8_t *, size_t>(void *dest, const char8_t *src, uint32_t byte_len, GuestEncoding encoding)>;
+    using HostEncodeTo = std::function<std::pair<char8_t *, size_t>(void *dest, const char *src, uint32_t byte_len, GuestEncoding encoding)>;
+    using HostDecodeFrom = std::function<std::pair<char *, size_t>(const void *src, uint32_t byte_len, HostEncoding encoding)>;
 
     class CanonicalOptions
     {
@@ -42,23 +43,33 @@ namespace cmcpp
 
         GuestMemory memory;
         HostEncoding string_encoding;
-
         virtual int realloc(int ptr, int old_size, int align, int new_size) = 0;
-        virtual std::pair<char8_t *, size_t> encodeTo(void *dest, const char8_t *src, uint32_t byte_len, GuestEncoding encoding) = 0;
         virtual void post_return() = 0;
+        bool sync = true;
+        // std::optional<std::function<void>> callback;
+        bool always_task_return = false;
+
+        virtual std::pair<char8_t *, size_t> encodeTo(void *dest, const char *src, uint32_t byte_len, GuestEncoding encoding) = 0;
+        virtual std::pair<char *, size_t> decodeFrom(const void *src, uint32_t byte_len, HostEncoding encoding) = 0;
     };
     using CanonicalOptionsPtr = std::shared_ptr<CanonicalOptions>;
-    CanonicalOptionsPtr createCanonicalOptions(const GuestMemory &memory, const GuestRealloc &realloc, const HostEncodeTo &encodeTo, HostEncoding encoding, const GuestPostReturn &post_return);
+    CanonicalOptionsPtr createCanonicalOptions(const GuestMemory &memory, const GuestRealloc &realloc,
+                                               HostEncodeTo encodeTo,
+                                               HostDecodeFrom decodeFrom,
+                                               HostEncoding encoding, const GuestPostReturn &post_return);
 
-    class CallContext
+    class LiftLowerContext
     {
     public:
-        virtual ~CallContext() = default;
+        virtual ~LiftLowerContext() = default;
 
         CanonicalOptionsPtr opts;
     };
-    using CallContextPtr = std::shared_ptr<CallContext>;
-    CallContextPtr createCallContext(const GuestMemory &memory, const GuestRealloc &realloc, const HostEncodeTo &encodeTo, HostEncoding encoding = HostEncoding::Utf8, const GuestPostReturn &post_return = nullptr);
+    using CallContextPtr = std::shared_ptr<LiftLowerContext>;
+    CallContextPtr createCallContext(const GuestMemory &memory, const GuestRealloc &realloc,
+                                     HostEncodeTo encodeTo,
+                                     HostDecodeFrom decodeFrom,
+                                     HostEncoding encoding = HostEncoding::Utf8, const GuestPostReturn &post_return = nullptr);
 }
 
 #endif

@@ -8,7 +8,7 @@ namespace cmcpp
 
     //  Vals  ----------------------------------------------------------------
 
-    using Val = std::variant<bool, int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t, int64_t, uint64_t, float32_t, float64_t, wchar_t, string_ptr, list_ptr, field_ptr, record_ptr, tuple_ptr, case_ptr, variant_ptr, enum_ptr, option_ptr, result_ptr, flags_ptr>;
+    using Val = std::variant<bool, int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t, int64_t, uint64_t, float32_t, float64_t, wchar_t, string_t, list_ptr, field_ptr, record_ptr, tuple_ptr, case_ptr, variant_ptr, enum_ptr, option_ptr, result_ptr, flags_ptr>;
 
     ValType valType(const Val &v);
     const char *valTypeName(ValType type);
@@ -22,16 +22,21 @@ namespace cmcpp
         std::string str;
 
     public:
-        const char8_t *ptr = nullptr;
-        size_t len = 0;
+        const char *ptr;
+        size_t len;
 
-        string_t();
-        string_t(const char8_t *ptr, size_t len);
-        string_t(const std::string &_str);
+        string_t() : ptr(nullptr), len(0) {}
+        string_t(const char *ptr, size_t len) : ptr(ptr), len(len) {};
+        string_t(const std::string &_str) : str(_str), ptr(_str.c_str()), len(_str.length()) {};
         ~string_t() = default;
-        bool operator==(const string_t &rhs) const;
-
-        std::string to_string() const;
+        bool operator==(const string_t &rhs) const
+        {
+            return std::string_view(ptr, len).compare(std::string_view(rhs.ptr, rhs.len)) == 0;
+        }
+        std::string to_string() const
+        {
+            return std::string(ptr, len);
+        }
     };
 
     class list_t

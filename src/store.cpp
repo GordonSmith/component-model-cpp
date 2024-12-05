@@ -10,7 +10,7 @@ namespace cmcpp
 {
     const uint32_t MAX_STRING_BYTE_LENGTH = (1U << 31) - 1;
 
-    std::pair<uint32_t, uint32_t> store_string_copy(const CallContext &cx, const char8_t *src, uint32_t src_code_units, uint32_t dst_code_unit_size, uint32_t dst_alignment, GuestEncoding dst_encoding)
+    std::pair<uint32_t, uint32_t> store_string_copy(const LiftLowerContext &cx, const char *src, uint32_t src_code_units, uint32_t dst_code_unit_size, uint32_t dst_alignment, GuestEncoding dst_encoding)
     {
         uint32_t dst_byte_length = dst_code_unit_size * src_code_units;
         assert(dst_byte_length <= MAX_STRING_BYTE_LENGTH);
@@ -22,7 +22,7 @@ namespace cmcpp
         return std::make_pair(ptr, src_code_units);
     }
 
-    std::pair<uint32_t, uint32_t> store_string_to_utf8(const CallContext &cx, const char8_t *src, uint32_t src_code_units, uint32_t worst_case_size)
+    std::pair<uint32_t, uint32_t> store_string_to_utf8(const LiftLowerContext &cx, const char *src, uint32_t src_code_units, uint32_t worst_case_size)
     {
         assert(worst_case_size <= MAX_STRING_BYTE_LENGTH);
         uint32_t ptr = cx.opts->realloc(0, 0, 1, src_code_units);
@@ -44,19 +44,19 @@ namespace cmcpp
         return std::make_pair(ptr, encoded.second);
     }
 
-    std::pair<uint32_t, uint32_t> store_utf16_to_utf8(const CallContext &cx, const char8_t *src, uint32_t src_code_units)
+    std::pair<uint32_t, uint32_t> store_utf16_to_utf8(const LiftLowerContext &cx, const char *src, uint32_t src_code_units)
     {
         uint32_t worst_case_size = src_code_units * 3;
         return store_string_to_utf8(cx, src, src_code_units, worst_case_size);
     }
 
-    std::pair<uint32_t, uint32_t> store_latin1_to_utf8(const CallContext &cx, const char8_t *src, uint32_t src_code_units)
+    std::pair<uint32_t, uint32_t> store_latin1_to_utf8(const LiftLowerContext &cx, const char *src, uint32_t src_code_units)
     {
         uint32_t worst_case_size = src_code_units * 2;
         return store_string_to_utf8(cx, src, src_code_units, worst_case_size);
     }
 
-    std::pair<uint32_t, uint32_t> store_utf8_to_utf16(const CallContext &cx, const char8_t *src, uint32_t src_code_units)
+    std::pair<uint32_t, uint32_t> store_utf8_to_utf16(const LiftLowerContext &cx, const char *src, uint32_t src_code_units)
     {
         uint32_t worst_case_size = 2 * src_code_units;
         assert(worst_case_size <= MAX_STRING_BYTE_LENGTH);
@@ -74,7 +74,7 @@ namespace cmcpp
         return std::make_pair(ptr, code_units);
     }
 
-    std::pair<uint32_t, uint32_t> store_string_to_latin1_or_utf16(const CallContext &cx, const char8_t *src, uint32_t src_code_units)
+    std::pair<uint32_t, uint32_t> store_string_to_latin1_or_utf16(const LiftLowerContext &cx, const char *src, uint32_t src_code_units)
     {
         assert(src_code_units <= MAX_STRING_BYTE_LENGTH);
         uint32_t ptr = cx.opts->realloc(0, 0, 2, src_code_units);
@@ -130,7 +130,7 @@ namespace cmcpp
         return std::make_pair(ptr, dst_byte_length);
     }
 
-    std::pair<uint32_t, uint32_t> store_probably_utf16_to_latin1_or_utf16(const CallContext &cx, const char8_t *src, uint32_t src_code_units)
+    std::pair<uint32_t, uint32_t> store_probably_utf16_to_latin1_or_utf16(const LiftLowerContext &cx, const char *src, uint32_t src_code_units)
     {
         uint32_t src_byte_length = 2 * src_code_units;
         if (src_byte_length > MAX_STRING_BYTE_LENGTH)
@@ -163,10 +163,10 @@ namespace cmcpp
         return std::make_pair(ptr, latin1_size);
     }
 
-    std::pair<uint32_t, uint32_t> store_string_into_range(const CallContext &cx, const string_ptr &v, HostEncoding src_encoding)
+    std::pair<uint32_t, uint32_t> store_string_into_range(const LiftLowerContext &cx, const string_t &v, HostEncoding src_encoding)
     {
-        const char8_t *src = v->ptr;
-        const size_t src_tagged_code_units = v->len;
+        const char *src = v.ptr;
+        const size_t src_tagged_code_units = v.len;
         HostEncoding src_simple_encoding;
         uint32_t src_code_units;
 
@@ -223,7 +223,7 @@ namespace cmcpp
     }
 
     template <typename T>
-    void store_int(const CallContext &cx, const T &v, uint32_t ptr, uint8_t nbytes)
+    void store_int(const LiftLowerContext &cx, const T &v, uint32_t ptr, uint8_t nbytes)
     {
         for (size_t i = 0; i < nbytes; ++i)
         {
@@ -231,14 +231,14 @@ namespace cmcpp
         }
     }
 
-    void store_string(const CallContext &cx, const string_ptr &v, uint32_t ptr)
+    void store_string(const LiftLowerContext &cx, const string_t &v, uint32_t ptr)
     {
         auto [begin, tagged_code_units] = store_string_into_range(cx, v);
         store_int(cx, begin, ptr, 4);
         store_int(cx, tagged_code_units, ptr + 4, 4);
     }
 
-    std::pair<uint32_t, uint32_t> store_list_into_range(const CallContext &cx, const list_ptr &v, const Val &elem_type)
+    std::pair<uint32_t, uint32_t> store_list_into_range(const LiftLowerContext &cx, const list_ptr &v, const Val &elem_type)
     {
         size_t nbytes = elem_size(elem_type);
         auto byte_length = v->vs.size() * nbytes;
@@ -262,14 +262,14 @@ namespace cmcpp
         return {ptr, v->vs.size()};
     }
 
-    void store_list(const CallContext &cx, const list_ptr &list, uint32_t ptr, const Val &elem_type)
+    void store_list(const LiftLowerContext &cx, const list_ptr &list, uint32_t ptr, const Val &elem_type)
     {
         auto [begin, length] = store_list_into_range(cx, list, elem_type);
         store_int(cx, begin, ptr, 4);
         store_int(cx, length, ptr + 4, 4);
     }
 
-    // void store_record(const CallContext &cx, const record_ptr &record, uint32_t ptr)
+    // void store_record(const LiftLowerContext &cx, const record_ptr &record, uint32_t ptr)
     // {
     //     for (auto f : record->fields)
     //     {
@@ -279,7 +279,7 @@ namespace cmcpp
     //     }
     // }
 
-    // void store_variant(const CallContext &cx, const variant_ptr &v, uint32_t ptr)
+    // void store_variant(const LiftLowerContext &cx, const variant_ptr &v, uint32_t ptr)
     // {
     //     auto [case_index, case_value] = match_case(v);
     //     auto disc_size = elem_size(discriminant_type(v->cases));
@@ -293,7 +293,7 @@ namespace cmcpp
     //     }
     // }
 
-    void store(const CallContext &cx, const Val &v, const Val &t, uint32_t ptr)
+    void store(const LiftLowerContext &cx, const Val &v, const Val &t, uint32_t ptr)
     {
         assert(ptr == align_to(ptr, alignment(valType(v))));
         assert(ptr + elem_size(v) <= cx.opts->memory.size());
@@ -336,7 +336,7 @@ namespace cmcpp
             store_int(cx, char_to_i32(std::get<wchar_t>(v)), ptr, 4);
             break;
         case ValType::String:
-            store_string(cx, std::get<string_ptr>(v), ptr);
+            store_string(cx, std::get<string_t>(v), ptr);
             break;
         case ValType::List:
             store_list(cx, std::get<list_ptr>(v), ptr, std::get<list_ptr>(t)->lt);

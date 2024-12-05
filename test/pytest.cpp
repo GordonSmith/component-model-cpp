@@ -102,7 +102,7 @@ cmcpp::CanonicalOptionsPtr mk_opts(std::vector<uint8_t> memory = std::vector<uin
                                    const cmcpp::GuestRealloc &realloc = nullptr,
                                    const cmcpp::GuestPostReturn &post_return = nullptr)
 {
-    return cmcpp::createCanonicalOptions(memory, realloc, cmcpp::encodeTo, encoding, post_return);
+    return cmcpp::createCanonicalOptions(memory, realloc, cmcpp::encodeTo, cmcpp::decodeFrom, encoding, post_return);
 }
 
 struct ComponentInstance
@@ -114,7 +114,7 @@ cmcpp::CallContextPtr mk_cx(std::vector<uint8_t> memory = std::vector<uint8_t>()
                             const cmcpp::GuestRealloc &realloc = nullptr,
                             const cmcpp::GuestPostReturn &post_return = nullptr)
 {
-    return cmcpp::createCallContext(memory, realloc, cmcpp::encodeTo, encoding, post_return);
+    return cmcpp::createCallContext(memory, realloc, cmcpp::encodeTo, cmcpp::decodeFrom, encoding, post_return);
 }
 
 std::tuple<std::string, std::string, size_t> mk_str(const std::string &s)

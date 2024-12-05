@@ -2,11 +2,11 @@
 #include "lift.hpp"
 #include "lower.hpp"
 #include "util.hpp"
+#include "host-util.hpp"
 
 using namespace cmcpp;
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-
 #include <doctest/doctest.h>
 
 #include <iostream>
@@ -14,24 +14,6 @@ using namespace cmcpp;
 #include <utility>
 #include <cassert>
 #include <fmt/core.h>
-
-using namespace cmcpp;
-
-std::pair<char8_t *, size_t> encodeTo(void *dest, const char8_t *src, uint32_t byte_len, GuestEncoding encoding)
-{
-    switch (encoding)
-    {
-    case GuestEncoding::Utf8:
-    case GuestEncoding::Latin1:
-        std::memcpy(dest, src, byte_len);
-        return std::make_pair(reinterpret_cast<char8_t *>(dest), byte_len);
-    case GuestEncoding::Utf16le:
-        assert(false);
-        break;
-    default:
-        throw std::runtime_error("Invalid encoding");
-    }
-}
 
 class Heap
 {
@@ -77,13 +59,15 @@ std::vector<uint8_t> &globalMemory()
     g_memory.resize(1024 * 1024);
     return g_memory;
 }
+
 CallContextPtr mk_cx(std::vector<uint8_t> &memory = globalMemory(),
                      HostEncoding encoding = HostEncoding::Utf8,
                      const GuestRealloc &realloc = nullptr,
                      const GuestPostReturn &post_return = nullptr)
 {
-    return createCallContext(memory, realloc, encodeTo, encoding, post_return);
+    return createCallContext(memory, realloc, encodeTo, decodeFrom, encoding, post_return);
 }
+
 void test(const Val &t, std::vector<WasmVal> vals_to_lift, std::optional<Val> v = std::nullopt, std::optional<Val> lower_t = std::nullopt, std::optional<Val> lower_v = std::nullopt, const CallContextPtr &cx = mk_cx())
 {
     auto vi = CoreValueIter(vals_to_lift);
@@ -104,8 +88,8 @@ void test(const Val &t, std::vector<WasmVal> vals_to_lift, std::optional<Val> v 
     auto expected32 = valType(got) == ValType::U32 ? std::get<uint32_t>(v.value()) : 0;
     auto gotChar = valType(got) == ValType::Char ? std::get<wchar_t>(got) : 0;
     auto expectedChar = valType(got) == ValType::Char ? std::get<wchar_t>(v.value()) : 0;
-    auto gotString = valType(got) == ValType::String ? std::get<string_ptr>(got)->to_string() : "";
-    auto expectedString = valType(got) == ValType::String ? std::get<string_ptr>(v.value())->to_string() : "";
+    // auto gotString = valType(got) == ValType::String ? std::get<string_t>(got).to_string() : "";
+    // auto expectedString = valType(got) == ValType::String ? std::get<string_t>(v.value()).to_string() : "";
 
     CHECK(got == v.value());
 
@@ -125,19 +109,12 @@ void test(const Val &t, std::vector<WasmVal> vals_to_lift, std::optional<Val> v 
         void *retVal = heap.realloc(reinterpret_cast<void *>(original_ptr), original_size, alignment, new_size);
         return reinterpret_cast<std::intptr_t>(retVal);
     };
-    CallContextPtr cx2 = createCallContext(heap.memory, realloc, encodeTo, cx->opts->string_encoding);
+    CallContextPtr cx2 = createCallContext(heap.memory, realloc, encodeTo, decodeFrom, cx->opts->string_encoding);
     auto lowered_vals = lower_flat(*cx2, v.value(), t);
     auto vi2 = CoreValueIter(lowered_vals);
     got = lift_flat(*cx2, vi2, lower_t.value());
     CHECK(valType(got) == valType(lower_v.value()));
     CHECK(got == lower_v.value());
-}
-
-TEST_CASE("Record")
-{
-    auto rt = std::make_shared<record_t>(std::vector<field_ptr>{std::make_shared<field_t>("x", uint8_t()), std::make_shared<field_t>("y", uint16_t()), std::make_shared<field_t>("z", uint32_t())});
-    auto r = std::make_shared<record_t>(std::vector<field_ptr>{std::make_shared<field_t>("x", (uint8_t)1), std::make_shared<field_t>("y", (uint16_t)2), std::make_shared<field_t>("z", (uint32_t)3)});
-    test(rt, {1, 2, 3}, r);
 }
 
 TEST_CASE("Tuple")
@@ -169,33 +146,6 @@ TEST_CASE("Flags")
         strVec2[i] = std::to_string(i);
     }
     test(std::make_shared<flags_t>(strVec), {(int32_t)0xffffffff, (int32_t)0x1}, std::make_shared<flags_t>(strVec2));
-}
-
-TEST_CASE("Variant")
-{
-    auto t = std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("x", uint8_t()), std::make_shared<case_t>("y", float64_t()), std::make_shared<case_t>("z", bool())});
-    std::vector<WasmVal> vals_to_lift = {0, 42};
-    auto zero = vals_to_lift[0].index();
-    auto one = vals_to_lift[1].index();
-    test(t, {0, 42}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("x", (uint8_t)42)}));
-    test(t, {0, 256}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("x", (uint8_t)0)}));
-    test(t, {1, (int64_t)0x4048f5c3}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("y", (float64_t)3.140000104904175)}));
-    test(t, {2, false}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("z", false)}));
-
-    t = std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("w", uint8_t()), std::make_shared<case_t>("x", uint8_t(), "w"), std::make_shared<case_t>("y", uint8_t()), std::make_shared<case_t>("z", uint8_t(), "x")});
-    test(t, {0, 42}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("w", (uint8_t)42)}));
-    test(t, {1, 42}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("x|w", (uint8_t)42)}));
-    test(t, {2, 42}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("y", (uint8_t)42)}));
-    test(t, {3, 42}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("z|x|w", (uint8_t)42)}));
-}
-
-TEST_CASE("Variant2")
-{
-    auto t = std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("w", uint8_t()), std::make_shared<case_t>("x", uint8_t(), "w"), std::make_shared<case_t>("y", uint8_t()), std::make_shared<case_t>("z", uint8_t(), "x")});
-    auto t2 = std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("w", uint8_t())});
-    test(t, {1, 42}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("x|w", (uint8_t)42)}), t2, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("w", (uint8_t)42)}));
-    // test(t, {3, 42}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("z|x|w", (uint8_t)42)}), t2, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("w", (uint8_t)42)}));
-    test(t, {0, 42}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("w", (uint8_t)42)}), t2, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("w", (uint8_t)42)}));
 }
 
 TEST_CASE("Option")
@@ -262,39 +212,20 @@ void testVal(const Val &v, T expected)
     testWasmValVal({{expected, v}});
 }
 
-TEST_CASE("pairs")
-{
-    test_pairs(bool(), {{0, false}, {1, true}, {2, true}, {(int32_t)4294967295, true}});
-    test_pairs(uint8_t(), {{127, (uint8_t)127}, {128, (uint8_t)128}, {255, (uint8_t)255}, {256, (uint8_t)0}, {(int32_t)4294967295, (uint8_t)255}, {(int32_t)4294967168, (uint8_t)128}, {(int32_t)4294967167, (uint8_t)127}});
-    test_pairs(int8_t(), {{127, (int8_t)127}, {128, (int8_t)-128}, {255, (int8_t)-1}, {256, (int8_t)0}, {(int32_t)4294967295, (int8_t)-1}, {(int32_t)4294967168, (int8_t)-128}, {(int32_t)4294967167, (int8_t)127}});
-    test_pairs(uint16_t(), {{32767, (uint16_t)32767}, {32768, (uint16_t)32768}, {65535, (uint16_t)65535}, {65536, (uint16_t)0}, {(1 << 32) - 1, (uint16_t)65535}, {(1 << 32) - 32768, (uint16_t)32768}, {(1 << 32) - 32769, (uint16_t)32767}});
-    test_pairs(int16_t(), {{32767, (int16_t)32767}, {32768, (int16_t)-32768}, {65535, (int16_t)-1}, {65536, (int16_t)0}, {(1 << 32) - 1, (int16_t)-1}, {(1 << 32) - 32768, (int16_t)-32768}, {(1 << 32) - 32769, (int16_t)32767}});
-    test_pairs(uint32_t(), {{(1 << 31) - 1, (uint32_t)((1 << 31) - 1)}, {1 << 31, (uint32_t)(1 << 31)}, {((1 << 32) - 1), (uint32_t)((1 << 32) - 1)}});
-    test_pairs(int32_t(), {{(1 << 31) - 1, (1 << 31) - 1}, {1 << 31, -(1 << 31)}, {(1 << 32) - 1, -1}});
-    test_pairs(uint64_t(), {{(int64_t)((1ULL << 63) - 1), (uint64_t)((1ULL << 63) - 1)}, {(int64_t)(1ULL << 63), (uint64_t)(1ULL << 63)}, {(int64_t)((1ULL << 64) - 1), (uint64_t)((1ULL << 64) - 1)}});
-    test_pairs(int64_t(), {{(int64_t)((1 << 63) - 1), (int64_t)((1 << 63) - 1)}, {(int64_t)(1 << 63), (int64_t) - (1 << 63)}, {(int64_t)((1 << 64) - 1), (int64_t)-1}});
-    test_pairs(float32_t(), {{(float32_t)3.14, (float32_t)3.14}});
-    test_pairs(float64_t(), {{3.14, 3.14}});
-    test_pairs(wchar_t(), {{0, L'\x00'}, {65, L'A'}, {0xD7FF, L'\uD7FF'}});
-    test_pairs(wchar_t(), {{0xE000, L'\uE000'}, {0x10FFFF, L'\U0010FFFF'}});
-
-    // test_pairs(Enum([ 'a', 'b' ]), {{0, {'a' : None}}, {1, {'b' : None}}, {2, None}});
-}
-
 void test_string_internal(HostEncoding host_encoding, GuestEncoding guest_encoding, const std::string &guestS, const std::string &expected)
 {
     Heap heap(guestS.length() * 2);
     memcpy(heap.memory.data(), guestS.data(), guestS.length());
 
-    auto cx = mk_cx(heap.memory, host_encoding);
+    CallContextPtr cx = mk_cx(heap.memory, host_encoding);
 
-    test(string_ptr(), {0, (int32_t)guestS.length()}, std::make_shared<string_t>(expected), std::nullopt, std::nullopt, cx);
+    test(string_t(), {0, (int32_t)guestS.length()}, string_t(expected), std::nullopt, std::nullopt, cx);
 }
 
 TEST_CASE("String")
 {
     std::vector<HostEncoding> host_encodings = {HostEncoding::Utf8}; //, HostEncoding::Utf16, HostEncoding::Latin1_Utf16};
-    std::vector<std::string> fun_strings = {"", "a", "hi", "\x00", "a\x00b", "\x80", "\x80b", "ab\xefc", "\u01ffy", "xy\u01ff", "a\ud7ffb", "a\u02ff\u03ff\u04ffbc", "\uf123", "\uf123\uf123abc", "abcdef\uf123"};
+    std::vector<std::string> fun_strings = {"xxx", "a", "hi", "\x00", "a\x00b", "\x80", "\x80b", "ab\xefc", "\u01ffy", "xy\u01ff", "a\ud7ffb", "a\u02ff\u03ff\u04ffbc", "\uf123", "\uf123\uf123abc", "abcdef\uf123"};
     for (auto s : fun_strings)
     {
         for (auto h_enc : host_encodings)
@@ -327,7 +258,7 @@ TEST_CASE("List")
     test_heap(std::make_shared<list_t>(int32_t()), std::make_shared<list_t>(int32_t(), std::vector<Val>{(int32_t)-1, (int32_t)-2, (int32_t)-3}), {0, 3}, {0xff, 0xff, 0xff, 0xff, 0xfe, 0xff, 0xff, 0xff, 0xfd, 0xff, 0xff, 0xff});
     test_heap(std::make_shared<list_t>(int64_t()), std::make_shared<list_t>(int64_t(), std::vector<Val>{(int64_t)-1, (int64_t)-2}), {0, 2}, {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff});
     test_heap(std::make_shared<list_t>(wchar_t()), std::make_shared<list_t>(wchar_t(), std::vector<Val>{L'A', L'B', L'c'}), {0, 3}, {65, 0, 0, 0, 66, 0, 0, 0, 99, 0, 0, 0});
-    test_heap(std::make_shared<list_t>(string_ptr()), std::make_shared<list_t>(string_ptr(), std::vector<Val>{std::make_shared<string_t>("hi"), std::make_shared<string_t>("wat")}), {0, 2}, {16, 0, 0, 0, 2, 0, 0, 0, 21, 0, 0, 0, 3, 0, 0, 0, 'h', 'i', 0xf, 0xf, 0xf, 'w', 'a', 't'});
+    test_heap(std::make_shared<list_t>(string_t()), std::make_shared<list_t>(string_t(), std::vector<Val>{string_t("hi"), string_t("wat")}), {0, 2}, {16, 0, 0, 0, 2, 0, 0, 0, 21, 0, 0, 0, 3, 0, 0, 0, 'h', 'i', 0xf, 0xf, 0xf, 'w', 'a', 't'});
     // test_heap(List(List(U8())), [[3,4,5],[],[6,7]], [0,3], [24,0,0,0, 3,0,0,0, 0,0,0,0, 0,0,0,0, 27,0,0,0, 2,0,0,0, 3,4,5,  6,7])
     // test_heap(List(List(U16())), [[5,6]], [0,1], [8,0,0,0, 2,0,0,0, 5,0, 6,0])
     // test_heap(List(List(U16())), None, [0,1], [9,0,0,0, 2,0,0,0, 0, 5,0, 6,0])
@@ -335,4 +266,57 @@ TEST_CASE("List")
     // test_heap(List(Tuple([U8(),U16(),U8(),U32()])), [mk_tup(6,7,8,9),mk_tup(4,5,6,7)], [0,2], [6,0xff, 7,0, 8,0xff,0xff,0xff, 9,0,0,0,   4,0xff, 5,0, 6,0xff,0xff,0xff, 7,0,0,0])
     // test_heap(List(Tuple([U16(),U8()])), [mk_tup(6,7),mk_tup(8,9)], [0,2], [6,0, 7, 0x0ff, 8,0, 9, 0xff])
     // test_heap(List(Tuple([Tuple([U16(),U8()]),U8()])), [mk_tup([4,5],6),mk_tup([7,8],9)], [0,2], [4,0, 5,0xff, 6,0xff,  7,0, 8,0xff, 9,0xff])
+}
+
+TEST_CASE("Record")
+{
+    auto rt = std::make_shared<record_t>(std::vector<field_ptr>{std::make_shared<field_t>("x", uint8_t()), std::make_shared<field_t>("y", uint16_t()), std::make_shared<field_t>("z", uint32_t())});
+    auto r = std::make_shared<record_t>(std::vector<field_ptr>{std::make_shared<field_t>("x", (uint8_t)1), std::make_shared<field_t>("y", (uint16_t)2), std::make_shared<field_t>("z", (uint32_t)3)});
+    test(rt, {1, 2, 3}, r);
+}
+
+TEST_CASE("pairs")
+{
+    test_pairs(bool(), {{0, false}, {1, true}, {2, true}, {(int32_t)4294967295, true}});
+    test_pairs(uint8_t(), {{127, (uint8_t)127}, {128, (uint8_t)128}, {255, (uint8_t)255}, {256, (uint8_t)0}, {(int32_t)4294967295, (uint8_t)255}, {(int32_t)4294967168, (uint8_t)128}, {(int32_t)4294967167, (uint8_t)127}});
+    test_pairs(int8_t(), {{127, (int8_t)127}, {128, (int8_t)-128}, {255, (int8_t)-1}, {256, (int8_t)0}, {(int32_t)4294967295, (int8_t)-1}, {(int32_t)4294967168, (int8_t)-128}, {(int32_t)4294967167, (int8_t)127}});
+    test_pairs(uint16_t(), {{32767, (uint16_t)32767}, {32768, (uint16_t)32768}, {65535, (uint16_t)65535}, {65536, (uint16_t)0}, {(1 << 32) - 1, (uint16_t)65535}, {(1 << 32) - 32768, (uint16_t)32768}, {(1 << 32) - 32769, (uint16_t)32767}});
+    test_pairs(int16_t(), {{32767, (int16_t)32767}, {32768, (int16_t)-32768}, {65535, (int16_t)-1}, {65536, (int16_t)0}, {(1 << 32) - 1, (int16_t)-1}, {(1 << 32) - 32768, (int16_t)-32768}, {(1 << 32) - 32769, (int16_t)32767}});
+    test_pairs(uint32_t(), {{(1 << 31) - 1, (uint32_t)((1 << 31) - 1)}, {1 << 31, (uint32_t)(1 << 31)}, {((1 << 32) - 1), (uint32_t)((1 << 32) - 1)}});
+    test_pairs(int32_t(), {{(1 << 31) - 1, (1 << 31) - 1}, {1 << 31, -(1 << 31)}, {(1 << 32) - 1, -1}});
+    test_pairs(uint64_t(), {{(int64_t)((1ULL << 63) - 1), (uint64_t)((1ULL << 63) - 1)}, {(int64_t)(1ULL << 63), (uint64_t)(1ULL << 63)}, {(int64_t)((1ULL << 64) - 1), (uint64_t)((1ULL << 64) - 1)}});
+    test_pairs(int64_t(), {{(int64_t)((1 << 63) - 1), (int64_t)((1 << 63) - 1)}, {(int64_t)(1 << 63), (int64_t) - (1 << 63)}, {(int64_t)((1 << 64) - 1), (int64_t)-1}});
+    test_pairs(float32_t(), {{(float32_t)3.14, (float32_t)3.14}});
+    test_pairs(float64_t(), {{3.14, 3.14}});
+    test_pairs(wchar_t(), {{0, L'\x00'}, {65, L'A'}, {0xD7FF, L'\uD7FF'}});
+    test_pairs(wchar_t(), {{0xE000, L'\uE000'}, {0x10FFFF, L'\U0010FFFF'}});
+
+    // test_pairs(Enum([ 'a', 'b' ]), {{0, {'a' : None}}, {1, {'b' : None}}, {2, None}});
+}
+
+TEST_CASE("Variant")
+{
+    auto t = std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("x", uint8_t()), std::make_shared<case_t>("y", float64_t()), std::make_shared<case_t>("z", bool())});
+    std::vector<WasmVal> vals_to_lift = {0, 42};
+    auto zero = vals_to_lift[0].index();
+    auto one = vals_to_lift[1].index();
+    test(t, {0, 42}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("x", (uint8_t)42)}));
+    test(t, {0, 256}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("x", (uint8_t)0)}));
+    test(t, {1, (int64_t)0x4048f5c3}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("y", (float64_t)3.140000104904175)}));
+    test(t, {2, false}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("z", false)}));
+
+    t = std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("w", uint8_t()), std::make_shared<case_t>("x", uint8_t(), "w"), std::make_shared<case_t>("y", uint8_t()), std::make_shared<case_t>("z", uint8_t(), "x")});
+    test(t, {0, 42}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("w", (uint8_t)42)}));
+    test(t, {1, 42}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("x|w", (uint8_t)42)}));
+    test(t, {2, 42}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("y", (uint8_t)42)}));
+    test(t, {3, 42}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("z|x|w", (uint8_t)42)}));
+}
+
+TEST_CASE("Variant2")
+{
+    auto t = std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("w", uint8_t()), std::make_shared<case_t>("x", uint8_t(), "w"), std::make_shared<case_t>("y", uint8_t()), std::make_shared<case_t>("z", uint8_t(), "x")});
+    auto t2 = std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("w", uint8_t())});
+    test(t, {1, 42}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("x|w", (uint8_t)42)}), t2, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("w", (uint8_t)42)}));
+    // test(t, {3, 42}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("z|x|w", (uint8_t)42)}), t2, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("w", (uint8_t)42)}));
+    test(t, {0, 42}, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("w", (uint8_t)42)}), t2, std::make_shared<variant_t>(std::vector<case_ptr>{std::make_shared<case_t>("w", (uint8_t)42)}));
 }

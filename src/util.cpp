@@ -70,7 +70,7 @@ namespace cmcpp
         return i != 0;
     }
 
-    wchar_t convert_i32_to_char(const CallContext &, int32_t i)
+    wchar_t convert_i32_to_char(const LiftLowerContext &, int32_t i)
     {
         // assert(i >= 0);
         // assert(i < 0x110000);
@@ -440,22 +440,22 @@ namespace cmcpp
         return "i64";
     }
 
-    std::pair<char8_t *, uint32_t> decode(void *src, uint32_t byte_len, HostEncoding encoding)
-    {
-        switch (encoding)
-        {
-        case HostEncoding::Utf8:
-        case HostEncoding::Latin1:
-            return {reinterpret_cast<char8_t *>(src), byte_len};
-        case HostEncoding::Latin1_Utf16:
-            assert(false);
-            break;
-        default:
-            throw std::runtime_error("Invalid encoding");
-        }
-    }
+    // std::pair<char *, uint32_t> decodeXXX(void *src, uint32_t byte_len, HostEncoding encoding)
+    // {
+    //     switch (encoding)
+    //     {
+    //     case HostEncoding::Utf8:
+    //     case HostEncoding::Latin1:
+    //         return {reinterpret_cast<char *>(src), byte_len};
+    //     case HostEncoding::Latin1_Utf16:
+    //         assert(false);
+    //         break;
+    //     default:
+    //         throw std::runtime_error("Invalid encoding");
+    //     }
+    // }
 
-    // std::u32string encode(const char8_t *src, uint32_t code_units, GuestEncoding encoding)
+    // std::u32string encode(const char *src, uint32_t code_units, GuestEncoding encoding)
     // {
     //     std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
     //     switch (encoding)
@@ -469,7 +469,7 @@ namespace cmcpp
     //     }
     // }
 
-    // size_t encodeTo(void *dest, const char8_t *src, uint32_t byte_len, GuestEncoding encoding)
+    // size_t encodeTo(void *dest, const char *src, uint32_t byte_len, GuestEncoding encoding)
     // {
     //     switch (encoding)
     //     {

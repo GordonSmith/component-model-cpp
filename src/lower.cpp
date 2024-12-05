@@ -9,19 +9,19 @@
 namespace cmcpp
 {
 
-    std::vector<WasmVal> lower_flat_string(const CallContext &cx, const string_ptr &string)
+    std::vector<WasmVal> lower_flat_string(const LiftLowerContext &cx, const string_t &string)
     {
         auto [ptr, packed_length] = store_string_into_range(cx, string);
         return {(int32_t)ptr, (int32_t)packed_length};
     }
 
-    std::vector<WasmVal> lower_flat_list(const CallContext &cx, const list_ptr &v, const Val &elem_type)
+    std::vector<WasmVal> lower_flat_list(const LiftLowerContext &cx, const list_ptr &v, const Val &elem_type)
     {
         auto [ptr, length] = store_list_into_range(cx, v, elem_type);
         return {(int32_t)ptr, (int32_t)length};
     }
 
-    std::vector<WasmVal> lower_flat_record(const CallContext &cx, const record_ptr &v, const std::vector<field_ptr> &fields)
+    std::vector<WasmVal> lower_flat_record(const LiftLowerContext &cx, const record_ptr &v, const std::vector<field_ptr> &fields)
     {
         std::vector<WasmVal> flat;
         for (auto f : fields)
@@ -79,7 +79,7 @@ namespace cmcpp
       return [case_index] + payload
     */
 
-    std::vector<WasmVal> lower_flat_variant(const CallContext &cx, const variant_ptr &v, const std::vector<case_ptr> &cases)
+    std::vector<WasmVal> lower_flat_variant(const LiftLowerContext &cx, const variant_ptr &v, const std::vector<case_ptr> &cases)
     {
         auto [case_index, case_value] = match_case(v, cases);
         std::vector<std::string> flat_types = flatten_variant(cases);
@@ -127,7 +127,7 @@ namespace cmcpp
         return payload;
     }
 
-    std::vector<WasmVal> lower_flat(const CallContext &cx, const Val &v, const Val &_t)
+    std::vector<WasmVal> lower_flat(const LiftLowerContext &cx, const Val &v, const Val &_t)
     {
         auto t = despecialize(_t);
         switch (valType(t))
@@ -157,7 +157,7 @@ namespace cmcpp
         case ValType::Char:
             return {char_to_i32(std::get<wchar_t>(v))};
         case ValType::String:
-            return lower_flat_string(cx, std::get<string_ptr>(v));
+            return lower_flat_string(cx, std::get<string_t>(v));
         case ValType::List:
             return lower_flat_list(cx, std::get<list_ptr>(v), std::get<list_ptr>(t)->lt);
         case ValType::Record:

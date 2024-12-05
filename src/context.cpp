@@ -2,21 +2,23 @@
 
 #include <cstring>
 #include <optional> // Include the necessary header file
+#include <cassert>
 
 namespace cmcpp
 {
-
     class CanonicalOptionsImpl : public CanonicalOptions
     {
     private:
         const GuestRealloc &_realloc;
         const GuestPostReturn &_post_return;
-        const HostEncodeTo &_encodeTo;
+        HostEncodeTo _encodeTo;
+        HostDecodeFrom _decodeFrom;
 
     public:
-        CanonicalOptionsImpl(const GuestMemory &memory, HostEncoding string_encoding,
-                             const GuestRealloc &realloc, const HostEncodeTo &encodeTo, const GuestPostReturn &post_return)
-            : _realloc(realloc), _encodeTo(encodeTo), _post_return(post_return)
+        CanonicalOptionsImpl(const GuestMemory &memory, HostEncoding string_encoding, const GuestRealloc &realloc,
+                             HostEncodeTo encodeTo,
+                             HostDecodeFrom decodeFrom, const GuestPostReturn &post_return)
+            : _realloc(realloc), _encodeTo(encodeTo), _decodeFrom(decodeFrom), _post_return(post_return)
         {
             this->memory = memory;
             this->string_encoding = string_encoding;
@@ -27,9 +29,15 @@ namespace cmcpp
             return _realloc(ptr, old_size, align, new_size);
         }
 
-        virtual std::pair<char8_t *, size_t> encodeTo(void *dest, const char8_t *src, uint32_t byte_len, GuestEncoding encoding)
+        virtual std::pair<char8_t *, size_t> encodeTo(void *dest, const char *src, uint32_t byte_len, GuestEncoding encoding)
         {
             return _encodeTo(dest, src, byte_len, encoding);
+        }
+
+        virtual std::pair<char *, size_t> decodeFrom(const void *src, uint32_t byte_len, HostEncoding encoding)
+        {
+            // return {(char *)src, byte_len};
+            return _decodeFrom(src, byte_len, encoding);
         }
 
         void post_return()
@@ -43,24 +51,26 @@ namespace cmcpp
     };
 
     CanonicalOptionsPtr createCanonicalOptions(const GuestMemory &memory, const GuestRealloc &realloc,
-                                               const HostEncodeTo &encodeTo,
-                                               HostEncoding encoding,
-                                               const GuestPostReturn &post_return)
+                                               HostEncodeTo encodeTo,
+                                               HostDecodeFrom decodeFrom,
+                                               HostEncoding encoding, const GuestPostReturn &post_return)
     {
-        return std::make_shared<CanonicalOptionsImpl>(memory, encoding, realloc, encodeTo, post_return);
+        return std::make_shared<CanonicalOptionsImpl>(memory, encoding, realloc, encodeTo, decodeFrom, post_return);
     }
 
-    class CallContextImpl : public CallContext
+    class CallContextImpl : public LiftLowerContext
     {
     public:
         CallContextImpl(CanonicalOptionsPtr options) { opts = options; }
     };
 
-    CallContextPtr createCallContext(const GuestMemory &memory, const GuestRealloc &realloc, const HostEncodeTo &encodeTo,
+    CallContextPtr createCallContext(const GuestMemory &memory, const GuestRealloc &realloc,
+                                     HostEncodeTo encodeTo,
+                                     HostDecodeFrom decodeFrom,
                                      HostEncoding encoding, const GuestPostReturn &post_return)
     {
         return std::make_shared<CallContextImpl>(
-            createCanonicalOptions(memory, realloc, encodeTo, encoding, post_return));
+            createCanonicalOptions(memory, realloc, encodeTo, decodeFrom, encoding, post_return));
     }
 
 }

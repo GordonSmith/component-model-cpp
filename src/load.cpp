@@ -9,7 +9,7 @@ namespace cmcpp
 {
 
     template <typename T>
-    T load_int(const CallContext &cx, uint32_t ptr, uint8_t nbytes)
+    T load_int(const LiftLowerContext &cx, uint32_t ptr, uint8_t nbytes)
     {
         assert(nbytes == sizeof(T));
         T retVal = 0;
@@ -20,7 +20,7 @@ namespace cmcpp
         return retVal;
     }
 
-    std::shared_ptr<string_t> load_string_from_range(const CallContext &cx, uint32_t ptr, uint32_t tagged_code_units)
+    string_t load_string_from_range(const LiftLowerContext &cx, uint32_t ptr, uint32_t tagged_code_units)
     {
         HostEncoding encoding;
         uint32_t byte_length = tagged_code_units;
@@ -53,18 +53,18 @@ namespace cmcpp
         }
         assert(isAligned(ptr, alignment));
         assert(ptr + byte_length <= cx.opts->memory.size());
-        auto [dec_str, dec_len] = decode(&cx.opts->memory[ptr], byte_length, encoding);
-        return std::make_shared<string_t>(dec_str, dec_len);
+        auto [dec_str, dec_len] = cx.opts->decodeFrom(&cx.opts->memory[ptr], byte_length, encoding);
+        return string_t(dec_str, dec_len);
     }
 
-    std::shared_ptr<string_t> load_string(const CallContext &cx, uint32_t ptr)
+    string_t load_string(const LiftLowerContext &cx, uint32_t ptr)
     {
         uint32_t begin = load_int<uint32_t>(cx, ptr, 4);
         uint32_t tagged_code_units = load_int<uint32_t>(cx, ptr + 4, 4);
         return load_string_from_range(cx, begin, tagged_code_units);
     }
 
-    std::shared_ptr<list_t> load_list_from_range(const CallContext &cx, uint32_t ptr, uint32_t length, const Val &t)
+    std::shared_ptr<list_t> load_list_from_range(const LiftLowerContext &cx, uint32_t ptr, uint32_t length, const Val &t)
     {
         assert(ptr == align_to(ptr, alignment(t)));
         assert(ptr + length * elem_size(t) <= cx.opts->memory.size());
@@ -76,7 +76,7 @@ namespace cmcpp
         return list;
     }
 
-    std::shared_ptr<list_t> load_list(const CallContext &cx, uint32_t ptr, const Val &t)
+    std::shared_ptr<list_t> load_list(const LiftLowerContext &cx, uint32_t ptr, const Val &t)
     {
         uint32_t begin = load_int<uint32_t>(cx, ptr, 4);
         uint32_t length = load_int<uint32_t>(cx, ptr + 4, 4);
@@ -93,7 +93,7 @@ namespace cmcpp
       return record
     */
 
-    std::shared_ptr<record_t> load_record(const CallContext &cx, uint32_t ptr, const std::vector<field_ptr> &fields)
+    std::shared_ptr<record_t> load_record(const LiftLowerContext &cx, uint32_t ptr, const std::vector<field_ptr> &fields)
     {
         auto record = std::make_shared<record_t>();
         for (auto field : fields)
@@ -139,7 +139,7 @@ namespace cmcpp
     return { case_label: load(cx, ptr, c.t) }
     */
 
-    std::shared_ptr<variant_t> load_variant(const CallContext &cx, uint32_t ptr, const std::vector<case_ptr> &cases)
+    std::shared_ptr<variant_t> load_variant(const LiftLowerContext &cx, uint32_t ptr, const std::vector<case_ptr> &cases)
     {
         uint32_t disc_size = elem_size(discriminant_type(cases));
         uint32_t case_index = load_int<uint32_t>(cx, ptr, disc_size);
@@ -161,13 +161,13 @@ namespace cmcpp
         return unpack_flags_from_int(i, labels)
     */
 
-    flags_ptr load_flags(const CallContext &cx, uint32_t ptr, const std::vector<std::string> &labels)
+    flags_ptr load_flags(const LiftLowerContext &cx, uint32_t ptr, const std::vector<std::string> &labels)
     {
         uint32_t i = load_int<uint32_t>(cx, ptr, elem_size_flags(labels));
         return unpack_flags_from_int(i, labels);
     }
 
-    Val load(const CallContext &cx, uint32_t ptr, ValType t)
+    Val load(const LiftLowerContext &cx, uint32_t ptr, ValType t)
     {
         switch (t)
         {
@@ -202,7 +202,7 @@ namespace cmcpp
         }
     }
 
-    Val load(const CallContext &cx, uint32_t ptr, const Val &v)
+    Val load(const LiftLowerContext &cx, uint32_t ptr, const Val &v)
     {
         switch (valType(v))
         {

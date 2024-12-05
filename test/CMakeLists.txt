@@ -3,6 +3,7 @@ project(component-model-cpp-tests)
 option(ENABLE_TEST_COVERAGE "Enable test coverage" OFF)
 option(TEST_INSTALLED_VERSION "Test the version found by find_package" OFF)
 
+find_package(fmt CONFIG REQUIRED)
 find_package(doctest CONFIG REQUIRED)
 find_path(WASMTIME_CPP_API_INCLUDE_DIRS "wasmtime-cpp-api/wasmtime.hh"
   PATHS ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}
@@ -27,6 +28,8 @@ include_directories(
 add_executable(${PROJECT_NAME} 
   main.cpp
   val.cpp
+  host-util.hpp
+  host-util.cpp
   # wasmtime.cpp
   # val3.cpp
 )
