@@ -65,10 +65,14 @@ CallContextPtr mk_cx(std::vector<uint8_t> &memory = globalMemory(),
                      const GuestRealloc &realloc = nullptr,
                      const GuestPostReturn &post_return = nullptr)
 {
-    return createCallContext(memory, realloc, trap, encodeTo, decodeFrom, encoding, post_return);
+    return createCallContext(memory, realloc, trap, convert, encoding, post_return);
 }
 
-void test(const Val &t, std::vector<WasmVal> vals_to_lift, std::optional<Val> v = std::nullopt, const CallContextPtr &cx = mk_cx(), std::optional<Encoding> dst_encoding, std::optional<Val> lower_t = std::nullopt, std::optional<Val> lower_v = std::nullopt)
+void test(const Val &t, std::vector<WasmVal> vals_to_lift, std::optional<Val> v,
+          const CallContextPtr &cx = mk_cx(),
+          std::optional<Encoding> dst_encoding = std::nullopt,
+          std::optional<Val> lower_t = std::nullopt,
+          std::optional<Val> lower_v = std::nullopt)
 {
     auto vi = CoreValueIter(vals_to_lift);
     if (!v.has_value())
@@ -109,15 +113,10 @@ void test(const Val &t, std::vector<WasmVal> vals_to_lift, std::optional<Val> v 
     {
         dst_encoding = cx->opts->string_encoding;
     }
-    dst_encoding = cx.opts.string_encoding
-                       std::function<int(int, int, int, int)>
-                           realloc = [heap](int original_ptr, int original_size, int alignment, int new_size) -> int
-    {
-        void *retVal = heap.realloc(reinterpret_cast<void *>(original_ptr), original_size, alignment, new_size);
-        return reinterpret_cast<std::intptr_t>(retVal);
-    };
-    CallContextPtr cx2 = createCallContext(heap.memory, realloc, trap, encodeTo, decodeFrom, cx->opts->string_encoding);
+    auto cx2 = mk_cx(heap.memory, dst_encoding.value(), [&heap](int original_ptr, int original_size, int alignment, int new_size) -> int
+                     { return (intptr_t)heap.realloc((void *)original_ptr, (size_t)original_size, (size_t)alignment, (size_t)new_size); });
     auto lowered_vals = lower_flat(*cx2, v.value(), t);
+
     auto vi2 = CoreValueIter(lowered_vals);
     got = lift_flat(*cx2, vi2, lower_t.value());
     CHECK(valType(got) == valType(lower_v.value()));
