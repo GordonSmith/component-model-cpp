@@ -19,19 +19,31 @@ namespace cmcpp
     class string_t
     {
     private:
-        std::string str;
-
-    public:
-        const char *ptr = nullptr;
-        size_t len = 0;
+        Encoding _encoding = Encoding::Utf8;
+        std::string owned_string;
+        std::string_view view = std::string_view(owned_string);
 
         string_t();
-        string_t(const char *ptr, size_t len);
-        string_t(const std::string &_str);
+
+    public:
+        // Param order to match canonical ABI, caller owns string  ---
+        string_t(const char *ptr, Encoding encoding, size_t len);
+
+        // Preallocate string storage, string_t instance owns string  ---
+        string_t(Encoding encoding, size_t len);
+
+        // Caller owns string  ---
+        string_t(Encoding encoding, const std::string &_str);
+
         ~string_t() = default;
+
         bool operator==(const string_t &rhs) const;
 
-        std::string to_string() const;
+        Encoding encoding() const;
+        char8_t *ptr() const;
+        const char *c_str() const;
+        const size_t byte_len() const;
+        const std::string_view &to_string() const;
     };
 
     class list_t

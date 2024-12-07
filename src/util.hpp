@@ -13,6 +13,8 @@ namespace cmcpp
     const float32_t CANONICAL_FLOAT32_NAN = 0x7fc00000;
     const float64_t CANONICAL_FLOAT64_NAN = 0x7ff8000000000000;
 
+    wchar_t trap_if(const LiftLowerContext &cx, bool condition, const char *message = nullptr);
+
     uint32_t align_to(uint32_t ptr, uint32_t alignment);
     int alignment(const Val &v);
     int alignment(ValType t);
@@ -24,7 +26,6 @@ namespace cmcpp
     wchar_t convert_i32_to_char(const LiftLowerContext &cx, int32_t i);
     bool convert_int_to_bool(int32_t i);
 
-    std::pair<char *, uint32_t> decodeXXX(void *src, uint32_t byte_len, HostEncoding encoding);
     float32_t decode_i32_as_float(int32_t i);
     float64_t decode_i64_as_float(int64_t i);
 
@@ -32,8 +33,8 @@ namespace cmcpp
     Val despecialize(const Val &v);
     ValType discriminant_type(const std::vector<case_ptr> &cases);
 
-    // std::u32string encode(const char *src, uint32_t byte_len, GuestEncoding encoding);
-    // size_t encodeTo(void *, const char *src, uint32_t byte_len, GuestEncoding encoding);
+    // std::u32string encode(const char *src, uint32_t byte_len, Encoding encoding);
+    // size_t encodeTo(void *, const char *src, uint32_t byte_len, Encoding encoding);
     uint32_t encode_float_as_i32(float32_t f);
     uint64_t encode_float_as_i64(float64_t f);
 

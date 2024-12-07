@@ -4,6 +4,7 @@
     "boost-type-index",
     "doctest",
     "fmt",
+    "boost-locale",
     "wasmtime-cpp-api"
   ]
 }

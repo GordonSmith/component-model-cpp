@@ -14,6 +14,14 @@
 namespace cmcpp
 {
 
+    wchar_t trap_if(const LiftLowerContext &cx, bool condition, const char *message)
+    {
+        if (condition)
+        {
+            cx.opts->trap(message);
+        }
+    }
+
     ValType despecialize(const ValType t)
     {
         switch (t)
@@ -440,14 +448,14 @@ namespace cmcpp
         return "i64";
     }
 
-    // std::pair<char *, uint32_t> decodeXXX(void *src, uint32_t byte_len, HostEncoding encoding)
+    // std::pair<char *, uint32_t> decodeXXX(void *src, uint32_t byte_len, Encoding encoding)
     // {
     //     switch (encoding)
     //     {
-    //     case HostEncoding::Utf8:
-    //     case HostEncoding::Latin1:
+    //     case Encoding::Utf8:
+    //     case Encoding::Latin1:
     //         return {reinterpret_cast<char *>(src), byte_len};
-    //     case HostEncoding::Latin1_Utf16:
+    //     case Encoding::Latin1_Utf16:
     //         assert(false);
     //         break;
     //     default:
@@ -455,29 +463,29 @@ namespace cmcpp
     //     }
     // }
 
-    // std::u32string encode(const char *src, uint32_t code_units, GuestEncoding encoding)
+    // std::u32string encode(const char *src, uint32_t code_units, Encoding encoding)
     // {
     //     std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
     //     switch (encoding)
     //     {
-    //     case GuestEncoding::Utf8:
-    //     case GuestEncoding::Latin1:
-    //     case GuestEncoding::Utf16le:
+    //     case Encoding::Utf8:
+    //     case Encoding::Latin1:
+    //     case Encoding::Utf16le:
     //         return conv.from_bytes(reinterpret_cast<const char *>(src), reinterpret_cast<const char *>(src + byte_len));
     //     default:
     //         throw std::runtime_error("Invalid encoding");
     //     }
     // }
 
-    // size_t encodeTo(void *dest, const char *src, uint32_t byte_len, GuestEncoding encoding)
+    // size_t encodeTo(void *dest, const char *src, uint32_t byte_len, Encoding encoding)
     // {
     //     switch (encoding)
     //     {
-    //     case GuestEncoding::Utf8:
-    //     case GuestEncoding::Latin1:
+    //     case Encoding::Utf8:
+    //     case Encoding::Latin1:
     //         std::memcpy(dest, src, byte_len);
     //         return byte_len;
-    //     case GuestEncoding::Utf16le:
+    //     case Encoding::Utf16le:
     //         assert(false);
     //         break;
     //     default:

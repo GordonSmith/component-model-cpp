@@ -57,7 +57,16 @@ namespace cmcpp
             }
             else if constexpr (std::is_same_v<T, string_ptr>)
             {
-                return *arg1 ==(*std::get<string_ptr>(rhs));
+                auto rhs_ptr = std::get<string_ptr>(rhs);
+                if (arg1 == nullptr && rhs_ptr == nullptr)
+                {
+                    return true;
+                }
+                if (arg1 == nullptr || rhs_ptr == nullptr)
+                {
+                    return false;
+                }
+                return *arg1 == *rhs_ptr;
             }
             else if constexpr (std::is_same_v<T, list_ptr>)
             {
@@ -108,21 +117,43 @@ namespace cmcpp
     //  ----------------------------------------------------------------------
 
     string_t::string_t() {}
-    string_t::string_t(const char *ptr, size_t len) : ptr(ptr), len(len) {}
-    string_t::string_t(const std::string &_str)
+    string_t::string_t(Encoding encoding, size_t len) : _encoding(encoding)
     {
-        str = _str;
-        ptr = str.c_str();
-        len = str.size();
+        owned_string.resize(len);
     }
-    std::string string_t::to_string() const
+    string_t::string_t(const char *ptr, Encoding encoding, size_t len) : _encoding(encoding)
     {
-        return std::string((const char *)ptr, len);
+        view = std::string_view(ptr, len);
+    }
+    string_t::string_t(Encoding encoding, const std::string &str) : _encoding(encoding)
+    {
+        view = std::string_view(str);
     }
 
     bool string_t::operator==(const string_t &rhs) const
     {
-        return std::string_view((const char *)ptr, len).compare(std::string_view((const char *)rhs.ptr, rhs.len)) == 0;
+        return view.compare(rhs.to_string()) == 0;
+    }
+
+    Encoding string_t::encoding() const
+    {
+        return _encoding;
+    }
+    char8_t *string_t::ptr() const
+    {
+        return (char8_t *)view.data();
+    }
+    const char *string_t::c_str() const
+    {
+        return view.data();
+    }
+    const size_t string_t::byte_len() const
+    {
+        return view.size();
+    }
+    const std::string_view &string_t::to_string() const
+    {
+        return view;
     }
 
     list_t::list_t() {}

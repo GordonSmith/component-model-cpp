@@ -61,14 +61,14 @@ std::vector<uint8_t> &globalMemory()
 }
 
 CallContextPtr mk_cx(std::vector<uint8_t> &memory = globalMemory(),
-                     HostEncoding encoding = HostEncoding::Utf8,
+                     Encoding encoding = Encoding::Utf8,
                      const GuestRealloc &realloc = nullptr,
                      const GuestPostReturn &post_return = nullptr)
 {
-    return createCallContext(memory, realloc, encodeTo, decodeFrom, encoding, post_return);
+    return createCallContext(memory, realloc, trap, encodeTo, decodeFrom, encoding, post_return);
 }
 
-void test(const Val &t, std::vector<WasmVal> vals_to_lift, std::optional<Val> v = std::nullopt, std::optional<Val> lower_t = std::nullopt, std::optional<Val> lower_v = std::nullopt, const CallContextPtr &cx = mk_cx())
+void test(const Val &t, std::vector<WasmVal> vals_to_lift, std::optional<Val> v = std::nullopt, const CallContextPtr &cx = mk_cx(), std::optional<Encoding> dst_encoding, std::optional<Val> lower_t = std::nullopt, std::optional<Val> lower_v = std::nullopt)
 {
     auto vi = CoreValueIter(vals_to_lift);
     if (!v.has_value())
@@ -103,13 +103,20 @@ void test(const Val &t, std::vector<WasmVal> vals_to_lift, std::optional<Val> v 
         lower_v = v;
         CHECK(lower_v.value() == v.value());
     }
+
     Heap heap(5 * cx->opts->memory.size());
-    std::function<int(int, int, int, int)> realloc = [heap](int original_ptr, int original_size, int alignment, int new_size) -> int
+    if (!dst_encoding.has_value())
+    {
+        dst_encoding = cx->opts->string_encoding;
+    }
+    dst_encoding = cx.opts.string_encoding
+                       std::function<int(int, int, int, int)>
+                           realloc = [heap](int original_ptr, int original_size, int alignment, int new_size) -> int
     {
         void *retVal = heap.realloc(reinterpret_cast<void *>(original_ptr), original_size, alignment, new_size);
         return reinterpret_cast<std::intptr_t>(retVal);
     };
-    CallContextPtr cx2 = createCallContext(heap.memory, realloc, encodeTo, decodeFrom, cx->opts->string_encoding);
+    CallContextPtr cx2 = createCallContext(heap.memory, realloc, trap, encodeTo, decodeFrom, cx->opts->string_encoding);
     auto lowered_vals = lower_flat(*cx2, v.value(), t);
     auto vi2 = CoreValueIter(lowered_vals);
     got = lift_flat(*cx2, vi2, lower_t.value());
@@ -212,25 +219,25 @@ void testVal(const Val &v, T expected)
     testWasmValVal({{expected, v}});
 }
 
-void test_string_internal(HostEncoding host_encoding, GuestEncoding guest_encoding, const std::string &guestS, const std::string &expected)
+void test_string_internal(Encoding src_encoding, Encoding dst_encoding, const std::string &s, const std::string &encoded, size_t tagged_code_units)
 {
-    Heap heap(guestS.length() * 2);
-    memcpy(heap.memory.data(), guestS.data(), guestS.length());
+    Heap heap(encoded.length());
+    memcpy(heap.memory.data(), encoded.data(), encoded.length());
 
-    CallContextPtr cx = mk_cx(heap.memory, host_encoding);
-
-    test(string_ptr(), {0, (int32_t)guestS.length()}, std::make_shared<string_t>(expected), std::nullopt, std::nullopt, cx);
+    CallContextPtr cx = mk_cx(heap.memory, src_encoding);
+    string_ptr v = std::make_shared<string_t>(src_encoding, s, tagged_code_units);
+    test(string_ptr(), {0, (int32_t)tagged_code_units}, v, cx, dst_encoding);
 }
 
 TEST_CASE("String")
 {
-    std::vector<HostEncoding> host_encodings = {HostEncoding::Utf8}; //, HostEncoding::Utf16, HostEncoding::Latin1_Utf16};
+    std::vector<Encoding> host_encodings = {Encoding::Utf8}; //, Encoding::Utf16, Encoding::Latin1_Utf16};
     std::vector<std::string> fun_strings = {"", "a", "hi", "\x00", "a\x00b", "\x80", "\x80b", "ab\xefc", "\u01ffy", "xy\u01ff", "a\ud7ffb", "a\u02ff\u03ff\u04ffbc", "\uf123", "\uf123\uf123abc", "abcdef\uf123"};
     for (auto s : fun_strings)
     {
         for (auto h_enc : host_encodings)
         {
-            test_string_internal(h_enc, GuestEncoding::Utf8, s, s);
+            test_string_internal(h_enc, Encoding::Utf8, s, s);
         }
     }
 }

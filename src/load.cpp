@@ -22,39 +22,41 @@ namespace cmcpp
 
     string_ptr load_string_from_range(const LiftLowerContext &cx, uint32_t ptr, uint32_t tagged_code_units)
     {
-        HostEncoding encoding;
+        PythonEncoding encoding;
         uint32_t byte_length = tagged_code_units;
         uint32_t alignment = 1;
-        if (cx.opts->string_encoding == HostEncoding::Utf8)
+        switch (cx.opts->string_encoding)
         {
+        case Encoding::Utf8:
             alignment = 1;
             byte_length = tagged_code_units;
-            encoding = HostEncoding::Utf8;
-        }
-        else if (cx.opts->string_encoding == HostEncoding::Utf16)
-        {
+            encoding = PythonEncoding::utf_8;
+            break;
+        case Encoding::Utf16:
             alignment = 2;
             byte_length = 2 * tagged_code_units;
-            encoding = HostEncoding::Latin1_Utf16;
-        }
-        else if (cx.opts->string_encoding == HostEncoding::Latin1_Utf16)
-        {
+            encoding = PythonEncoding::utf_16_le;
+            break;
+        case Encoding::Latin1_Utf16:
             alignment = 2;
             if (tagged_code_units & UTF16_TAG)
             {
                 byte_length = 2 * (tagged_code_units ^ UTF16_TAG);
-                encoding = HostEncoding::Latin1_Utf16;
+                encoding = PythonEncoding::utf_16_le;
             }
             else
             {
                 byte_length = tagged_code_units;
-                encoding = HostEncoding::Latin1;
+                encoding = PythonEncoding::latin_1;
             }
+            break;
         }
-        assert(isAligned(ptr, alignment));
-        assert(ptr + byte_length <= cx.opts->memory.size());
-        auto [dec_str, dec_len] = cx.opts->decodeFrom(&cx.opts->memory[ptr], byte_length, encoding);
-        return std::make_shared<string_t>(dec_str, dec_len);
+        trap_if(cx, ptr != align_to(ptr, alignment));
+        trap_if(cx, ptr + byte_length > cx.opts->memory.size());
+        string_t s(cx.opts->string_encoding, byte_length);
+
+        auto [dec_str, dec_len] = cx.opts->convert(s.ptr(), (const char8_t *)&cx.opts->memory[ptr], tagged_code_units, Encoding::Utf8, cx.opts->string_encoding);
+        return std::make_shared<string_t>(dec_str, cx.opts->string_encoding, dec_len);
     }
 
     string_ptr load_string(const LiftLowerContext &cx, uint32_t ptr)

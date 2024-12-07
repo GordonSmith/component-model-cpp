@@ -46,7 +46,7 @@ namespace cmcpp
 
     std::vector<WasmVal> lower_flat_flags(const flags_ptr &v, const std::vector<std::string> &labels)
     {
-        int32_t i = pack_flags_into_int(v, labels);
+        uint64_t i = pack_flags_into_int(v, labels);
         std::vector<WasmVal> flat;
         for (size_t _ = 0; _ < num_i32_flags(labels); ++_)
         {

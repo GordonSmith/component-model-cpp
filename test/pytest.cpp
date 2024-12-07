@@ -98,7 +98,7 @@ private:
 };
 
 cmcpp::CanonicalOptionsPtr mk_opts(std::vector<uint8_t> memory = std::vector<uint8_t>(),
-                                   cmcpp::HostEncoding encoding = cmcpp::HostEncoding::Utf8,
+                                   cmcpp::Encoding encoding = cmcpp::Encoding::Utf8,
                                    const cmcpp::GuestRealloc &realloc = nullptr,
                                    const cmcpp::GuestPostReturn &post_return = nullptr)
 {
@@ -110,7 +110,7 @@ struct ComponentInstance
 };
 
 cmcpp::CallContextPtr mk_cx(std::vector<uint8_t> memory = std::vector<uint8_t>(),
-                            cmcpp::HostEncoding encoding = cmcpp::HostEncoding::Utf8,
+                            cmcpp::Encoding encoding = cmcpp::Encoding::Utf8,
                             const cmcpp::GuestRealloc &realloc = nullptr,
                             const cmcpp::GuestPostReturn &post_return = nullptr)
 {
