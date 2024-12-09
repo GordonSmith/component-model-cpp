@@ -14,7 +14,7 @@
 namespace cmcpp
 {
 
-    wchar_t trap_if(const LiftLowerContext &cx, bool condition, const char *message)
+    void trap_if(const LiftLowerContext &cx, bool condition, const char *message)
     {
         if (condition)
         {

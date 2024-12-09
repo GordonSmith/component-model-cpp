@@ -114,6 +114,177 @@ namespace cmcpp
             } }, lhs, rhs);
     }
 
+    PrintValVisitor::PrintValVisitor(std::ostream &stream) : stream(stream) {}
+    void PrintValVisitor::operator()(const bool &v) const
+    {
+        stream << (v ? "true" : "false");
+    }
+    void PrintValVisitor::operator()(const int8_t &v) const
+    {
+        stream << (int)v;
+    }
+    void PrintValVisitor::operator()(const uint8_t &v) const
+    {
+        stream << (unsigned)v;
+    }
+    void PrintValVisitor::operator()(const int16_t &v) const
+    {
+        stream << (int)v;
+    }
+    void PrintValVisitor::operator()(const uint16_t &v) const
+    {
+        stream << (unsigned)v;
+    }
+    void PrintValVisitor::operator()(const int32_t &v) const
+    {
+        stream << v;
+    }
+    void PrintValVisitor::operator()(const uint32_t &v) const
+    {
+        stream << v;
+    }
+    void PrintValVisitor::operator()(const int64_t &v) const
+    {
+        stream << v;
+    }
+    void PrintValVisitor::operator()(const uint64_t &v) const
+    {
+        stream << v;
+    }
+    void PrintValVisitor::operator()(const float32_t &v) const
+    {
+        stream << v;
+    }
+    void PrintValVisitor::operator()(const float64_t &v) const
+    {
+        stream << v;
+    }
+    void PrintValVisitor::operator()(const wchar_t &v) const
+    {
+        stream << "todo"; // v;
+    }
+    void PrintValVisitor::operator()(const string_ptr &v) const
+    {
+        if (v == nullptr)
+        {
+            stream << "null";
+        }
+        else
+        {
+            stream << v->to_string();
+        }
+    }
+    void PrintValVisitor::operator()(const list_ptr &v) const
+    {
+        if (v == nullptr)
+        {
+            stream << "null";
+        }
+        else
+        {
+            stream << "todo"; //*v;
+        }
+    }
+    void PrintValVisitor::operator()(const field_ptr &v) const
+    {
+        if (v == nullptr)
+        {
+            stream << "null";
+        }
+        else
+        {
+            stream << "todo"; //*v;
+        }
+    }
+    void PrintValVisitor::operator()(const record_ptr &v) const
+    {
+        if (v == nullptr)
+        {
+            stream << "null";
+        }
+        else
+        {
+            stream << "todo"; //*v;
+        }
+    }
+    void PrintValVisitor::operator()(const tuple_ptr &v) const
+    {
+        if (v == nullptr)
+        {
+            stream << "null";
+        }
+        else
+        {
+            stream << "todo"; //*v;
+        }
+    }
+    void PrintValVisitor::operator()(const case_ptr &v) const
+    {
+        if (v == nullptr)
+        {
+            stream << "null";
+        }
+        else
+        {
+            stream << "todo"; //*v;
+        }
+    }
+    void PrintValVisitor::operator()(const variant_ptr &v) const
+    {
+        if (v == nullptr)
+        {
+            stream << "null";
+        }
+        else
+        {
+            stream << "todo"; //*v;
+        }
+    }
+    void PrintValVisitor::operator()(const enum_ptr &v) const
+    {
+        if (v == nullptr)
+        {
+            stream << "null";
+        }
+        else
+        {
+            stream << "todo"; //*v;
+        }
+    }
+    void PrintValVisitor::operator()(const option_ptr &v) const
+    {
+        if (v == nullptr)
+        {
+            stream << "null";
+        }
+        else
+        {
+            stream << "todo"; //*v;
+        }
+    }
+    void PrintValVisitor::operator()(const result_ptr &v) const
+    {
+        if (v == nullptr)
+        {
+            stream << "null";
+        }
+        else
+        {
+            stream << "todo"; //*v;
+        }
+    }
+    void PrintValVisitor::operator()(const flags_ptr &v) const
+    {
+        if (v == nullptr)
+        {
+            stream << "null";
+        }
+        else
+        {
+            stream << "todo"; //*v;
+        }
+    }
+
     //  ----------------------------------------------------------------------
 
     string_t::string_t() {}
@@ -150,6 +321,10 @@ namespace cmcpp
     const size_t string_t::byte_len() const
     {
         return view.size();
+    }
+    void string_t::resize(size_t len)
+    {
+        view = std::string_view(view.data(), len);
     }
     const std::string_view &string_t::to_string() const
     {

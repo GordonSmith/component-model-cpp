@@ -16,17 +16,17 @@ namespace cmcpp
 {
     enum class PythonEncoding
     {
+        latin_1,
         utf_8,
         utf_16_le,
-        latin_1,
-        // Latin1_Utf16
+        Latin1_Utf16
     };
 
     enum class Encoding
     {
+        Latin1,
         Utf8,
         Utf16,
-        Latin1,
         Latin1_Utf16
     };
 
@@ -45,12 +45,11 @@ namespace cmcpp
         Encoding string_encoding;
         virtual void trap(const char *msg = "") = 0;
         virtual int realloc(int ptr, int old_size, int align, int new_size) = 0;
+        virtual std::pair<char8_t *, size_t> convert(char8_t *dest, const char8_t *src, uint32_t byte_len, Encoding from_encoding, Encoding to_encoding) = 0;
         virtual void post_return() = 0;
         bool sync = true;
         // std::optional<std::function<void>> callback;
         bool always_task_return = false;
-
-        virtual std::pair<char8_t *, size_t> convert(char8_t *dest, const char8_t *src, uint32_t byte_len, Encoding from_encoding, Encoding to_encoding);
     };
     using CanonicalOptionsPtr = std::shared_ptr<CanonicalOptions>;
     CanonicalOptionsPtr createCanonicalOptions(const GuestMemory &memory,

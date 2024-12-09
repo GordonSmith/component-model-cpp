@@ -5,7 +5,7 @@ option(TEST_INSTALLED_VERSION "Test the version found by find_package" OFF)
 
 find_package(fmt CONFIG REQUIRED)
 find_package(doctest CONFIG REQUIRED)
-find_package(Boost REQUIRED COMPONENTS locale)
+find_package(utf8cpp CONFIG REQUIRED)
 
 find_path(WASMTIME_CPP_API_INCLUDE_DIRS "wasmtime-cpp-api/wasmtime.hh"
   PATHS ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}
@@ -41,7 +41,7 @@ target_link_libraries(${PROJECT_NAME}
   PRIVATE doctest::doctest
   PRIVATE component-model-cpp
   PRIVATE fmt::fmt
-  PRIVATE Boost::locale
+  PRIVATE utf8::cpp utf8cpp::utf8cpp
 )
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 20)
 add_test(

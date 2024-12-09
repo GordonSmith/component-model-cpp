@@ -13,7 +13,7 @@ namespace cmcpp
     const float32_t CANONICAL_FLOAT32_NAN = 0x7fc00000;
     const float64_t CANONICAL_FLOAT64_NAN = 0x7ff8000000000000;
 
-    wchar_t trap_if(const LiftLowerContext &cx, bool condition, const char *message = nullptr);
+    void trap_if(const LiftLowerContext &cx, bool condition, const char *message = nullptr);
 
     uint32_t align_to(uint32_t ptr, uint32_t alignment);
     int alignment(const Val &v);

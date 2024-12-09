@@ -22,41 +22,42 @@ namespace cmcpp
 
     string_ptr load_string_from_range(const LiftLowerContext &cx, uint32_t ptr, uint32_t tagged_code_units)
     {
-        PythonEncoding encoding;
+        Encoding encoding;
         uint32_t byte_length = tagged_code_units;
         uint32_t alignment = 1;
         switch (cx.opts->string_encoding)
         {
+        case Encoding::Latin1:
         case Encoding::Utf8:
             alignment = 1;
             byte_length = tagged_code_units;
-            encoding = PythonEncoding::utf_8;
+            encoding = Encoding::Utf8;
             break;
         case Encoding::Utf16:
             alignment = 2;
             byte_length = 2 * tagged_code_units;
-            encoding = PythonEncoding::utf_16_le;
+            encoding = Encoding::Utf16;
             break;
         case Encoding::Latin1_Utf16:
             alignment = 2;
             if (tagged_code_units & UTF16_TAG)
             {
                 byte_length = 2 * (tagged_code_units ^ UTF16_TAG);
-                encoding = PythonEncoding::utf_16_le;
+                encoding = Encoding::Utf16;
             }
             else
             {
                 byte_length = tagged_code_units;
-                encoding = PythonEncoding::latin_1;
+                encoding = Encoding::Latin1;
             }
             break;
         }
         trap_if(cx, ptr != align_to(ptr, alignment));
         trap_if(cx, ptr + byte_length > cx.opts->memory.size());
-        string_t s(cx.opts->string_encoding, byte_length);
-
-        auto [dec_str, dec_len] = cx.opts->convert(s.ptr(), (const char8_t *)&cx.opts->memory[ptr], tagged_code_units, Encoding::Utf8, cx.opts->string_encoding);
-        return std::make_shared<string_t>(dec_str, cx.opts->string_encoding, dec_len);
+        auto s = std::make_shared<string_t>(cx.opts->string_encoding, byte_length);
+        auto dec = cx.opts->convert(s->ptr(), (const char8_t *)&cx.opts->memory[ptr], byte_length, encoding, cx.opts->string_encoding);
+        s->resize(dec.second);
+        return s;
     }
 
     string_ptr load_string(const LiftLowerContext &cx, uint32_t ptr)

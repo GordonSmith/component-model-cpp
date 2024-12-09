@@ -171,6 +171,7 @@ namespace cmcpp
 
         switch (cx.opts->string_encoding)
         {
+        case Encoding::Latin1:
         case Encoding::Utf8:
             switch (src_simple_encoding)
             {

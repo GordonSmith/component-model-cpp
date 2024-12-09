@@ -28,7 +28,6 @@ namespace cmcpp
 
         virtual void trap(const char *msg = "")
         {
-            //  Optional
             _trap(msg);
         }
 

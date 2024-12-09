@@ -13,6 +13,34 @@ namespace cmcpp
     ValType valType(const Val &v);
     const char *valTypeName(ValType type);
     bool operator==(const Val &lhs, const Val &rhs);
+    struct PrintValVisitor
+    {
+        std::ostream &stream;
+        PrintValVisitor(std::ostream &stream);
+        void operator()(const bool &v) const;
+        void operator()(const int8_t &v) const;
+        void operator()(const uint8_t &v) const;
+        void operator()(const int16_t &v) const;
+        void operator()(const uint16_t &v) const;
+        void operator()(const int32_t &v) const;
+        void operator()(const uint32_t &v) const;
+        void operator()(const int64_t &v) const;
+        void operator()(const uint64_t &v) const;
+        void operator()(const float32_t &v) const;
+        void operator()(const float64_t &v) const;
+        void operator()(const wchar_t &v) const;
+        void operator()(const string_ptr &v) const;
+        void operator()(const list_ptr &v) const;
+        void operator()(const field_ptr &v) const;
+        void operator()(const record_ptr &v) const;
+        void operator()(const tuple_ptr &v) const;
+        void operator()(const case_ptr &v) const;
+        void operator()(const variant_ptr &v) const;
+        void operator()(const enum_ptr &v) const;
+        void operator()(const option_ptr &v) const;
+        void operator()(const result_ptr &v) const;
+        void operator()(const flags_ptr &v) const;
+    };
 
     //  ----------------------------------------------------------------------
 
@@ -43,6 +71,7 @@ namespace cmcpp
         char8_t *ptr() const;
         const char *c_str() const;
         const size_t byte_len() const;
+        void resize(size_t len);
         const std::string_view &to_string() const;
     };
 
