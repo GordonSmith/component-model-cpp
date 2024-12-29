@@ -54,7 +54,7 @@ namespace cmcpp
         }
         trap_if(cx, ptr != align_to(ptr, alignment));
         trap_if(cx, ptr + byte_length > cx.opts->memory.size());
-        auto s = std::make_shared<string_t>(cx.opts->string_encoding, byte_length);
+        string_ptr s = std::make_shared<string_t>(cx.opts->string_encoding, byte_length);
         auto dec = cx.opts->convert(s->ptr(), (const char8_t *)&cx.opts->memory[ptr], byte_length, encoding, cx.opts->string_encoding);
         s->resize(dec.second);
         return s;

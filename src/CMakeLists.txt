@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(fmt CONFIG REQUIRED)
 
 set(SRC
+  component-model.cpp
   traits.hpp
   traits.cpp
   context.hpp

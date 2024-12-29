@@ -9,9 +9,9 @@
 namespace cmcpp
 {
 
-    std::vector<WasmVal> lower_flat_string(const LiftLowerContext &cx, const string_ptr &string)
+    std::vector<WasmVal> lower_flat_string(const LiftLowerContext &cx, const string_ptr &v)
     {
-        auto [ptr, packed_length] = store_string_into_range(cx, string);
+        auto [ptr, packed_length] = store_string_into_range(cx, v);
         return {(int32_t)ptr, (int32_t)packed_length};
     }
 

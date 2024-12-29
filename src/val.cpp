@@ -291,6 +291,7 @@ namespace cmcpp
     string_t::string_t(Encoding encoding, size_t len) : _encoding(encoding)
     {
         owned_string.resize(len);
+        view = std::string_view(owned_string);
     }
     string_t::string_t(const char *ptr, Encoding encoding, size_t len) : _encoding(encoding)
     {

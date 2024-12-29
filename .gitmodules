@@ -4,3 +4,6 @@
 [submodule "ref/component-model"]
 	path = ref/component-model
 	url = https://github.com/WebAssembly/component-model.git
+[submodule "ref/vscode-wasm"]
+	path = ref/vscode-wasm
+	url = git@github.com:microsoft/vscode-wasm.git

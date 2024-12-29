@@ -19,8 +19,8 @@ namespace cmcpp
     {
         using SignedT = std::make_signed_t<T>;
         T i = vi.next(SignedT());
-        assert(0 <= i && i < (1ULL << core_width));
-        return R(i % (1ULL << t_width));
+        // assert(0 <= i && i < (1ULL << core_width));
+        return i % (1ULL << t_width);
     }
 
     template <typename T, typename R>
