@@ -27,6 +27,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(src)
 add_subdirectory(test)
-add_subdirectory(wasm)
+#  Open wasm folder in dev container to build wasm file  ---
 
+# ---- Enable testing ----
 enable_testing()

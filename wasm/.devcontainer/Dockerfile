@@ -23,25 +23,25 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     xz-utils \
     && apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
-RUN curl --proto '=https' --tlsv1.3 https://sh.rustup.rs -sSf | sh -s -- -y
-
-SHELL ["/bin/bash", "--login", "-c"]
-
-ARG USERNAME=vscode
-
-# List of current vertsion can be found in https://github.com/bytecodealliance/wit-bindgen/releases  ---
-ARG WIT_VERSION=0.36.0
-RUN cargo install wasm-tools && \
-    cargo install --git https://github.com/bytecodealliance/wit-bindgen --tag wit-bindgen-cli-${WIT_VERSION} wit-bindgen-cli && \
-    curl https://wasmtime.dev/install.sh -sSf | bash 
 
 # List of current vertsion can be found in https://github.com/WebAssembly/wasi-sdk/releases  ---
 ARG WASI_VERSION=25
 ARG WASI_MINOR_VERSION=0
 ARG WASI_VERSION_FULL=${WASI_VERSION}.${WASI_MINOR_VERSION}
-RUN wget https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_VERSION}/wasi-sdk-${WASI_VERSION_FULL}-linux.tar.gz
-RUN tar xvf wasi-sdk-${WASI_VERSION_FULL}-linux.tar.gz && rm wasi-sdk-${WASI_VERSION_FULL}-linux.tar.gz
-RUN mv wasi-sdk-${WASI_VERSION_FULL} wasi-sdk
+RUN wget https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_VERSION}/wasi-sdk-${WASI_VERSION_FULL}-x86_64-linux.tar.gz
+RUN tar xvf wasi-sdk-${WASI_VERSION_FULL}-x86_64-linux.tar.gz && rm wasi-sdk-${WASI_VERSION_FULL}-x86_64-linux.tar.gz
+RUN mv wasi-sdk-${WASI_VERSION_FULL}-x86_64-linux /wasi-sdk
+    
+USER vscode
+ARG USERNAME=vscode
+
+RUN curl --proto '=https' --tlsv1.3 https://sh.rustup.rs -sSf | sh -s -- -y
+
+SHELL ["/bin/bash", "--login", "-c"]
+
+# List of current vertsion can be found in https://github.com/bytecodealliance/wit-bindgen/releases  ---
+RUN cargo install wasm-tools
+RUN cargo install wit-bindgen-cli
 
 # # Install wasmtime
 # ENV WASMTIME_VERSION="${WASMTIME_VERSION:-"v9.0.4"}"
@@ -50,4 +50,3 @@ RUN mv wasi-sdk-${WASI_VERSION_FULL} wasi-sdk
 # RUN chmod a+x ${INSTALLER}
 # RUN ${INSTALLER} --version ${WASMTIME_VERSION}
 # RUN cp ${HOME}/.wasmtime/bin/wasmtime /usr/bin/wasmtime
-

@@ -14,10 +14,6 @@ add_custom_target(wit-generate ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/tests.c)
 set(CMAKE_EXECUTABLE_SUFFIX ".wasm")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions --sysroot=/${WASI_SDK_PREFIX}/share/wasi-sysroot")
 
-include_directories(
-    ${CMAKE_CURRENT_BINARY_DIR}
-)
-
 add_executable(wasmtests
     bool.cpp
     int.cpp
@@ -30,8 +26,11 @@ add_executable(wasmtests
     ${CMAKE_CURRENT_BINARY_DIR}/tests.h
 )
 
-target_link_options(wasmtests PRIVATE "LINKER:--no-entry")
+target_include_directories(wasmtests 
+    PUBLIC ${CMAKE_CURRENT_BINARY_DIR}
+)
 
+target_link_options(wasmtests PRIVATE "LINKER:--no-entry")
 
 add_custom_command(
     TARGET wasmtests POST_BUILD  
