@@ -1,13 +1,41 @@
-#ifndef STORE_HPP
-#define STORE_HPP
+#ifndef CMCPP_STORE_HPP
+#define CMCPP_STORE_HPP
 
 #include "context.hpp"
-#include "val.hpp"
+#include "float.hpp"
+#include "integer.hpp"
+#include "string.hpp"
+#include "list.hpp"
+#include "util.hpp"
+
+#include <tuple>
+#include <cassert>
 
 namespace cmcpp
 {
-    void store(const LiftLowerContext &cx, const Val &v, const Val &t, uint32_t ptr);
-    std::pair<uint32_t, uint32_t> store_list_into_range(const LiftLowerContext &cx, const list_ptr &v, const Val &elem_type);
-    std::pair<uint32_t, uint32_t> store_string_into_range(const LiftLowerContext &cx, const string_ptr &v);
+    template <Boolean T>
+    inline void store(CallContext &cx, const T &v, uint32_t ptr)
+    {
+        integer::store<T>(cx, v, ptr);
+    }
+
+    template <Integer T>
+    inline void store(CallContext &cx, const T &v, uint32_t ptr)
+    {
+        integer::store<T>(cx, v, ptr);
+    }
+
+    template <Float T>
+    inline void store(CallContext &cx, const T &v, uint32_t ptr)
+    {
+        float_::store<T>(cx, v, ptr);
+    }
+
+    template <String T>
+    inline void store(CallContext &cx, const T &v, uint32_t ptr)
+    {
+        string::store(cx, v, ptr);
+    }
 }
+
 #endif

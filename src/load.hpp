@@ -1,16 +1,37 @@
-#ifndef LOAD_HPP
-#define LOAD_HPP
+#ifndef CMCPP_LOAD_HPP
+#define CMCPP_LOAD_HPP
 
 #include "context.hpp"
-#include "val.hpp"
+#include "integer.hpp"
+#include "float.hpp"
+#include "string.hpp"
+#include "util.hpp"
 
 namespace cmcpp
 {
-    string_ptr load_string(const LiftLowerContext &cx, uint32_t ptr);
-    string_ptr load_string_from_range(const LiftLowerContext &cx, uint32_t ptr, uint32_t tagged_code_units);
-    std::shared_ptr<list_t> load_list_from_range(const LiftLowerContext &cx, uint32_t ptr, uint32_t length, const Val &t);
-    std::string case_label_with_refinements(case_ptr c, const std::vector<case_ptr> &cases);
-    Val load(const LiftLowerContext &cx, uint32_t ptr, ValType t);
-    Val load(const LiftLowerContext &cx, uint32_t ptr, const Val &v);
+    template <Boolean T>
+    inline T load(const CallContext &cx, uint32_t ptr)
+    {
+        return convert_int_to_bool(integer::load<uint8_t>(cx, ptr));
+    }
+
+    template <Integer T>
+    inline uint8_t load(const CallContext &cx, uint32_t ptr)
+    {
+        return integer::load<T>(cx, ptr);
+    }
+
+    template <Float T>
+    inline float32_t load(const CallContext &cx, uint32_t ptr)
+    {
+        return float_::load<T>(cx, ptr);
+    }
+
+    template <String T>
+    inline string_t load(const CallContext &cx, uint32_t ptr)
+    {
+        return string::load(cx, ptr);
+    }
 }
+
 #endif

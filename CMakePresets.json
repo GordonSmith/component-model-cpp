@@ -136,7 +136,7 @@
     ],
     "buildPresets": [
         {
-            "name": "Ninja-Linux",
+            "name": "ninja-linux",
             "condition": {
                 "type": "equals",
                 "lhs": "${hostSystemName}",
@@ -146,13 +146,13 @@
             "nativeToolOptions": []
         },
         {
-            "name": "Ninja-Linux-Debug",
-            "inherits": "Ninja-Linux",
+            "name": "ninja-linux-Debug",
+            "inherits": "ninja-linux",
             "configuration": "Debug"
         },
         {
-            "name": "Ninja-Linux-Release",
-            "inherits": "Ninja-Linux",
+            "name": "ninja-linux-Release",
+            "inherits": "ninja-linux",
             "configuration": "Release"
         },
         {

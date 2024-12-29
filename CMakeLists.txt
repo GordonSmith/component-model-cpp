@@ -22,5 +22,11 @@ if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
   )
 endif()
 
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 add_subdirectory(src)
 add_subdirectory(test)
+add_subdirectory(wasm)
+
+enable_testing()
