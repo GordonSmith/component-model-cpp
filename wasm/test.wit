@@ -17,10 +17,6 @@ world tests {
   export bool-and: func(a: bool, b: bool) -> bool;
   export bool-or: func(a: bool, b: bool) -> bool;
   export bool-xor: func(a: bool, b: bool) -> bool;
-  export f32-add: func(a: f32, b: f32) -> f32;
-  export f32-sub: func(a: f32, b: f32) -> f32;
-  export f64-add: func(a: f64, b: f64) -> f64;
-  export f64-sub: func(a: f64, b: f64) -> f64;
   export u8-add: func(a: u8, b: u8) -> u8;
   export u8-sub: func(a: u8, b: u8) -> u8;
   export u16-add: func(a: u16, b: u16) -> u16;
@@ -33,9 +29,21 @@ world tests {
   export s8-sub: func(a: s8, b: s8) -> s8;
   export s16-add: func(a: s16, b: s16) -> s16;
   export s16-sub: func(a: s16, b: s16) -> s16;
-
+  export s32-add: func(a: s32, b: s32) -> s32;
+  export s32-sub: func(a: s32, b: s32) -> s32;
+  export s64-add: func(a: s64, b: s64) -> s64;
+  export s64-sub: func(a: s64, b: s64) -> s64;
+  export f32-add: func(a: f32, b: f32) -> f32;
+  export f32-sub: func(a: f32, b: f32) -> f32;
+  export f64-add: func(a: f64, b: f64) -> f64;
+  export f64-sub: func(a: f64, b: f64) -> f64;
+  
+  
+  export list-char-append: func(a: list<char>, b: list<char>) -> list<char>;
+  export list-list-string-append: func(a: list<list<string>>, b: list<list<string>>) -> string;
+  export string-append: func(a: string, b: string) -> string;
   export utf8-string: func(a: string, b: string) -> string;
-
+  
   export list-bool: func() -> list<bool>;
   export list-bool-bool: func(a: list<bool>) -> list<bool>;
 

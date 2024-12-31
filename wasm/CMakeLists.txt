@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.22)
 
 project(wasmtests)
 
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 set(WASM_PATH "${CMAKE_CURRENT_BINARY_DIR}/bin/${PROJECT_NAME}.wasm")
 
 add_custom_command(

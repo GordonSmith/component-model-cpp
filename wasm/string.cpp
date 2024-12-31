@@ -69,3 +69,14 @@ void tests_list_list_string_append(tests_list_list_string_t *a, tests_list_list_
     dbglog(std::to_string(++tally) + ":  " + r);
     tests_string_dup(ret, r.c_str());
 }
+
+void tests_utf8_string(tests_string_t *a, tests_string_t *b, tests_string_t *ret)
+{
+    std::string s1((const char *)a->ptr, (size_t)a->len);
+    tests_string_free(a);
+    std::string s2((const char *)b->ptr, (size_t)b->len);
+    tests_string_free(b);
+    std::string r = s1 + s2;
+    dbglog(std::to_string(++tally) + ":  " + r);
+    tests_string_dup(ret, r.c_str());
+}
