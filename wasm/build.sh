@@ -17,8 +17,6 @@ trap cleanup EXIT
 
 npx -y @devcontainers/cli up --workspace-folder ${SCRIPT_DIR} | jq . > "${SCRIPT_DIR}/up.json"
 
-CMAKE_OPTIONS="-G Ninja -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_TOOLCHAIN_FILE=\${WASI_SDK_PREFIX}/share/cmake/wasi-sdk.cmake -DWASI_SDK_PREFIX=\${WASI_SDK_PREFIX}"
-
-npx -y @devcontainers/cli exec --workspace-folder ${SCRIPT_DIR} mkdir -p ./build 
-npx -y @devcontainers/cli exec --workspace-folder ${SCRIPT_DIR} sh -c 'cmake -S . -B ./build -G Ninja -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_TOOLCHAIN_FILE=${WASI_SDK_PREFIX}/share/cmake/wasi-sdk.cmake -DWASI_SDK_PREFIX=${WASI_SDK_PREFIX}'
-npx -y @devcontainers/cli exec --workspace-folder ${SCRIPT_DIR} cmake --build ./build --parallel
+npx -y @devcontainers/cli exec --workspace-folder ${SCRIPT_DIR} --config wasm/.devcontainer/devcontainer.json mkdir -p ./build 
+npx -y @devcontainers/cli exec --workspace-folder ${SCRIPT_DIR} --config wasm/.devcontainer/devcontainer.json sh -c 'cmake --preset wasi-sdk'
+npx -y @devcontainers/cli exec --workspace-folder ${SCRIPT_DIR} --config wasm/.devcontainer/devcontainer.json cmake --build ./build --parallel
