@@ -265,7 +265,7 @@ namespace cmcpp
             }
             trap_if(cx, ptr != align_to(ptr, alignment));
             trap_if(cx, ptr + byte_length > cx.memory.size());
-            return {encoding, reinterpret_cast<const char8_t *>(&cx.memory[ptr]), byte_length};
+            return string_t{encoding, reinterpret_cast<const char8_t *>(&cx.memory[ptr]), byte_length};
         }
 
         string_t load(const CallContext &cx, offset offset)

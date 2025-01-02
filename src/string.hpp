@@ -11,8 +11,8 @@ namespace cmcpp
         void store(CallContext &cx, const string_t &v, uint32_t ptr);
         WasmValVector lower_flat(CallContext &cx, const string_t &v);
 
-        string_t load(const CallContext &cx, offset offset);
-        string_t lift_flat(const CallContext &cx, const WasmValVectorIterator &vi);
+        CMCPP_API string_t load(const CallContext &cx, offset offset);
+        CMCPP_API string_t lift_flat(const CallContext &cx, const WasmValVectorIterator &vi);
     }
 }
 

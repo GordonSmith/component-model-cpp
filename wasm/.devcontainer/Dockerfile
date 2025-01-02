@@ -31,9 +31,10 @@ ARG WASI_VERSION_FULL=${WASI_VERSION}.${WASI_MINOR_VERSION}
 RUN wget https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_VERSION}/wasi-sdk-${WASI_VERSION_FULL}-x86_64-linux.tar.gz
 RUN tar xvf wasi-sdk-${WASI_VERSION_FULL}-x86_64-linux.tar.gz && rm wasi-sdk-${WASI_VERSION_FULL}-x86_64-linux.tar.gz
 RUN mv wasi-sdk-${WASI_VERSION_FULL}-x86_64-linux /wasi-sdk
-    
+
 USER vscode
 ARG USERNAME=vscode
+SHELL ["/bin/bash", "--login", "-c"]
 
 RUN curl --proto '=https' --tlsv1.3 https://sh.rustup.rs -sSf | sh -s -- -y
 

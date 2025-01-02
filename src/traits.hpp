@@ -1,6 +1,8 @@
 #ifndef CMCPP_TRAITS_HPP
 #define CMCPP_TRAITS_HPP
 
+#include "platform.hpp"
+
 #include <cstdint>
 #include <vector>
 #include <optional>
@@ -314,6 +316,13 @@ namespace cmcpp
         Encoding encoding;
         const char8_t *ptr;
         size_t byte_len;
+
+        string_t(Encoding encoding, const char8_t *ptr, size_t byte_len);
+        string_t(const std::string &str);
+        void operator=(const std::string &str);
+
+    private:
+        std::string str_buff;
     };
     template <>
     struct ValTrait<string_t>

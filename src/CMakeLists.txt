@@ -1,16 +1,15 @@
 project(component-model-cpp)
 
-# ---- Add source files ----
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(fmt CONFIG REQUIRED)
 
 set(SRC
-#   component-model.cpp
+    boolean.cpp
+    boolean.hpp
     context.hpp
     context.cpp
-    boolean.hpp
     float.hpp
     float.cpp
     integer.hpp
@@ -19,6 +18,7 @@ set(SRC
     list.cpp
     load.hpp
     load.cpp
+    platform.hpp
     string.hpp
     string.cpp
     traits.hpp
@@ -29,21 +29,24 @@ set(SRC
     util.cpp
 )
 
-add_library(${PROJECT_NAME} STATIC ${SRC})
+add_library(${PROJECT_NAME} 
+    SHARED ${SRC}
+)
 
 # target_include_directories(${PROJECT_NAME}
 #   ...
 # )
 
 target_link_libraries(${PROJECT_NAME} 
-#   PRIVATE fmt::fmt
 )
 
-set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 20)
+target_compile_definitions(${PROJECT_NAME} 
+    PRIVATE CMCPP_EXPORTS
+)
+# set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 20)
 # target_compile_options(${PROJECT_NAME} PUBLIC "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/permissive->")
 
 target_include_directories(
-  ${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+    ${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
                          $<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION}>
 )
-
