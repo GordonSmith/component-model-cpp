@@ -171,6 +171,13 @@ TEST_CASE("Float")
     auto cx = createCallContext(&heap, Encoding::Utf8);
     test_numeric<float32_t>(cx);
     test_numeric<float64_t>(cx);
+
+    auto flat_v = lower_flat(*cx, std::numeric_limits<float>::infinity());
+    auto b = lift_flat<float32_t>(*cx, flat_v);
+    CHECK(std::isnan(b));
+    flat_v = lower_flat(*cx, std::numeric_limits<double>::infinity());
+    b = lift_flat<float64_t>(*cx, flat_v);
+    CHECK(std::isnan(b));
 }
 
 const char *const hw = "hello World!";

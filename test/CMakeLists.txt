@@ -3,6 +3,15 @@ project(component-model-test)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if(CMAKE_COMPILER_IS_GNUCXX)
+    add_compile_options(--coverage)
+    add_link_options(--coverage)
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
+    add_link_options(-fprofile-instr-generate)
+endif()
+
+
 find_package(doctest CONFIG REQUIRED)
 find_package(ICU REQUIRED COMPONENTS uc dt in io)
 
