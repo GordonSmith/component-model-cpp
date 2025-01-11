@@ -271,21 +271,29 @@ TEST_CASE("String-Latin1_Utf16")
     auto v = lower_flat(*cx, hw);
     auto hw_ret = lift_flat<string_t>(*cx, v);
     CHECK(hw_ret == hw);
+    auto hw_l1_ret = lift_flat<latin1_u16string_t>(*cx, v);
+    CHECK(hw_l1_ret.encoding == Encoding::Latin1);
 
     u16string_t hw16 = u"Hello World!";
     v = lower_flat(*cx, hw16);
     auto hw16_ret = lift_flat<u16string_t>(*cx, v);
     CHECK(hw16_ret == hw16);
+    hw_l1_ret = lift_flat<latin1_u16string_t>(*cx, v);
+    CHECK(hw_l1_ret.encoding == Encoding::Latin1);
 
     hw = "Hello 🌍!";
     v = lower_flat(*cx, hw);
     hw_ret = lift_flat<string_t>(*cx, v);
     CHECK(hw_ret == hw);
+    hw_l1_ret = lift_flat<latin1_u16string_t>(*cx, v);
+    CHECK(hw_l1_ret.encoding == Encoding::Utf16);
 
     hw16 = u"Hello 🌍!";
     v = lower_flat(*cx, hw16);
     hw16_ret = lift_flat<u16string_t>(*cx, v);
     CHECK(hw16_ret == hw16);
+    hw_l1_ret = lift_flat<latin1_u16string_t>(*cx, v);
+    CHECK(hw_l1_ret.encoding == Encoding::Utf16);
 }
 
 void testString(Encoding guestEncoding)

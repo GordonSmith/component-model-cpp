@@ -332,6 +332,32 @@ namespace cmcpp
         using flat_type_1 = int32_t;
     };
 
+    struct latin1_u16string_t
+    {
+        Encoding encoding;
+        std::vector<char8_t> str;
+
+        inline void resize(size_t new_size)
+        {
+            str.resize(new_size);
+        }
+        inline void *data()
+        {
+            return str.data();
+        }
+    };
+    template <>
+    struct ValTrait<latin1_u16string_t>
+    {
+        static constexpr Encoding encoding = Encoding::Latin1_Utf16;
+        static constexpr ValType type = ValType::String;
+        static constexpr size_t char_size = sizeof(char8_t);
+        static constexpr uint32_t size = 8;
+        static constexpr uint32_t alignment = 4;
+        using flat_type_0 = int32_t;
+        using flat_type_1 = int32_t;
+    };
+
     template <typename T>
     concept String = ValTrait<T>::type == ValType::String;
     //  List  --------------------------------------------------------------------

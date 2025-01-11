@@ -210,6 +210,10 @@ namespace cmcpp
             size_t char_size = ValTrait<T>::char_size;
             size_t host_byte_length = byte_length * 2;
             T retVal;
+            if constexpr (std::is_same<T, latin1_u16string_t>::value)
+            {
+                retVal.encoding = encoding;
+            }
             retVal.resize(host_byte_length);
             auto decoded = cx.convert(retVal.data(), host_byte_length, (void *)&cx.memory[ptr], byte_length, encoding, ValTrait<T>::encoding);
             if ((decoded.second / char_size) < host_byte_length)
