@@ -5,6 +5,7 @@
 #include "integer.hpp"
 #include "float.hpp"
 #include "string.hpp"
+#include "flags.hpp"
 #include "util.hpp"
 
 namespace cmcpp
@@ -15,14 +16,20 @@ namespace cmcpp
         return convert_int_to_bool(integer::load<uint8_t>(cx, ptr));
     }
 
+    template <Char T>
+    inline T load(const CallContext &cx, uint32_t ptr)
+    {
+        return convert_i32_to_char(cx, integer::load<uint32_t>(cx, ptr));
+    }
+
     template <Integer T>
-    inline uint8_t load(const CallContext &cx, uint32_t ptr)
+    inline T load(const CallContext &cx, uint32_t ptr)
     {
         return integer::load<T>(cx, ptr);
     }
 
     template <Float T>
-    inline float32_t load(const CallContext &cx, uint32_t ptr)
+    inline T load(const CallContext &cx, uint32_t ptr)
     {
         return float_::load<T>(cx, ptr);
     }
@@ -31,6 +38,12 @@ namespace cmcpp
     inline T load(const CallContext &cx, uint32_t ptr)
     {
         return string::load<T>(cx, ptr);
+    }
+
+    template <Flags T>
+    inline T load(const CallContext &cx, uint32_t ptr)
+    {
+        return flags::load<T>(cx, ptr);
     }
 }
 

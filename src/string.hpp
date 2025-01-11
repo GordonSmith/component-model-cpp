@@ -47,7 +47,7 @@ namespace cmcpp
                     trap_if(cx, ptr + worst_case_size > cx.memory.size(), "Out of bounds access");
 
 #ifdef SIMPLE_UTF16_CONVERSION
-                    // Convert entire string to UTF-16 in one go, ignoring the previously copued data  ---
+                    // Convert entire string to UTF-16 in one go, ignoring the previously computed data  ---
                     auto encoded = cx.convert(&cx.memory[ptr], worst_case_size, src, src_code_units * ValTrait<T>::char_size, src_encoding, Encoding::Utf16);
                     if (encoded.second < worst_case_size)
                     {
@@ -75,7 +75,7 @@ namespace cmcpp
                     // Add special tag to indicate the string is a UTF-16 string  ---
                     uint32_t tagged_code_units = static_cast<uint32_t>(dst_byte_length + encoded.second / 2) | UTF16_TAG;
                     return std::make_pair(ptr, tagged_code_units);
-#endif // SIMPLE_UTF16_CONVERSION
+#endif
                 }
             }
             if (dst_byte_length < src_code_units)
@@ -120,6 +120,8 @@ namespace cmcpp
             switch (cx.guest_encoding)
             {
             case Encoding::Latin1:
+                cx.trap("Invalid guest encoding, must be UTF8, UTF16 or Latin1/UTF16");
+                break;
             case Encoding::Utf8:
                 switch (src_simple_encoding)
                 {
@@ -215,7 +217,7 @@ namespace cmcpp
                 retVal.encoding = encoding;
             }
             retVal.resize(host_byte_length);
-            auto decoded = cx.convert(retVal.data(), host_byte_length, (void *)&cx.memory[ptr], byte_length, encoding, ValTrait<T>::encoding);
+            auto decoded = cx.convert(retVal.data(), host_byte_length, (void *)&cx.memory[ptr], byte_length, encoding, ValTrait<T>::encoding == Encoding::Latin1_Utf16 ? encoding : ValTrait<T>::encoding);
             if ((decoded.second / char_size) < host_byte_length)
             {
                 retVal.resize(decoded.second / char_size);

@@ -3,6 +3,9 @@
 
 #include <cstdint>
 #include <vector>
+#include <map>
+#include <string_view>
+#include <bitset>
 #include <optional>
 #include <variant>
 #include <memory>
@@ -10,6 +13,7 @@
 #include <array>
 #include <cassert>
 #include <limits>
+#include <cstring>
 
 //  See canonical ABI:
 //  https://github.com/WebAssembly/component-model/blob/main/design/mvp/canonical-abi/definitions.py
@@ -152,7 +156,20 @@ namespace cmcpp
     };
     template <typename T>
     concept Boolean = ValTrait<T>::type == ValType::Bool;
+    //  Char  --------------------------------------------------------------------
+    using char_t = char32_t;
 
+    template <>
+    struct ValTrait<char_t>
+    {
+        static constexpr ValType type = ValType::Char;
+        static constexpr uint32_t size = 4;
+        static constexpr uint32_t alignment = 4;
+        using flat_type = int32_t;
+    };
+
+    template <typename T>
+    concept Char = ValTrait<T>::type == ValType::Char;
     //  Numerics  --------------------------------------------------------------------
 
     template <>
@@ -304,6 +321,8 @@ namespace cmcpp
     concept DoubleWord = ValTrait<T>::type == ValType::U64 || ValTrait<T>::type == ValType::S64 || ValTrait<T>::type == ValType::F64;
 
     //  Strings --------------------------------------------------------------------
+    const uint32_t UTF16_TAG = 1U << 31;
+
     using string_t = std::string;
     template <>
     struct ValTrait<string_t>
@@ -332,18 +351,20 @@ namespace cmcpp
         using flat_type_1 = int32_t;
     };
 
+    //  Do we really need to support this on the host?
     struct latin1_u16string_t
     {
-        Encoding encoding;
-        std::vector<char8_t> str;
+        Encoding encoding = Encoding::Latin1;
+        string_t str;
+        u16string_t u16str;
 
         inline void resize(size_t new_size)
         {
-            str.resize(new_size);
+            encoding == Encoding::Latin1 ? str.resize(new_size) : u16str.resize(new_size);
         }
-        inline void *data()
+        inline void *data() const
         {
-            return str.data();
+            return encoding == Encoding::Latin1 ? (void *)str.data() : (void *)u16str.data();
         }
     };
     template <>
@@ -361,7 +382,6 @@ namespace cmcpp
     template <typename T>
     concept String = ValTrait<T>::type == ValType::String;
     //  List  --------------------------------------------------------------------
-
     template <typename T>
     using list_t = std::vector<T>;
     template <typename T>
@@ -376,9 +396,97 @@ namespace cmcpp
     };
     template <typename T>
     concept List = ValTrait<T>::type == ValType::List;
+    //  Flags  --------------------------------------------------------------------
+    template <size_t N>
+    struct StringLiteral
+    {
+        constexpr StringLiteral(const char (&str)[N])
+        {
+            std::copy(str, str + N, value);
+        }
+        char value[N];
+        constexpr std::string_view view() const
+        {
+            return std::string_view(value, N - 1);
+        }
+    };
 
+    template <StringLiteral... Ts>
+    struct flags_t : std::bitset<sizeof...(Ts)>
+    {
+        static constexpr size_t labelsSize = sizeof...(Ts);
+        static constexpr std::array<const char *, labelsSize> labels = {Ts.value...};
+
+        template <StringLiteral T>
+        bool test() const
+        {
+            constexpr size_t index = getIndex<T>();
+            return std::bitset<sizeof...(Ts)>::test(index);
+        }
+
+        template <StringLiteral T>
+        void set()
+        {
+            constexpr size_t index = getIndex<T>();
+            std::bitset<sizeof...(Ts)>::set(index);
+        }
+
+        template <StringLiteral T>
+        void reset()
+        {
+            constexpr size_t index = getIndex<T>();
+            std::bitset<sizeof...(Ts)>::reset(index);
+        }
+
+    private:
+        static constexpr int constexpr_strcmp(const char *str1, const char *str2)
+        {
+            while (*str1 && (*str1 == *str2))
+            {
+                ++str1;
+                ++str2;
+            }
+            return (static_cast<unsigned char>(*str1) - static_cast<unsigned char>(*str2));
+        }
+
+        template <StringLiteral T, size_t Index = 0>
+        static constexpr size_t getIndex()
+        {
+            if constexpr (Index < labelsSize)
+            {
+                return constexpr_strcmp(labels[Index], T.value) == 0 ? Index : getIndex<T, Index + 1>();
+            }
+            else
+            {
+                return -1;
+            }
+        }
+    };
+
+    template <StringLiteral... Ts>
+    constexpr size_t byteSize()
+    {
+        size_t n = sizeof...(Ts);
+        assert(0 < n && n <= 32);
+        if (n <= 8)
+            return 1;
+        if (n <= 16)
+            return 2;
+        return 4;
+    }
+
+    template <StringLiteral... Ts>
+    struct ValTrait<flags_t<Ts...>>
+    {
+        static constexpr ValType type = ValType::Flags;
+        static constexpr auto size = byteSize<Ts...>();
+        static constexpr auto alignment = byteSize<Ts...>();
+        using flat_type = int32_t;
+    };
+
+    template <typename T>
+    concept Flags = ValTrait<T>::type == ValType::Flags;
     //  Record  --------------------------------------------------------------------
-
     template <typename T>
     concept Field = ValTrait<T>::type != ValType::UNKNOWN;
 

@@ -36,4 +36,20 @@ namespace cmcpp
     {
         return i > 0;
     }
+
+    char_t convert_i32_to_char(const CallContext &cx, int32_t i)
+    {
+        trap_if(cx, i >= 0x110000);
+        trap_if(cx, 0xD800 <= i && i <= 0xDFFF);
+        return i;
+    }
+
+    int32_t char_to_i32(const CallContext &cx, const char_t &v)
+    {
+        uint32_t retVal = v;
+        trap_if(cx, retVal >= 0x110000);
+        trap_if(cx, 0xD800 <= retVal && retVal <= 0xDFFF);
+        return retVal;
+    }
+
 }

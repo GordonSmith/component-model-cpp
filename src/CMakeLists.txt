@@ -8,6 +8,7 @@ set(SRC
     boolean.hpp
     context.hpp
     context.cpp
+    flags.hpp
     float.hpp
     float.cpp
     integer.hpp

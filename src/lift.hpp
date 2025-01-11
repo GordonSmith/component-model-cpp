@@ -6,6 +6,7 @@
 #include "float.hpp"
 #include "string.hpp"
 #include "list.hpp"
+#include "flags.hpp"
 #include "record.hpp"
 #include "util.hpp"
 
@@ -15,6 +16,12 @@ namespace cmcpp
     inline T lift_flat(const CallContext &cx, const WasmValVectorIterator &vi)
     {
         return convert_int_to_bool(vi.next<int32_t>());
+    }
+
+    template <Char T>
+    inline T lift_flat(const CallContext &cx, const WasmValVectorIterator &vi)
+    {
+        return convert_i32_to_char(cx, vi.next<int32_t>());
     }
 
     template <UnsignedInteger T>
@@ -45,6 +52,12 @@ namespace cmcpp
     inline T lift_flat(const CallContext &cx, const WasmValVectorIterator &vi)
     {
         return list::lift_flat<typename ValTrait<T>::inner_type>(cx, vi);
+    }
+
+    template <Flags T>
+    inline T lift_flat(const CallContext &cx, const WasmValVectorIterator &vi)
+    {
+        return flags::lift_flat<T>(cx, vi);
     }
 
     template <Record T>

@@ -47,9 +47,9 @@ namespace cmcpp
         }
 
         template <Float T>
-        T lower_flat(T f)
+        WasmValVector lower_flat(T f)
         {
-            return canonicalize_nan(f);
+            return {canonicalize_nan(f)};
         }
 
         template <typename T>

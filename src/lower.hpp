@@ -6,6 +6,7 @@
 #include "float.hpp"
 #include "string.hpp"
 #include "list.hpp"
+#include "flags.hpp"
 #include "record.hpp"
 #include "util.hpp"
 
@@ -18,6 +19,12 @@ namespace cmcpp
     inline WasmValVector lower_flat(CallContext &cx, const T &v)
     {
         return {static_cast<ValTrait<T>::flat_type>(v)};
+    }
+
+    template <Char T>
+    inline WasmValVector lower_flat(CallContext &cx, const T &v)
+    {
+        return {static_cast<ValTrait<T>::flat_type>(char_to_i32(cx, v))};
     }
 
     template <UnsignedInteger T>
@@ -51,6 +58,12 @@ namespace cmcpp
     inline WasmValVector lower_flat(CallContext &cx, const T &v)
     {
         return list::lower_flat(cx, v);
+    }
+
+    template <Flags T>
+    inline WasmValVector lower_flat(CallContext &cx, const T &v)
+    {
+        return flags::lower_flat(cx, v);
     }
 
     template <Record T>

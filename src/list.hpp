@@ -25,29 +25,27 @@ namespace cmcpp
     namespace list
     {
         template <typename T>
-        std::tuple<offset, size> store_into_range(CallContext &cx, const list_t<T> &v)
+        std::tuple<offset, size> store_into_valid_range(CallContext &cx, const list_t<T> &v, uint32_t ptr)
         {
-            auto elem_type = ValTrait<T>::type;
             size_t nbytes = ValTrait<T>::size;
-            auto byte_length = v.size() * nbytes;
-            if (byte_length >= std::numeric_limits<size>::max())
-            {
-                throw std::runtime_error("byte_length exceeds limit");
-            }
-            uint32_t ptr = cx.realloc(0, 0, ValTrait<T>::alignment, byte_length);
-            if (ptr != align_to(ptr, ValTrait<T>::alignment))
-            {
-                throw std::runtime_error("ptr not aligned");
-            }
-            if (ptr + byte_length > cx.memory.size())
-            {
-                throw std::runtime_error("memory overflow");
-            }
             for (size_t i = 0; i < v.size(); ++i)
             {
                 cmcpp::store<T>(cx, v[i], ptr + i * nbytes);
             }
             return {ptr, v.size()};
+        }
+
+        template <typename T>
+        std::tuple<offset, size> store_into_range(CallContext &cx, const list_t<T> &v)
+        {
+            auto elem_type = ValTrait<T>::type;
+            size_t nbytes = ValTrait<T>::size;
+            auto byte_length = v.size() * nbytes;
+            trap_if(cx, byte_length > std::numeric_limits<size>::max(), "byte_length exceeds limit");
+            uint32_t ptr = cx.realloc(0, 0, ValTrait<T>::alignment, byte_length);
+            trap_if(cx, ptr != align_to(ptr, ValTrait<T>::alignment), "misaligned");
+            trap_if(cx, ptr + byte_length > cx.memory.size(), "memory overflow");
+            return store_into_valid_range(cx, v, ptr);
         }
 
         template <typename T>

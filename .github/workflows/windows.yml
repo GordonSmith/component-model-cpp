@@ -18,10 +18,6 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: "windows-2019"
-            config: vcpkg-VS-16
-            build: VS-16-Debug
-          
           - os: "windows-2022"
             config: vcpkg-VS-17
             build: VS-17-Debug

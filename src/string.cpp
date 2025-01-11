@@ -78,8 +78,8 @@ namespace cmcpp
             auto encoded = cx.convert(&cx.memory[ptr], src_byte_length, src, src_code_units, Encoding::Utf16, Encoding::Utf16);
             const uint8_t *enc_src_ptr = &cx.memory[ptr];
             if (std::any_of(enc_src_ptr, enc_src_ptr + encoded.second,
-                            [](uint8_t c)
-                            { return static_cast<unsigned char>(c) >= (1 << 8); }))
+                            [](unsigned c)
+                            { return c >= (1 << 8); }))
             {
                 uint32_t tagged_code_units = static_cast<uint32_t>(encoded.second / 2) | UTF16_TAG;
                 return std::make_pair(ptr, tagged_code_units);
