@@ -332,6 +332,18 @@ namespace cmcpp
         using flat_type_1 = int32_t;
     };
 
+    using latin1_u16string_t = std::basic_string<char8_t>;
+    template <>
+    struct ValTrait<latin1_u16string_t>
+    {
+        static constexpr Encoding encoding = Encoding::Latin1_Utf16;
+        static constexpr ValType type = ValType::String;
+        static constexpr uint32_t size = 8;
+        static constexpr uint32_t alignment = 4;
+        using flat_type_0 = int32_t;
+        using flat_type_1 = int32_t;
+    };
+
     template <typename T>
     concept String = ValTrait<T>::type == ValType::String;
     //  List  --------------------------------------------------------------------

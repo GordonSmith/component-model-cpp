@@ -272,6 +272,8 @@ TEST_CASE("String-Latin1_Utf16")
     auto hw_ret = lift_flat<string_t>(*cx, v);
     CHECK(hw_ret == hw);
 
+    auto hw_l1_ret = lift_flat<latin1_u16string_t>(*cx, v);
+
     u16string_t hw16 = u"Hello World!";
     v = lower_flat(*cx, hw16);
     auto hw16_ret = lift_flat<u16string_t>(*cx, v);
