@@ -1,10 +1,7 @@
 {
-  "dependencies": [
-    "boost-pfr",
-    "boost-type-index",
-    "doctest",
-    "fmt",
-    "utfcpp",
-    "wasmtime-cpp-api"
-  ]
+    "dependencies": [
+        "doctest",
+        "icu",
+        "wasmtime-cpp-api"
+    ]
 }

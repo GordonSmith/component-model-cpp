@@ -28,9 +28,9 @@ namespace cmcpp
     }
 
     template <String T>
-    inline string_t load(const CallContext &cx, uint32_t ptr)
+    inline T load(const CallContext &cx, uint32_t ptr)
     {
-        return string::load(cx, ptr);
+        return string::load<T>(cx, ptr);
     }
 }
 

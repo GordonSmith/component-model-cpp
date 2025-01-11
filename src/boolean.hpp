@@ -2,6 +2,8 @@
 #define CMCPP_BOOLEAN_HPP
 
 #include "context.hpp"
+#include "integer.hpp"
+#include "util.hpp"
 
 namespace cmcpp
 {

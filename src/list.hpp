@@ -61,18 +61,6 @@ namespace cmcpp
         template <typename T>
         WasmValVector lower_flat(CallContext &cx, const list_t<T> &v)
         {
-            std::size_t maybe_length = 0;
-            if (maybe_length)
-            {
-                assert(maybe_length == v.size());
-                WasmValVector flat;
-                for (auto e : v)
-                {
-                    auto ef = lower_flat(cx, e);
-                    flat.insert(flat.end(), ef.begin(), ef.end());
-                }
-                return flat;
-            }
             auto [ptr, length] = store_into_range(cx, v);
             return {static_cast<int32_t>(ptr), static_cast<int32_t>(length)};
         }
@@ -101,16 +89,6 @@ namespace cmcpp
         template <typename T>
         list_t<T> lift_flat(const CallContext &cx, const WasmValVectorIterator &vi)
         {
-            std::size_t maybe_length = 0;
-            if (maybe_length)
-            {
-                list_t<T> list = {};
-                for (size_t i = 0; i < maybe_length; ++i)
-                {
-                    list.push_back(lift_flat<T>(cx, vi));
-                }
-                return list;
-            }
             auto ptr = vi.next<int32_t>();
             auto length = vi.next<int32_t>();
             return load_from_range<T>(cx, ptr, length);

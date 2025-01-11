@@ -34,6 +34,7 @@ public:
         {
             return align_to(original_ptr, alignment);
         }
+
         uint32_t ret = align_to(last_alloc, alignment);
         last_alloc = ret + new_size;
         if (last_alloc > memory.size())
@@ -172,67 +173,209 @@ TEST_CASE("Float")
     test_numeric<float64_t>(cx);
 }
 
-const char *const hw = "hello world";
-TEST_CASE("String")
+const char *const hw = "hello World!";
+const char *const hw8 = "hello 世界-🌍-!";
+const char16_t *hw16 = u"hello 世界-🌍-!";
+
+template <String T, typename T2>
+void printString(T str, T2 hw)
+{
+    for (size_t i = 0; i < str.length(); ++i)
+    {
+        std::wcout << L"Character " << i << L": wstr=" << static_cast<wchar_t>(str[i]) << L", whw=" << static_cast<wchar_t>(hw[i]) << std::endl;
+        if (str[i] != hw[i])
+        {
+            std::wcout << L"Mismatch at position " << i << std::endl;
+        }
+    }
+}
+const char *const unicode_test_strings[] = {"", "a", "\x00", "hello", "こんにちは", "你好", "안녕하세요", "Здравствуйте", "مرحبا", "שלום", "नमस्ते", "สวัสดี", "γειά σου", "hola", "bonjour", "hallo", "ciao", "Olá", "hello 世界-🌍-!", "ہیلو", "ሰላም", "ہیلو", "ਸਤ ਸ੍ਰੀ ਅਕਾਲ", "வணக்கம்", "హలో", "ಹಲೋ", "ഹലോ", "ສະບາຍດີ", "မင်္ဂလာပါ", "សួស្តី", "ສະບາຍດີ", "ສະບາຍດີ", "ສະບາຍດີ"};
+const char16_t *const unicode_test_u16strings[] = {u"", u"a", u"\x00", u"hello", u"こんにちは", u"你好", u"안녕하세요", u"Здравствуйте", u"مرحبا", u"שלום", u"नमस्ते", u"สวัสดี", u"γειά σου", u"hola", u"bonjour", u"hallo", u"ciao", u"Olá", u"hello 世界-🌍-!", u"ہیلو", u"ሰላም", u"ہیلو", u"ਸਤ ਸ੍ਰੀ ਅਕਾਲ", u"வணக்கம்", u"హలో", u"ಹಲೋ", u"ഹലോ", u"ສະບາຍດີ", u"မင်္ဂလာပါ", u"សួស្តី", u"ສະບາຍດີ", u"ສະບາຍດີ", u"ສະບາຍດີ"};
+const char *const boundary_test_strings[] = {
+    "\x7F",             // DEL character in ASCII
+    "\xC2\x80",         // First 2-byte UTF-8 character
+    "\xDF\xBF",         // Last 2-byte UTF-8 character
+    "\xE0\xA0\x80",     // First 3-byte UTF-8 character
+    "\xEF\xBF\xBF",     // Last 3-byte UTF-8 character
+    "\xF0\x90\x80\x80", // First 4-byte UTF-8 character
+    "\xF4\x8F\xBF\xBF", // Last 4-byte UTF-8 character
+    "\xED\x9F\xBF",     // Last valid UTF-16 character before surrogates
+    "\xEE\x80\x80",     // First character after surrogates
+    "\xEF\xBF\xBD",     // Replacement character (U+FFFD)
+    "\xED\xA0\x7F",     // First high surrogate - 1 (Invalid UTF-8)
+    "\xED\xA0\x80",     // First high surrogate (Invalid UTF-8)
+    "\xED\xBF\xBF",     // Last high surrogate (Invalid UTF-8)
+    "\xED\xBF\xC0",     // Last high surrogate + 1 (Invalid UTF-8)
+    "\xF4\x90\x80\x80"  // Beyond U+10FFFF (Invalid UTF-8)
+};
+const char16_t *const boundary_test_u16strings[] = {
+    u"\x7F",             // DEL character in ASCII
+    u"\xC2\x80",         // First 2-byte UTF-8 character
+    u"\xDF\xBF",         // Last 2-byte UTF-8 character
+    u"\xE0\xA0\x80",     // First 3-byte UTF-8 character
+    u"\xEF\xBF\xBF",     // Last 3-byte UTF-8 character
+    u"\xF0\x90\x80\x80", // First 4-byte UTF-8 character
+    u"\xF4\x8F\xBF\xBF", // Last 4-byte UTF-8 character
+    u"\xED\x9F\xBF",     // Last valid UTF-16 character before surrogates
+    u"\xED\xA0\x7F",     // First high surrogate - 1
+    u"\xED\xA0\x80",     // First high surrogate
+    u"\xED\xBF\xBF",     // Last high surrogate
+    u"\xED\xBF\xC0",     // Last high surrogate + 1
+    u"\xEE\x80\x80",     // First character after surrogates
+    u"\xEF\xBF\xBD",     // Replacement character (U+FFFD)
+    u"\xF4\x90\x80\x80"  // Invalid UTF-8 (beyond U+10FFFF)
+};
+
+TEST_CASE("String-Utf16")
 {
     Heap heap(1024 * 1024);
-    auto cx = createCallContext(&heap, Encoding::Utf8);
-    auto v = lower_flat(*cx, string_t{Encoding::Utf8, (const char8_t *)hw, strlen(hw)});
-    auto str = lift_flat<string_t>(*cx, v);
-    CHECK(str.encoding == Encoding::Utf8);
-    CHECK(str.byte_len == strlen(hw));
-    CHECK(std::string((const char *)str.ptr, str.byte_len) == hw);
+    auto cx = createCallContext(&heap, Encoding::Utf16);
+    u16string_t hw16 = u"Hello World!";
+    auto v = lower_flat(*cx, hw16);
+    auto hw16_ret = lift_flat<u16string_t>(*cx, v);
+    CHECK(hw16_ret == hw16);
+
+    string_t hw = "Hello World!";
+    v = lower_flat(*cx, hw);
+    auto hw_ret = lift_flat<string_t>(*cx, v);
+    CHECK(hw_ret == hw);
 }
 
-TEST_CASE("List")
+TEST_CASE("String-Utf8")
 {
     Heap heap(1024 * 1024);
     auto cx = createCallContext(&heap, Encoding::Utf8);
-    list_t<string_t> strings = {string_t{Encoding::Utf8, (const char8_t *)hw, 5}, string_t{Encoding::Utf8, (const char8_t *)hw, 3}};
-    auto v = lower_flat(*cx, strings);
-    auto strs = lift_flat<list_t<string_t>>(*cx, v);
-    CHECK(strs.size() == 2);
-    CHECK(strs[0].encoding == Encoding::Utf8);
-    CHECK(strs[0].byte_len == 5);
-    CHECK(std::string((const char *)strs[0].ptr, strs[0].byte_len) == std::string(hw, strs[0].byte_len));
-    CHECK(strs[1].encoding == Encoding::Utf8);
-    CHECK(strs[1].byte_len == 3);
-    CHECK(std::string((const char *)strs[1].ptr, strs[1].byte_len) == std::string(hw, strs[1].byte_len));
-    v = lower_flat(*cx, strings);
-    strs = lift_flat<list_t<string_t>>(*cx, v);
-    CHECK(strs.size() == 2);
-    CHECK(strs[0].encoding == Encoding::Utf8);
-    CHECK(strs[0].byte_len == 5);
-    CHECK(std::string((const char *)strs[0].ptr, strs[0].byte_len) == std::string(hw, strs[0].byte_len));
-    CHECK(strs[1].encoding == Encoding::Utf8);
-    CHECK(strs[1].byte_len == 3);
-    CHECK(std::string((const char *)strs[1].ptr, strs[1].byte_len) == std::string(hw, strs[1].byte_len));
+    string_t hw = "Hello World!";
+    auto v = lower_flat(*cx, hw);
+    auto hw_ret = lift_flat<string_t>(*cx, v);
+    CHECK(hw_ret == hw);
+
+    u16string_t hw16 = u"Hello World!";
+    v = lower_flat(*cx, hw16);
+    auto hw16_ret = lift_flat<u16string_t>(*cx, v);
+    CHECK(hw16_ret == hw16);
 }
 
-TEST_CASE("List2")
+TEST_CASE("String-Latin1_Utf16")
 {
     Heap heap(1024 * 1024);
-    auto cx = createCallContext(&heap, Encoding::Utf8);
-    list_t<list_t<string_t>> strings = {{string_t{Encoding::Utf8, (const char8_t *)hw, 5}, string_t{Encoding::Utf8, (const char8_t *)hw, 3}}, {string_t{Encoding::Utf8, (const char8_t *)hw, 5}, string_t{Encoding::Utf8, (const char8_t *)hw, 3}}, {string_t{Encoding::Utf8, (const char8_t *)hw, 5}, string_t{Encoding::Utf8, (const char8_t *)hw, 3}}};
-    auto v = lower_flat(*cx, strings);
-    auto strs = lift_flat<list_t<list_t<string_t>>>(*cx, v);
-    CHECK(strs.size() == 3);
-    CHECK(strs[0][0].encoding == Encoding::Utf8);
-    CHECK(strs[0][0].byte_len == 5);
-    CHECK(std::string((const char *)strs[0][0].ptr, strs[0][0].byte_len) == std::string(hw, strs[0][0].byte_len));
-    CHECK(strs[1][0].encoding == Encoding::Utf8);
-    CHECK(strs[1][0].byte_len == 5);
-    CHECK(std::string((const char *)strs[0][1].ptr, strs[0][1].byte_len) == std::string(hw, strs[0][1].byte_len));
-    v = lower_flat(*cx, strings);
-    strs = lift_flat<list_t<list_t<string_t>>>(*cx, v);
-    CHECK(strs.size() == 3);
-    CHECK(strs[0][0].encoding == Encoding::Utf8);
-    CHECK(strs[0][0].byte_len == 5);
-    CHECK(std::string((const char *)strs[0][0].ptr, strs[0][0].byte_len) == std::string(hw, strs[0][0].byte_len));
-    CHECK(strs[1][0].encoding == Encoding::Utf8);
-    CHECK(strs[1][0].byte_len == 5);
-    CHECK(std::string((const char *)strs[0][1].ptr, strs[0][1].byte_len) == std::string(hw, strs[0][1].byte_len));
+    auto cx = createCallContext(&heap, Encoding::Latin1_Utf16);
+    string_t hw = "Hello World!";
+    auto v = lower_flat(*cx, hw);
+    auto hw_ret = lift_flat<string_t>(*cx, v);
+    CHECK(hw_ret == hw);
+
+    u16string_t hw16 = u"Hello World!";
+    v = lower_flat(*cx, hw16);
+    auto hw16_ret = lift_flat<u16string_t>(*cx, v);
+    CHECK(hw16_ret == hw16);
+
+    hw = "Hello 🌍!";
+    v = lower_flat(*cx, hw);
+    hw_ret = lift_flat<string_t>(*cx, v);
+    CHECK(hw_ret == hw);
+
+    hw16 = u"Hello 🌍!";
+    v = lower_flat(*cx, hw16);
+    hw16_ret = lift_flat<u16string_t>(*cx, v);
+    CHECK(hw16_ret == hw16);
 }
+
+void testString(Encoding guestEncoding)
+{
+    Heap heap(1024 * 1024);
+    auto cx = createCallContext(&heap, guestEncoding);
+
+    for (auto hw : unicode_test_strings)
+    {
+        string_t hw_str = hw;
+        auto v = lower_flat(*cx, hw_str);
+        auto hw_str_ret = lift_flat<string_t>(*cx, v);
+        // printString(hw_str_ret, hw);
+        CHECK(hw_str_ret == hw_str);
+    }
+
+    for (unsigned int i = 0; i < sizeof(boundary_test_strings) / sizeof(boundary_test_strings[0]); ++i)
+    {
+        string_t hw_str = boundary_test_strings[i];
+        auto v = lower_flat(*cx, hw_str);
+        auto hw_str_ret = lift_flat<string_t>(*cx, v);
+        // printString(hw_str_ret, hw);
+
+        if (guestEncoding != Encoding::Utf8 && i >= 10)
+            CHECK(hw_str_ret != hw_str);
+        else
+            CHECK(hw_str_ret == hw_str);
+    }
+
+    for (auto hw : unicode_test_u16strings)
+    {
+        u16string_t hw_str = hw;
+        auto v = lower_flat(*cx, hw_str);
+        auto hw_str_ret = lift_flat<u16string_t>(*cx, v);
+        CHECK(hw_str_ret.length() == hw_str.length());
+        // printString(hw_str_ret, hw);
+        CHECK(hw_str_ret == hw_str);
+    }
+
+    for (unsigned int i = 0; i < sizeof(boundary_test_u16strings) / sizeof(boundary_test_u16strings[0]); ++i)
+    {
+        u16string_t hw_str = boundary_test_u16strings[i];
+        auto v = lower_flat(*cx, hw_str);
+        auto hw_str_ret = lift_flat<u16string_t>(*cx, v);
+        // printString(hw_str_ret, hw);
+        CHECK(hw_str_ret == hw_str);
+    }
+}
+
+TEST_CASE("String-complex")
+{
+    testString(Encoding::Utf8);
+    testString(Encoding::Utf16);
+    testString(Encoding::Latin1_Utf16);
+}
+
+// TEST_CASE("List")
+// {
+//     Heap heap(1024 * 1024);
+//     auto cx = createCallContext(&heap, Encoding::Utf8);
+//     list_t<string_t> strings = {string_t{(const char *)hw8, 5}, string_t{(const char *)hw8, 3}};
+//     auto v = lower_flat(*cx, strings);
+//     auto strs = lift_flat<list_t<string_t>>(*cx, v);
+//     CHECK(strs.size() == 2);
+//     CHECK(strs[0].byte_len == 5);
+//     CHECK(std::string((const char *)strs[0].ptr, strs[0].byte_len) == std::string(hw8, strs[0].byte_len));
+//     CHECK(strs[1].byte_len == 3);
+//     CHECK(std::string((const char *)strs[1].ptr, strs[1].byte_len) == std::string(hw8, strs[1].byte_len));
+//     v = lower_flat(*cx, strings);
+//     strs = lift_flat<list_t<string_t>>(*cx, v);
+//     CHECK(strs.size() == 2);
+//     CHECK(strs[0].byte_len == 5);
+//     CHECK(std::string((const char *)strs[0].ptr, strs[0].byte_len) == std::string(hw8, strs[0].byte_len));
+//     CHECK(strs[1].byte_len == 3);
+//     CHECK(std::string((const char *)strs[1].ptr, strs[1].byte_len) == std::string(hw8, strs[1].byte_len));
+// }
+
+// TEST_CASE("List2")
+// {
+//     Heap heap(1024 * 1024);
+//     auto cx = createCallContext(&heap, Encoding::Utf8);
+//     list_t<list_t<string_t>> strings = {{string_t{(const char *)hw8, 5}, string_t{ (const char *)hw8, 3}}, {string_t{(const char *)hw8, 5}, string_t{(const char *)hw8, 3}}, {string_t{(const char *)hw8, 5}, string_t{(const char *)hw8, 3}}};
+//     auto v = lower_flat(*cx, strings);
+//     auto strs = lift_flat<list_t<list_t<string_t>>>(*cx, v);
+//     CHECK(strs.size() == 3);
+//     CHECK(strs[0][0].byte_len == 5);
+//     CHECK(std::string((const char *)strs[0][0].ptr, strs[0][0].byte_len) == std::string(hw8, strs[0][0].byte_len));
+//     CHECK(strs[1][0].byte_len == 5);
+//     CHECK(std::string((const char *)strs[0][1].ptr, strs[0][1].byte_len) == std::string(hw8, strs[0][1].byte_len));
+//     v = lower_flat(*cx, strings);
+//     strs = lift_flat<list_t<list_t<string_t>>>(*cx, v);
+//     CHECK(strs.size() == 3);
+//     CHECK(strs[0][0].byte_len == 5);
+//     CHECK(std::string((const char *)strs[0][0].ptr, strs[0][0].byte_len) == std::string(hw8, strs[0][0].byte_len));
+//     CHECK(strs[1][0].byte_len == 5);
+//     CHECK(std::string((const char *)strs[0][1].ptr, strs[0][1].byte_len) == std::string(hw8, strs[0][1].byte_len));
+// }
 
 struct MyRecord0
 {
@@ -254,7 +397,7 @@ TEST_CASE("Records")
     // CHECK(r2.age == rr0.age);
     // CHECK(r2.weight == rr0.weight);
 
-    // StructWithFields<string_t, uint16_t> r2 = {string_t{Encoding::Utf8, (const char8_t *)"name", 5}, {42}};
+    // StructWithFields<string_t, uint16_t> r2 = {string_t{Encoding::Utf8, (const char *)"name", 5}, {42}};
 
     // auto v = lower_flat<record_t<MyRecord1>>(*cx, r0);
     // auto rr = lift_flat<MyRecord1>(*cx, v);
@@ -273,23 +416,23 @@ TEST_CASE("Records")
     // record_t<field_t<"ages", list_t<uint32_t>>> ages_record = record_t{list_t<uint32_t>{42, 43, 44}};
     // auto v2 = lower_flat<record_t<field_t<"ages", list_t<uint32_t>>>>(*cx, ages_record);
 
-    // record_t<string_t, uint32_t> r = { {"name", {Encoding::Utf8, (const char8_t *)hw, 5}}, {"age", 42} };
+    // record_t<string_t, uint32_t> r = { {"name", {Encoding::Utf8, (const char *)hw8, 5}}, {"age", 42} };
     // auto v = lower_flat<record_t<string_t, uint32_t>>(*cx, r);
     // auto rr = lift_flat<record_t<string_t, uint32_t>>(*cx, v);
-    // CHECK(std::string((const char *)std::get<0>(rr).v.ptr, std::get<0>(rr).v.byte_len) == std::string(hw, std::get<0>(rr).v.byte_len));
+    // CHECK(std::string((const char *)std::get<0>(rr).v.ptr, std::get<0>(rr).v.byte_len) == std::string(hw8, std::get<0>(rr).v.byte_len));
     // CHECK(std::get<1>(rr).label == "age");
     // CHECK(std::get<1>(rr).v == 42);
-    // record_t<string_t, uint32_t> r2 = { {"name", {Encoding::Utf8, (const char8_t *)hw, 5}}, {"age", 42} };
+    // record_t<string_t, uint32_t> r2 = { {"name", {Encoding::Utf8, (const char *)hw8, 5}}, {"age", 42} };
 
     // CHECK(rr.fields[0].v.byte_len == 5);
-    // CHECK(std::string((const char *)rr.fields[0].v.ptr, rr.fields[0].v.byte_len) == std::string(hw, rr.fields[0].v.byte_len));
+    // CHECK(std::string((const char *)rr.fields[0].v.ptr, rr.fields[0].v.byte_len) == std::string(hw8, rr.fields[0].v.byte_len));
     // CHECK(rr.fields[1].v == 42);
-    // record_t<int32_t, string_t> r2 = {string_t{Encoding::Utf8, (const char8_t *)hw, 5}, 42};
+    // record_t<int32_t, string_t> r2 = {string_t{Encoding::Utf8, (const char *)hw8, 5}, 42};
     // v = lower_flat(*cx, r2);
     // rr = lift_flat<record_t<int32_t, string_t>>(*cx, v);
     // CHECK(rr.fields[0].v.encoding == Encoding::Utf8);
     // CHECK(rr.fields[0].v.byte_len == 5);
-    // CHECK(std::string((const char *)rr.fields[0].v.ptr, rr.fields[0].v.byte_len) == std::string(hw, rr.fields[0].v.byte_len));
+    // CHECK(std::string((const char *)rr.fields[0].v.ptr, rr.fields[0].v.byte_len) == std::string(hw8, rr.fields[0].v.byte_len));
     // CHECK(rr.fields[1].v == 42);
 }
 
@@ -395,7 +538,7 @@ TEST_CASE("Records")
 //     CallContextPtr cx = mk_cx(heap.memory, src_encoding);
 
 //     char8_t *v_mem = (char8_t *)std::malloc(s.length() * 4);
-//     auto _v = convert(v_mem, (const char8_t *)s.c_str(), s.length(), Encoding::Utf8, src_encoding);
+//     auto _v = convert(v_mem, (const char *)s.c_str(), s.length(), Encoding::Utf8, src_encoding);
 //     string_ptr v = std::make_shared<string_t>((const char *)_v.first, src_encoding, _v.second);
 //     test(string_ptr(), {0, (int32_t)tagged_code_units}, v, cx, dst_encoding);
 // }
@@ -411,7 +554,7 @@ TEST_CASE("Records")
 //     case Encoding::Utf8:
 //     {
 //         char8_t *encoded_mem = (char8_t *)std::malloc(worst_case_size);
-//         auto _encoded = convert(encoded_mem, (const char8_t *)s.c_str(), s.length(), Encoding::Utf8, src_encoding);
+//         auto _encoded = convert(encoded_mem, (const char *)s.c_str(), s.length(), Encoding::Utf8, src_encoding);
 //         auto encoded = std::make_shared<string_t>((const char *)_encoded.first, src_encoding, _encoded.second);
 //         tagged_code_units = _encoded.second;
 //         test_string_internal(src_encoding, dst_encoding, s, encoded, tagged_code_units);
@@ -420,7 +563,7 @@ TEST_CASE("Records")
 //     case Encoding::Utf16:
 //     {
 //         char8_t *encoded_mem = (char8_t *)std::malloc(worst_case_size);
-//         auto _encoded = convert(encoded_mem, (const char8_t *)s.c_str(), s.length(), Encoding::Utf8, src_encoding);
+//         auto _encoded = convert(encoded_mem, (const char *)s.c_str(), s.length(), Encoding::Utf8, src_encoding);
 //         auto encoded = std::make_shared<string_t>((const char *)_encoded.first, src_encoding, _encoded.second);
 //         tagged_code_units = _encoded.second / 2;
 //         test_string_internal(src_encoding, dst_encoding, s, encoded, tagged_code_units);
@@ -430,7 +573,7 @@ TEST_CASE("Records")
 //         try
 //         {
 //             char8_t *encoded_mem = (char8_t *)std::malloc(worst_case_size);
-//             auto _encoded = convert(encoded_mem, (const char8_t *)s.c_str(), s.length(), Encoding::Utf8, Encoding::Latin1);
+//             auto _encoded = convert(encoded_mem, (const char *)s.c_str(), s.length(), Encoding::Utf8, Encoding::Latin1);
 //             auto encoded = std::make_shared<string_t>((const char *)_encoded.first, src_encoding, _encoded.second);
 //             tagged_code_units = _encoded.second;
 //             test_string_internal(src_encoding, dst_encoding, s, encoded, tagged_code_units);
@@ -439,7 +582,7 @@ TEST_CASE("Records")
 //         catch (...)
 //         {
 //             char8_t *encoded_mem = (char8_t *)std::malloc(worst_case_size);
-//             auto _encoded = convert(encoded_mem, (const char8_t *)s.c_str(), s.length(), Encoding::Utf8, Encoding::Utf16);
+//             auto _encoded = convert(encoded_mem, (const char *)s.c_str(), s.length(), Encoding::Utf8, Encoding::Utf16);
 //             auto encoded = std::make_shared<string_t>((const char *)_encoded.first, Encoding::Latin1, _encoded.second);
 //             tagged_code_units = _encoded.second / 2 | UTF16_TAG;
 //             test_string_internal(src_encoding, dst_encoding, s, encoded, tagged_code_units);

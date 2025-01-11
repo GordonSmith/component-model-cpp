@@ -1,60 +1,94 @@
 #include "host-util.hpp"
+
+#include <iostream>
+#include <string>
 #include <cstring>
 #include <cassert>
-// #include "utf8.h"
+#include <unicode/ucnv.h>
+#include <unicode/unistr.h>
+
+using namespace cmcpp;
 
 void trap(const char *msg)
 {
     throw new std::runtime_error(msg);
 }
 
-// bool isLatin1(const std::string &str)
-// {
-//     return utf8::is_valid(str);
-// }
+const char *const LATIN1 = "ISO-8859-1";
+const char *const UTF8 = "UTF-8";
+const char *const UTF16 = "UTF-16-LE";
 
-std::pair<char8_t *, size_t> convert(char8_t *dest, const char8_t *src, uint32_t byte_len, Encoding from_encoding, Encoding to_encoding)
+const char *encodingToICU(const Encoding encoding)
 {
-    switch (from_encoding)
+    switch (encoding)
     {
     case Encoding::Latin1:
+        return LATIN1;
     case Encoding::Utf8:
-        switch (to_encoding)
-        {
-        case Encoding::Latin1:
-        case Encoding::Utf8:
-            std::memcpy(dest, src, byte_len);
-            return std::make_pair(reinterpret_cast<char8_t *>(dest), byte_len);
-        case Encoding::Utf16:
-        case Encoding::Latin1_Utf16:
-        // {
-        //     std::u16string s = utf8::utf8to16(std::string_view((const char *)src, byte_len));
-        //     std::memcpy(dest, s.data(), s.size() * 2);
-        //     return std::make_pair(reinterpret_cast<char8_t *>(dest), s.size() * 2);
-        // }
-        default:
-            throw std::runtime_error("Invalid encoding");
-        }
-        break;
+        return UTF8;
     case Encoding::Utf16:
-    case Encoding::Latin1_Utf16:
-        switch (to_encoding)
-        {
-        case Encoding::Latin1:
-        case Encoding::Utf8:
-        // {
-        //     std::string s = utf8::utf16to8(std::u16string_view((const char16_t *)src, byte_len));
-        //     std::memcpy(dest, s.data(), s.size());
-        //     return std::make_pair(reinterpret_cast<char8_t *>(dest), byte_len);
-        // }
-        case Encoding::Utf16:
-        case Encoding::Latin1_Utf16:
-            std::memcpy(dest, src, byte_len);
-            return std::make_pair(reinterpret_cast<char8_t *>(dest), byte_len);
-        default:
-            throw std::runtime_error("Invalid encoding");
-        }
-        break;
+        return UTF16;
+    default:
+        return "";
     }
-    throw std::runtime_error("Invalid encoding");
+}
+
+std::pair<void *, size_t> convert(void *dest, uint32_t dest_byte_len, const void *src, uint32_t src_byte_len, Encoding from_encoding, Encoding to_encoding)
+{
+    if (from_encoding == to_encoding)
+    {
+        assert(dest_byte_len >= src_byte_len);
+        if (src_byte_len > 0){
+            std::memcpy(dest, src, src_byte_len);
+            return std::make_pair(dest, src_byte_len);
+        }
+        return std::make_pair(nullptr, 0);
+    }
+
+    UErrorCode status = U_ZERO_ERROR;
+    const char *sourceEncoding = encodingToICU(from_encoding);
+    const char *targetEncoding = encodingToICU(to_encoding);
+
+    // Create a converter for the source encoding
+    UConverter *sourceConverter = ucnv_open(sourceEncoding, &status);
+    if (U_FAILURE(status))
+    {
+        std::cerr << "Error opening source converter: " << u_errorName(status) << std::endl;
+        return std::make_pair(nullptr, 0);
+    }
+
+    // Create a converter for the target encoding
+    UConverter *targetConverter = ucnv_open(targetEncoding, &status);
+    if (U_FAILURE(status))
+    {
+        std::cerr << "Error opening target converter: " << u_errorName(status) << std::endl;
+        ucnv_close(sourceConverter);
+        return std::make_pair(nullptr, 0);
+    }
+
+    // Convert source string to UnicodeString
+    icu::UnicodeString unicodeString((const char *)src, src_byte_len, sourceConverter, status);
+    if (U_FAILURE(status))
+    {
+        std::cerr << "Error converting to UnicodeString: " << u_errorName(status) << std::endl;
+        ucnv_close(sourceConverter);
+        ucnv_close(targetConverter);
+        return std::make_pair(nullptr, 0);
+    }
+
+    status = U_ZERO_ERROR;
+    auto targetLength = unicodeString.extract((char *)dest, dest_byte_len, targetConverter, status);
+    if (U_FAILURE(status))
+    {
+        std::cerr << "Error extracting target string: " << u_errorName(status) << std::endl;
+        ucnv_close(sourceConverter);
+        ucnv_close(targetConverter);
+        return std::make_pair(nullptr, 0);
+    }
+
+    auto retVal = std::make_pair(dest, targetLength);
+    ucnv_close(sourceConverter);
+    ucnv_close(targetConverter);
+
+    return retVal;
 }

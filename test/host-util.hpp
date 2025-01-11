@@ -4,5 +4,8 @@
 using namespace cmcpp;
 
 void trap(const char *msg = "");
-bool isLatin1(const std::string &std);
-std::pair<char8_t *, size_t> convert(char8_t *dest, const char8_t *src, uint32_t byte_len, Encoding from_encoding, Encoding to_encoding);
+
+const char * encodingToICU(const Encoding encoding);
+
+std::pair<void *, size_t> convert(void *dest, uint32_t dest_byte_len, const void *src, uint32_t src_byte_len, Encoding from_encoding, Encoding to_encoding);
+ 

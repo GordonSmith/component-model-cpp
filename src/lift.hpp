@@ -38,13 +38,7 @@ namespace cmcpp
     template <String T>
     inline T lift_flat(const CallContext &cx, const WasmValVectorIterator &vi)
     {
-        return string::lift_flat(cx, vi);
-    }
-
-    template <List T>
-    inline T lift_flat(const CallContext &cx, const WasmValVectorIterator &vi, std::size_t maybe_length)
-    {
-        return list::lift_flat<typename ValTrait<T>::inner_type>(cx, vi, maybe_length);
+        return string::lift_flat<T>(cx, vi);
     }
 
     template <List T>

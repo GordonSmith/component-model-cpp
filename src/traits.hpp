@@ -1,8 +1,6 @@
 #ifndef CMCPP_TRAITS_HPP
 #define CMCPP_TRAITS_HPP
 
-#include "platform.hpp"
-
 #include <cstdint>
 #include <vector>
 #include <optional>
@@ -136,7 +134,9 @@ namespace cmcpp
         using inner_type = void;
         static constexpr uint32_t size = 0;
         static constexpr uint32_t alignment = 0;
-        using flat_types = void;
+        using flat_type = void;
+        using flat_type_0 = void;
+        using flat_type_1 = void;
     };
 
     //  Boolean  --------------------------------------------------------------------
@@ -304,38 +304,36 @@ namespace cmcpp
     concept DoubleWord = ValTrait<T>::type == ValType::U64 || ValTrait<T>::type == ValType::S64 || ValTrait<T>::type == ValType::F64;
 
     //  Strings --------------------------------------------------------------------
-
-    template <>
-    struct ValTrait<char8_t>
-    {
-        static constexpr ValType type = ValType::Char;
-    };
-
-    struct string_t
-    {
-        Encoding encoding;
-        const char8_t *ptr;
-        size_t byte_len;
-
-        string_t(Encoding encoding, const char8_t *ptr, size_t byte_len);
-        string_t(const std::string &str);
-        void operator=(const std::string &str);
-
-    private:
-        std::string str_buff;
-    };
+    using string_t = std::string;
     template <>
     struct ValTrait<string_t>
     {
+        static constexpr Encoding encoding = Encoding::Utf8;
         static constexpr ValType type = ValType::String;
+        static constexpr size_t char_size = sizeof(char);
+        using inner_type = char;
         static constexpr uint32_t size = 8;
         static constexpr uint32_t alignment = 4;
         using flat_type_0 = int32_t;
         using flat_type_1 = int32_t;
     };
+
+    using u16string_t = std::u16string;
+    template <>
+    struct ValTrait<u16string_t>
+    {
+        static constexpr Encoding encoding = Encoding::Utf16;
+        static constexpr ValType type = ValType::String;
+        static constexpr size_t char_size = sizeof(char16_t);
+        using inner_type = char16_t;
+        static constexpr uint32_t size = 8;
+        static constexpr uint32_t alignment = 4;
+        using flat_type_0 = int32_t;
+        using flat_type_1 = int32_t;
+    };
+
     template <typename T>
     concept String = ValTrait<T>::type == ValType::String;
-
     //  List  --------------------------------------------------------------------
 
     template <typename T>
@@ -345,7 +343,6 @@ namespace cmcpp
     {
         static constexpr ValType type = ValType::List;
         using inner_type = T;
-        static constexpr std::size_t maybe_length = 0;
         static constexpr uint32_t size = 8;
         static constexpr uint32_t alignment = 4;
         // static constexpr WasmValTypeVector() using flat_type_0 = int32_t;

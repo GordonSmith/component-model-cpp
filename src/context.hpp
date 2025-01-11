@@ -20,7 +20,7 @@ namespace cmcpp
     using GuestRealloc = std::function<int(int ptr, int old_size, int align, int new_size)>;
     using GuestMemory = std::span<uint8_t>;
     using GuestPostReturn = std::function<void()>;
-    using HostUnicodeConversion = std::function<std::pair<char8_t *, size_t>(char8_t *dest, const char8_t *src, uint32_t byte_len, Encoding from_encoding, Encoding to_encoding)>;
+    using HostUnicodeConversion = std::function<std::pair<void *, size_t>(void *dest, uint32_t dest_byte_len, const void *src, uint32_t src_byte_len, Encoding from_encoding, Encoding to_encoding)>;
 
     struct CallContext
     {

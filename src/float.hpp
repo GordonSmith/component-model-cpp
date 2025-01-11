@@ -27,16 +27,6 @@ namespace cmcpp
             return f;
         }
 
-        template <Float T>
-        T maybe_scramble_nan(T f)
-        {
-            if (!std::isfinite(f))
-            {
-                f = std::numeric_limits<T>::quiet_NaN();
-            }
-            return f;
-        }
-
         template <typename T>
         inline void store(CallContext &cx, const T &v, offset ptrnbytes)
         {
@@ -54,6 +44,12 @@ namespace cmcpp
         inline void store<float64_t>(CallContext &cx, const float64_t &v, offset ptr)
         {
             integer::store(cx, encode_float_as_i64(v), ptr);
+        }
+
+        template <Float T>
+        T lower_flat(T f)
+        {
+            return canonicalize_nan(f);
         }
 
         template <typename T>
