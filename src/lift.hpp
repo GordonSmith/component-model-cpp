@@ -60,12 +60,12 @@ namespace cmcpp
         return flags::lift_flat<T>(cx, vi);
     }
 
-    template <Record T>
-    T lift_flat(const CallContext &cx, const WasmValVectorIterator &vi)
-    {
-        auto x = record::lift_flat<T>(cx, vi);
-        return x;
-    }
+    // template <Record T>
+    // T lift_flat(const CallContext &cx, const WasmValVectorIterator &vi)
+    // {
+    //     auto x = record::lift_flat<T>(cx, vi);
+    //     return x;
+    // }
 }
 
 #endif

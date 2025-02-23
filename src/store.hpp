@@ -6,6 +6,7 @@
 #include "integer.hpp"
 #include "string.hpp"
 #include "list.hpp"
+#include "variant.hpp"
 #include "flags.hpp"
 #include "util.hpp"
 
@@ -42,6 +43,12 @@ namespace cmcpp
     inline void store(CallContext &cx, const T &v, uint32_t ptr)
     {
         string::store(cx, v, ptr);
+    }
+
+    template <Variant T>
+    inline void store(CallContext &cx, const T &v, uint32_t ptr)
+    {
+        variant::store(cx, v, ptr);
     }
 
     template <Flags T>

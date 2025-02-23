@@ -66,11 +66,11 @@ namespace cmcpp
         return flags::lower_flat(cx, v);
     }
 
-    template <Record T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v)
-    {
-        return record::lower_flat(cx, v);
-    }
+    // template <Record T>
+    // inline WasmValVector lower_flat(CallContext &cx, const T &v)
+    // {
+    //     return record::lower_flat(cx, v);
+    // }
 }
 
 #endif

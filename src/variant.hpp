@@ -15,6 +15,16 @@ namespace cmcpp
 {
     namespace variant
     {
+        template <Variant T>
+        void store(CallContext &cx, const T &v, uint32_t ptr)
+        {
+            Variant<bool, int32_t, int64_t, float32_t, float64_t> vv = true;
+            std::visit([&](auto &&arg)
+                       {
+                           using V = std::decay_t<decltype(arg)>;
+                           store(cx, arg, ptr); },
+                       v);
+        }
         // template <Variant T>
         // std::pair<int, std::optional<typename T::value_type>> match_case(const T &v)
         // {
@@ -67,10 +77,9 @@ namespace cmcpp
         //     std::visit([&](auto &&arg) {
         //         using V = std::decay_t<decltype(arg)>;
         //         auto f = lower_flat(arg);
-        //         flat.insert(flat.end(), f.begin(), f.end()); 
+        //         flat.insert(flat.end(), f.begin(), f.end());
         //     }, v);
         // }
-
 
         // template <Variant T>
         // void lower_flat(CallContext &cx, const T &v, uint32_t ptr)

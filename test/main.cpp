@@ -405,16 +405,15 @@ struct MyRecord0
     uint32_t weight;
 };
 
-TEST_CASE("Records")
-{
-    Heap heap(1024 * 1024);
-    auto cx = createCallContext(&heap, Encoding::Utf8);
+// TEST_CASE("Records")
+// {
+//     Heap heap(1024 * 1024);
+//     auto cx = createCallContext(&heap, Encoding::Utf8);
 
-    using R0 = record_t<uint16_t, uint32_t>;
-    R0 r0 = {42, 43};
-    auto v = lower_flat(*cx, r0);
-    auto rr = lift_flat<R0>(*cx, v);
-    CHECK(r0 == rr);
-    auto rr0 = to_struct<MyRecord0>(rr);
-}
-
+//     using R0 = record_t<uint16_t, uint32_t>;
+//     R0 r0 = {42, 43};
+//     auto v = lower_flat(*cx, r0);
+//     auto rr = lift_flat<R0>(*cx, v);
+//     CHECK(r0 == rr);
+//     auto rr0 = to_struct<MyRecord0>(rr);
+// }

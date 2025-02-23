@@ -130,6 +130,20 @@ namespace cmcpp
         LAST
     };
 
+    //  Utils   ---------------------------------------------------------------
+    template <size_t N>
+    struct StringLiteral
+    {
+        constexpr StringLiteral(const char (&str)[N])
+        {
+            std::copy(str, str + N, value);
+        }
+        char value[N];
+        constexpr std::string_view view() const
+        {
+            return std::string_view(value, N - 1);
+        }
+    };
     //  ValTrait ---------------------------------------------------------------
     template <typename T>
     struct ValTrait
@@ -143,6 +157,8 @@ namespace cmcpp
         using flat_type_1 = void;
     };
 
+    template <typename T>
+    concept Value = ValTrait<T>::type != ValType::UNKNOWN;
     //  Boolean  --------------------------------------------------------------------
     using bool_t = bool;
 
@@ -396,21 +412,47 @@ namespace cmcpp
     };
     template <typename T>
     concept List = ValTrait<T>::type == ValType::List;
-    //  Flags  --------------------------------------------------------------------
-    template <size_t N>
-    struct StringLiteral
+    //  Field  --------------------------------------------------------------------
+    template <StringLiteral L, Value T>
+    struct field_t : T
     {
-        constexpr StringLiteral(const char (&str)[N])
-        {
-            std::copy(str, str + N, value);
-        }
-        char value[N];
-        constexpr std::string_view view() const
-        {
-            return std::string_view(value, N - 1);
-        }
+        static constexpr const char *label = L.value;
     };
 
+    template <StringLiteral L, Value T>
+    struct ValTrait<field_t<L, T>>
+    {
+        static constexpr ValType type = ValType::Field;
+    };
+    template <typename T>
+    concept Field = ValTrait<T>::type == ValType::Field;
+    //  Case  --------------------------------------------------------------------
+    template <StringLiteral L, Value T>
+    struct case_t : std::optional<T>
+    {
+        static constexpr const char *label = L.value;
+    };
+
+    template <StringLiteral L, Value T>
+    struct ValTrait<case_t<L, T>>
+    {
+        static constexpr ValType type = ValType::Case;
+    };
+    template <typename T>
+    concept Case = ValTrait<T>::type == ValType::Case;
+    //  Variant--------------------------------------------------------------------
+    template <Value... Ts>
+    using variant_t = std::variant<Ts...>;
+    template <Value... Ts>
+    struct ValTrait<variant_t<Ts...>>
+    {
+        static constexpr ValType type = ValType::Variant;
+        using inner_type = typename std::variant<Ts...>;
+        // ... *************************************************...
+    };
+    template <typename T>
+    concept Variant = ValTrait<T>::type == ValType::Variant;
+    //  Flags  --------------------------------------------------------------------
     template <StringLiteral... Ts>
     struct flags_t : std::bitset<sizeof...(Ts)>
     {
@@ -486,46 +528,44 @@ namespace cmcpp
 
     template <typename T>
     concept Flags = ValTrait<T>::type == ValType::Flags;
+    //  Field  --------------------------------------------------------------------
+    // template <typename T>
+    // concept Field = ValTrait<T>::type != ValType::UNKNOWN;
+
+    // template <Field... Ts>
+    // using record_t = std::tuple<Ts...>;
+    // template <Field... Ts>
+    // struct ValTrait<record_t<Ts...>>
+    // {
+    //     static constexpr ValType type = ValType::Record;
+    //     using inner_type = typename std::tuple<Ts...>;
+    // };
     //  Record  --------------------------------------------------------------------
-    template <typename T>
-    concept Field = ValTrait<T>::type != ValType::UNKNOWN;
+    // template <typename T>
+    // concept Record = ValTrait<T>::type == ValType::Record;
 
-    template <Field... Ts>
-    using record_t = std::tuple<Ts...>;
-    template <Field... Ts>
-    struct ValTrait<record_t<Ts...>>
-    {
-        static constexpr ValType type = ValType::Record;
-        using inner_type = typename std::tuple<Ts...>;
-    };
-    template <typename T>
-    concept Record = ValTrait<T>::type == ValType::Record;
+    // template <typename T, Record R, std::size_t... I>
+    // T to_struct_impl(const R &t, std::index_sequence<I...>)
+    // {
+    //     return T{std::get<I>(t)...};
+    // }
 
-    template <typename T, Record R, std::size_t... I>
-    T to_struct_impl(const R &t, std::index_sequence<I...>)
-    {
-        return T{std::get<I>(t)...};
-    }
-
-    template <typename T, Record R>
-    T to_struct(const R &t)
-    {
-        return to_struct_impl<T>(t, std::make_index_sequence<std::tuple_size_v<R>>{});
-    }
-
+    // template <typename T, Record R>
+    // T to_struct(const R &t)
+    // {
+    //     return to_struct_impl<T>(t, std::make_index_sequence<std::tuple_size_v<R>>{});
+    // }
     //  Variant  ------------------------------------------------------------------
-
-    template <Field... Ts>
-    using variant_t = std::variant<Ts...>;
-    template <Field... Ts>
-    struct ValTrait<variant_t<Ts...>>
-    {
-        static constexpr ValType type = ValType::Variant;
-        using inner_type = typename std::variant<Ts...>;
-    };
-    template <typename T>
-    concept Variant = ValTrait<T>::type == ValType::Variant;
-
+    // template <Field... Ts>
+    // using variant_t = std::variant<Ts...>;
+    // template <Field... Ts>
+    // struct ValTrait<variant_t<Ts...>>
+    // {
+    //     static constexpr ValType type = ValType::Variant;
+    //     using inner_type = typename std::variant<Ts...>;
+    // };
+    // template <typename T>
+    // concept Variant = ValTrait<T>::type == ValType::Variant;
     //  Other  --------------------------------------------------------------------
 
     // template <typename... Ts>
