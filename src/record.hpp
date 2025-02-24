@@ -17,7 +17,7 @@ namespace cmcpp
     {
 
         template <Record T>
-        void store(const CallContext &cx, const T&v, uint32_t ptr)
+        void store(const CallContext &cx, const T &v, uint32_t ptr)
         {
             auto process_field = [&](auto &&field)
             {
@@ -31,7 +31,7 @@ namespace cmcpp
         }
 
         template <Record T>
-        WasmValVector lower_flat(CallContext &cx, const T &v)
+        WasmValVector lower_flat_record(CallContext &cx, const T &v)
         {
             WasmValVector retVal = {};
             auto process_field = [&](auto &&field)
@@ -62,7 +62,7 @@ namespace cmcpp
         }
 
         template <Record T>
-        inline T lift_flat(const CallContext &cx, const WasmValVectorIterator &vi)
+        inline T lift_flat_record(const CallContext &cx, const CoreValueIter &vi)
         {
             T result;
             auto process_field = [&](auto &&field)

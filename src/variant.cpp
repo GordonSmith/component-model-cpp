@@ -5,5 +5,6 @@ namespace cmcpp
 
     namespace variant
     {
+
     }
 }

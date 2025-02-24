@@ -3,6 +3,7 @@
 
 #include "context.hpp"
 #include "integer.hpp"
+#include "float.hpp"
 #include "store.hpp"
 #include "load.hpp"
 #include "util.hpp"
@@ -15,111 +16,111 @@ namespace cmcpp
 {
     namespace variant
     {
-        // template <Variant T>
-        // std::pair<int, std::optional<typename T::value_type>> match_case(const T &v)
-        // {
-        //     auto index = v.index();
-        //     auto value = std::get<index>(v);
-        //     return {index, value};
-        // }
 
-        // template <Variant T>
-        // ValType discriminant_type(const T &v)
-        // {
-        //     auto n = std::variant_size_v<decltype(v)>;
-        //     assert(n > 0 && n < std::numeric_limits<unsigned int>::max());
-        //     int match = std::ceil<int>(std::log2(n) / 8);
-        //     switch (match)
-        //     {
-        //     case 0:
-        //         return ValType::U8;
-        //     case 1:
-        //         return ValType::U8;
-        //     case 2:
-        //         return ValType::U16;
-        //     case 3:
-        //         return ValType::U32;
-        //     }
-        //     return ValType::UNKNOWN;
-        // }
+        template <Variant T>
+        std::size_t max_case_alignment(const T &v)
+        {
+            std::size_t a = 1;
+            std::visit([&](auto &&arg)
+                       {
+                using V = std::decay_t<decltype(arg)>;
+                a = std::max(a, alignment(arg)); }, v);
+            return a;
+        }
 
-        // template <Variant T>
-        // std::size_t max_case_alignment(const T &v)
-        // {
-        //     std::size_t a = 1;
-        //     std::visit([&](auto &&arg)
-        //                {
-        //         using V = std::decay_t<decltype(arg)>;
-        //         a = std::max(a, alignment(arg)); }, v);
-        //     return a;
-        // }
+        struct LowerFlatVisitor
+        {
+            CallContext &cx;
+            template <typename T>
+            WasmValVector operator()(T &&arg) const
+            {
+                return lower_flat(cx, std::forward<T>(arg));
+            }
+        };
 
-        // template <Variant T>
-        // std::size_t alignment_variant(const T &v)
-        // {
-        //     return std::max(alignment(discriminant_type(v)), max_case_alignment(v));
-        // }
+        template <Variant T>
+        WasmValVector lower_flat_variant(CallContext &cx, const T &v)
+        {
+            auto case_index = v.index();
+            WasmValTypeVector flat_types(ValTrait<T>::flat_types.begin(), ValTrait<T>::flat_types.end());
+            auto top = flat_types.front();
+            flat_types.erase(flat_types.begin());
+            assert(top == WasmValType::i32);
+            auto payload = std::visit(LowerFlatVisitor{cx}, v);
 
-        // template <Variant T>
-        // WasmValVector flatten_variant(const T &v)
-        // {
-        //     WasmValVector flat;
-        //     std::visit([&](auto &&arg) {
-        //         using V = std::decay_t<decltype(arg)>;
-        //         auto f = lower_flat(arg);
-        //         flat.insert(flat.end(), f.begin(), f.end()); 
-        //     }, v);
-        // }
+            auto payload_iter = payload.begin();
+            auto have_types = ValTrait<T>::flat_types;
+            auto have_types_iter = have_types.begin();
+            size_t i = 0;
+            while (payload_iter != payload.end() && have_types_iter != have_types.end())
+            {
+                auto want = flat_types.front();
+                flat_types.erase(flat_types.begin());
+                auto have = *have_types_iter;
+                if (have == WasmValType::f32 && want == WasmValType::i32)
+                {
+                    payload[i] = float_::encode_float_as_i32(std::get<float32_t>(*payload_iter));
+                }
+                else if (have == WasmValType::i32 && want == WasmValType::i64)
+                {
+                    payload[i] = static_cast<int64_t>(std::get<int32_t>(*payload_iter));
+                }
+                else if (have == WasmValType::f32 && want == WasmValType::i64)
+                {
+                    payload[i] = static_cast<int64_t>(float_::encode_float_as_i32(std::get<float32_t>(*payload_iter)));
+                }
+                else if (have == WasmValType::f64 && want == WasmValType::i64)
+                {
+                    payload[i] = static_cast<int64_t>(std::get<float64_t>(*payload_iter));
+                }
+                else
+                {
+                    assert(have == want);
+                }
+                ++payload_iter;
+                ++have_types_iter;
+                ++i;
+            }
+            for (auto itr = flat_types.begin(); itr != flat_types.end(); ++itr)
+            {
+                payload.push_back(0);
+            }
+            payload.insert(payload.begin(), static_cast<int32_t>(case_index));
+            return payload;
+        }
 
+        template <Variant T, std::size_t Index = 0>
+        T lift_flat_helper(const CallContext &cx, const CoreValueIter &vi, int32_t case_index)
+        {
+            if (case_index == Index)
+            {
+                using CaseType = std::variant_alternative_t<Index, T>;
+                auto value = lift_flat<CaseType>(cx, vi);
+                return T(std::in_place_index<Index>, value);
+            }
+            else if constexpr (Index + 1 < std::variant_size_v<T>)
+            {
+                return lift_flat_helper<T, Index + 1>(cx, vi, case_index);
+            }
+            else
+            {
+                // This should not happen if the earlier trap_if check is correct
+                throw std::runtime_error("Invalid variant case index");
+            }
+        }
 
-        // template <Variant T>
-        // void lower_flat(CallContext &cx, const T &v, uint32_t ptr)
-        // {
-        //     auto [case_index, case_value] = match_case(v);
-        //     std::vector<std::string> flat_types = flatten_variant(v);
-        //     assert(flat_types[0] == "i32");
-        //     flat_types.erase(flat_types.begin());
-        //     auto c = cases[case_index];
-        //     std::vector<WasmVal> payload;
-        //     if (c->v.has_value())
-        //     {
-        //         payload = lower_flat(cx, case_value.value(), c->v.value());
-        //         auto vTypes = flatten_type(c->v.value());
-        //         for (size_t i = 0; i < payload.size(); ++i)
-        //         {
-        //             auto fv = payload[i];
-        //             auto have = vTypes[i];
-        //             auto want = flat_types[0];
-        //             flat_types.erase(flat_types.begin());
-        //             if (have == "f32" && want == "i32")
-        //             {
-        //                 payload[i] = encode_float_as_i32(std::get<float32_t>(fv));
-        //             }
-        //             else if (have == "i32" && want == "i64")
-        //             {
-        //                 payload[i] = fv;
-        //             }
-        //             else if (have == "f32" && want == "i64")
-        //             {
-        //                 payload[i] = encode_float_as_i32(std::get<float32_t>(fv));
-        //             }
-        //             else if (have == "f64" && want == "i64")
-        //             {
-        //                 payload[i] = static_cast<int64_t>(encode_float_as_i64(std::get<float64_t>(fv)));
-        //             }
-        //             else
-        //             {
-        //                 assert(have == want);
-        //             }
-        //         }
-        //     }
-        //     for (auto _ : flat_types)
-        //     {
-        //         payload.push_back(0);
-        //     }
-        //     payload.insert(payload.begin(), case_index);
-        //     return payload;
-        // }
+        template <Variant T>
+        inline T lift_flat(const CallContext &cx, const CoreValueIter &vi)
+        {
+            WasmValTypeVector flat_types(ValTrait<T>::flat_types.begin(), ValTrait<T>::flat_types.end());
+            auto top = flat_types.front();
+            flat_types.erase(flat_types.begin());
+            assert(top == WasmValType::i32);
+            int32_t case_index = vi.next<int32_t>();
+            trap_if(cx, case_index >= std::variant_size_v<T>);
+            CoerceValueIter cvi(vi, flat_types);
+            return lift_flat_helper<T>(cx, cvi, case_index);
+        }
     }
 }
 

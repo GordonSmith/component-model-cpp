@@ -57,7 +57,7 @@ namespace cmcpp
         }
 
         template <typename T>
-        WasmValVector lower_flat(CallContext &cx, const list_t<T> &v)
+        WasmValVector lower_flat_list(CallContext &cx, const list_t<T> &v)
         {
             auto [ptr, length] = store_into_range(cx, v);
             return {static_cast<int32_t>(ptr), static_cast<int32_t>(length)};
@@ -85,7 +85,7 @@ namespace cmcpp
         }
 
         template <typename T>
-        list_t<T> lift_flat(const CallContext &cx, const WasmValVectorIterator &vi)
+        list_t<T> lift_flat(const CallContext &cx, const CoreValueIter &vi)
         {
             auto ptr = vi.next<int32_t>();
             auto length = vi.next<int32_t>();

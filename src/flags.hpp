@@ -43,7 +43,7 @@ namespace cmcpp
         }
 
         template <Flags T>
-        T lift_flat(const CallContext &cx, const WasmValVectorIterator &vi)
+        T lift_flat(const CallContext &cx, const CoreValueIter &vi)
         {
             auto i = vi.next<int32_t>();
             uint8_t buff[ValTrait<T>::size];

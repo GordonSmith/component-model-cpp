@@ -234,7 +234,7 @@ namespace cmcpp
         }
 
         template <String T>
-        T lift_flat(const CallContext &cx, const WasmValVectorIterator &vi)
+        T lift_flat(const CallContext &cx, const CoreValueIter &vi)
         {
 
             auto ptr = vi.next<int32_t>();

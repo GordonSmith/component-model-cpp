@@ -11,12 +11,11 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     add_link_options(-fprofile-instr-generate)
 endif()
 
-
 find_package(doctest CONFIG REQUIRED)
 find_package(ICU REQUIRED COMPONENTS uc dt in io)
 
 include_directories(
-    ../src
+    ${ROOT_DIR}/src
     ${ICU_INCLUDE_DIR}
 )
 

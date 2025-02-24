@@ -57,7 +57,7 @@ namespace cmcpp
     template <List T>
     inline WasmValVector lower_flat(CallContext &cx, const T &v)
     {
-        return list::lower_flat(cx, v);
+        return list::lower_flat_list(cx, v);
     }
 
     template <Flags T>
@@ -69,7 +69,13 @@ namespace cmcpp
     template <Record T>
     inline WasmValVector lower_flat(CallContext &cx, const T &v)
     {
-        return record::lower_flat(cx, v);
+        return record::lower_flat_record(cx, v);
+    }
+
+    template <Variant T>
+    inline WasmValVector lower_flat(CallContext &cx, const T &v)
+    {
+        return variant::lower_flat_variant(cx, v);
     }
 }
 

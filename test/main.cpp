@@ -405,16 +405,80 @@ struct MyRecord0
     uint32_t weight;
 };
 
+struct MyRecord1 : MyRecord0
+{
+    string_t name;
+};
+
+struct MyRecord2 : MyRecord1
+{
+    list_t<string_t> friends;
+};
+
 TEST_CASE("Records")
 {
     Heap heap(1024 * 1024);
     auto cx = createCallContext(&heap, Encoding::Utf8);
 
     using R0 = record_t<uint16_t, uint32_t>;
+    auto flatTypes = ValTrait<R0>::flat_types;
+    CHECK(flatTypes.size() == 2);
     R0 r0 = {42, 43};
     auto v = lower_flat(*cx, r0);
     auto rr = lift_flat<R0>(*cx, v);
     CHECK(r0 == rr);
-    auto rr0 = to_struct<MyRecord0>(rr);
+    auto str0 = to_struct<MyRecord0>(rr);
+
+    using R1 = record_t<uint16_t, uint32_t, string_t>;
+    R1 r1 = {142, 143, "Hello"};
+    auto vv = lower_flat(*cx, r1);
+    auto rr1 = lift_flat<R1>(*cx, vv);
+    CHECK(r1 == rr1);
+    auto str1 = to_struct<MyRecord1>(rr1);
+
+    using R2 = record_t<uint16_t, uint32_t, string_t, list_t<string_t>>;
+    R2 r2 = {242, 243, "2Hello", {"2World", "!"}};
+    auto vvv = lower_flat(*cx, r2);
+    auto rr2 = lift_flat<R2>(*cx, vvv);
+    CHECK(r2 == rr2);
+    auto str2 = to_struct<MyRecord2>(rr2);
 }
 
+TEST_CASE("Variant")
+{
+    Heap heap(1024 * 1024);
+    auto cx = createCallContext(&heap, Encoding::Utf8);
+
+    using V0 = variant_t<uint16_t, uint32_t>;
+    V0 v0 = static_cast<uint32_t>(42);
+    auto vv0 = lower_flat(*cx, v0);
+    auto v00 = lift_flat<V0>(*cx, vv0);
+    CHECK(v0 == v00);
+
+    using V1 = variant_t<uint16_t, uint32_t, string_t>;
+    V1 v1 = "Hello";
+    auto vv1 = lower_flat(*cx, v1);
+    auto v11 = lift_flat<V1>(*cx, vv1);
+    CHECK(v1 == v11);
+
+    using V2 = variant_t<uint16_t, uint32_t, string_t, list_t<string_t>>;
+    V2 v2 = list_t<string_t>{"Hello", "World", "!"};
+    auto vv2 = lower_flat(*cx, v2);
+    auto v22 = lift_flat<V2>(*cx, vv2);
+    CHECK(v2 == v22);
+
+    using V3 = variant_t<uint16_t, uint32_t, string_t, list_t<string_t>, record_t<uint16_t, uint32_t>>;
+    V3 v3 = record_t<uint16_t, uint32_t>{42, 43};
+    CHECK(ValTrait<V3>::size == 5);
+    auto vv3 = lower_flat(*cx, v3);
+    auto v33 = lift_flat<V3>(*cx, vv3);
+    CHECK(v3 == v33);
+
+    using V4 = variant_t<uint16_t, uint32_t, string_t, list_t<string_t>, record_t<uint16_t, uint32_t>, V3>;
+    V4 v4 = record_t<uint16_t, uint32_t>{42, 43};
+    auto vv4 = lower_flat(*cx, v4);
+    auto v44 = lift_flat<V4>(*cx, vv4);
+    auto rr4 = std::get<record_t<uint16_t, uint32_t>>(v44);
+    auto rrr4 = to_struct<MyRecord0>(rr4);
+    CHECK(v4 == v44);
+}

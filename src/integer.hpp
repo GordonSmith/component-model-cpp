@@ -2,6 +2,7 @@
 #define CMCPP_INTEGER_HPP
 
 #include "context.hpp"
+#include "util.hpp"
 
 #include <cstring>
 #include <iostream>
@@ -36,19 +37,19 @@ namespace cmcpp
         }
 
         template <typename T>
-        T lift_flat_unsigned(const WasmValVectorIterator &vi, uint32_t core_width, uint32_t t_width)
+        T lift_flat_unsigned(const CoreValueIter &vi, uint32_t core_width, uint32_t t_width)
         {
             using WasmValType = ValTrait<T>::flat_type;
-            auto retVal = vi.next<WasmValType>();
+            auto retVal = std::get<WasmValType>(vi.next(ValTrait<T>::flat_types[0]));
             assert(ValTrait<WasmValType>::LOW_VALUE <= retVal && retVal < ValTrait<WasmValType>::HIGH_VALUE);
             return retVal;
         }
 
         template <typename T>
-        T lift_flat_signed(const WasmValVectorIterator &vi, uint32_t core_width, uint32_t t_width)
+        T lift_flat_signed(const CoreValueIter &vi, uint32_t core_width, uint32_t t_width)
         {
             using WasmValType = ValTrait<T>::flat_type;
-            auto retVal = static_cast<T>(vi.next<WasmValType>());
+            auto retVal = static_cast<T>(std::get<WasmValType>(vi.next(ValTrait<T>::flat_types[0])));
             assert(ValTrait<T>::LOW_VALUE <= retVal && retVal <= ValTrait<T>::HIGH_VALUE);
             return retVal;
         }
