@@ -539,6 +539,18 @@ namespace cmcpp
             }
             return v;
         }();
+        template <typename T>
+        auto toTupleImpl(const T &record, Ts... members)
+        {
+            return std::make_tuple(record.*members...);
+        }
+
+        // Helper function to generate pointers to struct members
+        template <typename T>
+        auto toTuple(const T &record, Ts... members)
+        {
+            return toTupleImpl(record, members...);
+        }
     };
     template <typename T>
     concept Record = ValTrait<T>::type == ValType::Record;
