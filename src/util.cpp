@@ -22,7 +22,7 @@ namespace cmcpp
         switch (t)
         {
         case ValType::Tuple:
-            return ValType::Record;
+            return ValType::Tuple;
         case ValType::Enum:
             return ValType::Variant;
         case ValType::Option:

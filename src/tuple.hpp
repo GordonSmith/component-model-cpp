@@ -1,5 +1,5 @@
-#ifndef CMCPP_RECORD_HPP
-#define CMCPP_RECORD_HPP
+#ifndef CMCPP_TUPLE_HPP
+#define CMCPP_TUPLE_HPP
 
 #include "context.hpp"
 #include "integer.hpp"
@@ -13,10 +13,10 @@
 
 namespace cmcpp
 {
-    namespace record
+    namespace tuple
     {
 
-        template <Record T>
+        template <Tuple T>
         void store(const CallContext &cx, const T &v, uint32_t ptr)
         {
             auto process_field = [&](auto &&field)
@@ -30,8 +30,8 @@ namespace cmcpp
                        { (process_field(fields), ...); }, v);
         }
 
-        template <Record T>
-        WasmValVector lower_flat_record(CallContext &cx, const T &v)
+        template <Tuple T>
+        WasmValVector lower_flat_tuple(CallContext &cx, const T &v)
         {
             WasmValVector retVal = {};
             auto process_field = [&](auto &&field)
@@ -45,7 +45,7 @@ namespace cmcpp
             return retVal;
         }
 
-        template <Record T>
+        template <Tuple T>
         T load(const CallContext &cx, uint32_t ptr)
         {
             T result;
@@ -61,8 +61,8 @@ namespace cmcpp
             return result;
         }
 
-        template <Record T>
-        inline T lift_flat_record(const CallContext &cx, const CoreValueIter &vi)
+        template <Tuple T>
+        inline T lift_flat_tuple(const CallContext &cx, const CoreValueIter &vi)
         {
             T result;
             auto process_field = [&](auto &&field)

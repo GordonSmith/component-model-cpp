@@ -7,7 +7,7 @@
 #include "string.hpp"
 #include "list.hpp"
 #include "flags.hpp"
-#include "record.hpp"
+#include "tuple.hpp"
 #include "variant.hpp"
 #include "util.hpp"
 
@@ -62,11 +62,19 @@ namespace cmcpp
         return flags::lift_flat<T>(cx, vi);
     }
 
+    template <Tuple T>
+    T lift_flat(const CallContext &cx, const CoreValueIter &vi)
+    {
+        auto x = tuple::lift_flat_tuple<T>(cx, vi);
+        return x;
+    }
+
     template <Record T>
     T lift_flat(const CallContext &cx, const CoreValueIter &vi)
     {
-        auto x = record::lift_flat_record<T>(cx, vi);
-        return x;
+        using TupleType = decltype(boost::pfr::structure_to_tuple(std::declval<typename ValTrait<T>::inner_type>()));
+        TupleType x = tuple::lift_flat_tuple<TupleType>(cx, vi);
+        return to_struct<T>(x);
     }
 
     template <Variant T>

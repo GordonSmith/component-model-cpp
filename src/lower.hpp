@@ -7,7 +7,7 @@
 #include "string.hpp"
 #include "list.hpp"
 #include "flags.hpp"
-#include "record.hpp"
+#include "tuple.hpp"
 #include "util.hpp"
 
 #include <tuple>
@@ -66,10 +66,16 @@ namespace cmcpp
         return flags::lower_flat(cx, v);
     }
 
+    template <Tuple T>
+    inline WasmValVector lower_flat(CallContext &cx, const T &v)
+    {
+        return tuple::lower_flat_tuple(cx, v);
+    }
+
     template <Record T>
     inline WasmValVector lower_flat(CallContext &cx, const T &v)
     {
-        return record::lower_flat_record(cx, v);
+        return tuple::lower_flat_tuple(cx, boost::pfr::structure_to_tuple((typename ValTrait<T>::inner_type)v));
     }
 
     template <Variant T>
@@ -77,6 +83,7 @@ namespace cmcpp
     {
         return variant::lower_flat_variant(cx, v);
     }
+
 }
 
 #endif

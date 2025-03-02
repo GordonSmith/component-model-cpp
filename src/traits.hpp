@@ -16,6 +16,8 @@
 #include <cstring>
 #include <cmath>
 
+#include "boost/pfr.hpp"
+
 //  See canonical ABI:
 //  https://github.com/WebAssembly/component-model/blob/main/design/mvp/canonical-abi/definitions.py
 //  https://github.com/WebAssembly/component-model/blob/main/design/mvp/CanonicalABI.md
@@ -120,8 +122,7 @@ namespace cmcpp
         using flat_type = void;
         using flat_type_0 = void;
         using flat_type_1 = void;
-        static constexpr WasmValTypeVector flatten_type() { return {}; }
-        static constexpr std::array<WasmValType, 1> flat_types = {WasmValType::i32};
+        static constexpr std::array<WasmValType, 0> flat_types = {};
     };
 
     //  Boolean  --------------------------------------------------------------------
@@ -134,7 +135,6 @@ namespace cmcpp
         static constexpr uint32_t size = 1;
         static constexpr uint32_t alignment = 1;
         using flat_type = int32_t;
-        static constexpr WasmValTypeVector flatten_type() { return {WasmValType::i32}; }
         static constexpr std::array<WasmValType, 1> flat_types = {WasmValType::i32};
     };
     template <typename T>
@@ -149,7 +149,6 @@ namespace cmcpp
         static constexpr uint32_t size = 4;
         static constexpr uint32_t alignment = 4;
         using flat_type = int32_t;
-        static constexpr WasmValTypeVector flatten_type() { return {WasmValType::i32}; }
         static constexpr std::array<WasmValType, 1> flat_types = {WasmValType::i32};
     };
 
@@ -164,7 +163,6 @@ namespace cmcpp
         static constexpr uint32_t size = 1;
         static constexpr uint32_t alignment = 1;
         using flat_type = int32_t;
-        static constexpr WasmValTypeVector flatten_type() { return {WasmValType::i32}; }
         static constexpr std::array<WasmValType, 1> flat_types = {WasmValType::i32};
 
         static constexpr int8_t LOW_VALUE = std::numeric_limits<int8_t>::lowest();
@@ -178,7 +176,6 @@ namespace cmcpp
         static constexpr uint32_t size = 1;
         static constexpr uint32_t alignment = 1;
         using flat_type = int32_t;
-        static constexpr WasmValTypeVector flatten_type() { return {WasmValType::i32}; }
         static constexpr std::array<WasmValType, 1> flat_types = {WasmValType::i32};
 
         static constexpr int8_t LOW_VALUE = std::numeric_limits<uint8_t>::lowest();
@@ -192,7 +189,6 @@ namespace cmcpp
         static constexpr uint32_t size = 2;
         static constexpr uint32_t alignment = 2;
         using flat_type = int32_t;
-        static constexpr WasmValTypeVector flatten_type() { return {WasmValType::i32}; }
         static constexpr std::array<WasmValType, 1> flat_types = {WasmValType::i32};
 
         static constexpr int16_t LOW_VALUE = std::numeric_limits<int16_t>::lowest();
@@ -206,7 +202,6 @@ namespace cmcpp
         static constexpr uint32_t size = 2;
         static constexpr uint32_t alignment = 2;
         using flat_type = int32_t;
-        static constexpr WasmValTypeVector flatten_type() { return {WasmValType::i32}; }
         static constexpr std::array<WasmValType, 1> flat_types = {WasmValType::i32};
 
         static constexpr uint16_t LOW_VALUE = std::numeric_limits<uint16_t>::lowest();
@@ -220,7 +215,6 @@ namespace cmcpp
         static constexpr uint32_t size = 4;
         static constexpr uint32_t alignment = 4;
         using flat_type = int32_t;
-        static constexpr WasmValTypeVector flatten_type() { return {WasmValType::i32}; }
         static constexpr std::array<WasmValType, 1> flat_types = {WasmValType::i32};
 
         static constexpr int32_t LOW_VALUE = std::numeric_limits<int32_t>::lowest();
@@ -234,7 +228,6 @@ namespace cmcpp
         static constexpr uint32_t size = 4;
         static constexpr uint32_t alignment = 4;
         using flat_type = int32_t;
-        static constexpr WasmValTypeVector flatten_type() { return {WasmValType::i32}; }
         static constexpr std::array<WasmValType, 1> flat_types = {WasmValType::i32};
 
         static constexpr uint32_t LOW_VALUE = std::numeric_limits<uint32_t>::lowest();
@@ -248,7 +241,6 @@ namespace cmcpp
         static constexpr uint32_t size = 8;
         static constexpr uint32_t alignment = 8;
         using flat_type = int64_t;
-        static constexpr WasmValTypeVector flatten_type() { return {WasmValType::i64}; }
         static constexpr std::array<WasmValType, 1> flat_types = {WasmValType::i64};
 
         static constexpr int64_t LOW_VALUE = std::numeric_limits<int64_t>::lowest();
@@ -262,7 +254,6 @@ namespace cmcpp
         static constexpr uint32_t size = 8;
         static constexpr uint32_t alignment = 8;
         using flat_type = int64_t;
-        static constexpr WasmValTypeVector flatten_type() { return {WasmValType::i64}; }
         static constexpr std::array<WasmValType, 1> flat_types = {WasmValType::i64};
 
         static constexpr uint64_t LOW_VALUE = std::numeric_limits<uint64_t>::lowest();
@@ -286,7 +277,6 @@ namespace cmcpp
         static constexpr uint32_t size = 4;
         static constexpr uint32_t alignment = 4;
         using flat_type = float32_t;
-        static constexpr WasmValTypeVector flatten_type() { return {WasmValType::f32}; }
         static constexpr std::array<WasmValType, 1> flat_types = {WasmValType::f32};
 
         static constexpr float32_t LOW_VALUE = std::numeric_limits<float32_t>::lowest();
@@ -300,7 +290,6 @@ namespace cmcpp
         static constexpr uint32_t size = 8;
         static constexpr uint32_t alignment = 8;
         using flat_type = float64_t;
-        static constexpr WasmValTypeVector flatten_type() { return {WasmValType::f64}; }
         static constexpr std::array<WasmValType, 1> flat_types = {WasmValType::f64};
 
         static constexpr float64_t LOW_VALUE = std::numeric_limits<float64_t>::lowest();
@@ -346,7 +335,6 @@ namespace cmcpp
         using inner_type = char;
         static constexpr uint32_t size = 8;
         static constexpr uint32_t alignment = 4;
-        static constexpr WasmValTypeVector flatten_type() { return {WasmValType::i32, WasmValType::i32}; }
         static constexpr std::array<WasmValType, 2> flat_types = {WasmValType::i32, WasmValType::i32};
     };
 
@@ -360,7 +348,6 @@ namespace cmcpp
         using inner_type = char16_t;
         static constexpr uint32_t size = 8;
         static constexpr uint32_t alignment = 4;
-        static constexpr WasmValTypeVector flatten_type() { return {WasmValType::i32, WasmValType::i32}; }
         static constexpr std::array<WasmValType, 2> flat_types = {WasmValType::i32, WasmValType::i32};
     };
 
@@ -388,7 +375,6 @@ namespace cmcpp
         static constexpr size_t char_size = sizeof(char8_t);
         static constexpr uint32_t size = 8;
         static constexpr uint32_t alignment = 4;
-        static constexpr WasmValTypeVector flatten_type() { return {WasmValType::i32, WasmValType::i32}; }
         static constexpr std::array<WasmValType, 2> flat_types = {WasmValType::i32, WasmValType::i32};
     };
 
@@ -407,7 +393,6 @@ namespace cmcpp
         static constexpr uint32_t alignment = 4;
         using flat_type_0 = int32_t;
         using flat_type_1 = int32_t;
-        static constexpr WasmValTypeVector flatten_type() { return {WasmValType::i32, WasmValType::i32}; }
         static constexpr std::array<WasmValType, 2> flat_types = {WasmValType::i32, WasmValType::i32};
     };
     template <typename T>
@@ -498,7 +483,6 @@ namespace cmcpp
         static constexpr ValType type = ValType::Flags;
         static constexpr auto size = byteSize<Ts...>();
         static constexpr auto alignment = byteSize<Ts...>();
-        static constexpr WasmValTypeVector flatten_type() { return {WasmValType::i32}; }
         static constexpr std::array<WasmValType, 1> flat_types = {WasmValType::i32};
     };
 
@@ -509,54 +493,72 @@ namespace cmcpp
     template <typename T>
     concept Field = ValTrait<T>::type != ValType::UNKNOWN;
 
-    //  Record  --------------------------------------------------------------------
+    //  Tuple  --------------------------------------------------------------------
     template <Field... Ts>
-    using record_t = std::tuple<Ts...>;
+    using tuple_t = std::tuple<Ts...>;
     template <Field... Ts>
-    struct ValTrait<record_t<Ts...>>
+    struct ValTrait<tuple_t<Ts...>>
     {
-        static constexpr ValType type = ValType::Record;
+        static constexpr ValType type = ValType::Tuple;
         using inner_type = typename std::tuple<Ts...>;
         static constexpr size_t flat_types_len = []() constexpr
         {
             size_t i = 0;
-            for (auto &f : {ValTrait<Ts>::flatten_type()...})
-            {
-                i += f.size();
-            }
+            ((i += ValTrait<Ts>::flat_types.size()), ...);
             return i;
         }();
         static constexpr std::array<WasmValType, flat_types_len> flat_types = []() constexpr
         {
             std::array<WasmValType, flat_types_len> v;
             size_t i = 0;
-            for (auto &f : {ValTrait<Ts>::flatten_type()...})
-            {
-                for (auto &ft : f)
-                {
+            (([&v, &i]()
+              {
+                for (auto &ft : ValTrait<Ts>::flat_types) {
                     v[i++] = ft;
-                }
-            }
+                } }()),
+             ...);
             return v;
         }();
     };
     template <typename T>
+    concept Tuple = ValTrait<T>::type == ValType::Tuple;
+
+    //  Record  ------------------------------------------------------------------
+    template <typename S>
+    concept Struct = (std::is_aggregate_v<S>);
+
+    template <Struct R>
+    struct record_t : R
+    {
+    };
+
+    template <Struct R>
+    struct ValTrait<record_t<R>>
+    {
+        static constexpr ValType type = ValType::Record;
+        using inner_type = R;
+        using tuple_type = decltype(boost::pfr::structure_to_tuple(std::declval<R>()));
+        static constexpr size_t flat_types_len = ValTrait<tuple_type>::flat_types_len;
+        static constexpr std::array<WasmValType, flat_types_len> flat_types = ValTrait<tuple_type>::flat_types;
+    };
+    template <typename T>
     concept Record = ValTrait<T>::type == ValType::Record;
 
-    template <typename T, Record R, std::size_t... I>
-    T to_struct_impl(const R &t, std::index_sequence<I...>)
+    template <Record R, Tuple T, std::size_t... I>
+    R to_struct_impl(const T &t, std::index_sequence<I...>)
     {
-        return T{std::get<I>(t)...};
+        return R{std::get<I>(t)...};
     }
 
-    template <typename T, Record R>
-    T to_struct(const R &t)
+    template <Record R, Tuple T>
+    R to_struct(const T &t)
     {
-        return to_struct_impl<T>(t, std::make_index_sequence<std::tuple_size_v<R>>{});
+        return to_struct_impl<R>(t, std::make_index_sequence<std::tuple_size_v<T>>{});
     }
 
     //  Variant  ------------------------------------------------------------------
-    inline constexpr WasmValType join(WasmValType a, WasmValType b)
+    inline constexpr WasmValType
+    join(WasmValType a, WasmValType b)
     {
         if (a == b)
         {

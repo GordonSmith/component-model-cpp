@@ -15,48 +15,6 @@ using namespace cmcpp;
 #include <cassert>
 // #include <fmt/core.h>
 
-class Heap
-{
-private:
-    uint32_t last_alloc = 0;
-
-public:
-    std::vector<uint8_t> memory;
-
-    Heap(size_t arg) : memory(arg), last_alloc(0)
-    {
-        CHECK(true);
-    }
-
-    uint32_t realloc(uint32_t original_ptr, size_t original_size, uint32_t alignment, size_t new_size)
-    {
-        if (original_ptr != 0 && new_size < original_size)
-        {
-            return align_to(original_ptr, alignment);
-        }
-
-        uint32_t ret = align_to(last_alloc, alignment);
-        last_alloc = ret + new_size;
-        if (last_alloc > memory.size())
-        {
-            std::cout << "oom: have " << memory.size() << " need " << last_alloc << std::endl;
-            trap("oom");
-        }
-        std::memcpy(&memory[ret], &memory[original_ptr], original_size);
-        return ret;
-    }
-};
-
-std::unique_ptr<CallContext> createCallContext(Heap *heap, Encoding encoding)
-{
-    std::unique_ptr<cmcpp::InstanceContext> instanceContext = std::make_unique<cmcpp::InstanceContext>(trap, convert,
-                                                                                                       [heap](int original_ptr, int original_size, int alignment, int new_size) -> int
-                                                                                                       {
-                                                                                                           return heap->realloc(original_ptr, original_size, alignment, new_size);
-                                                                                                       });
-    return instanceContext->createCallContext(heap->memory, encoding);
-}
-
 TEST_CASE("Boolean")
 {
     Heap heap(1024 * 1024);
@@ -399,49 +357,111 @@ TEST_CASE("Flags")
     CHECK(f2.test<"nine">() == true);
 }
 
-struct MyRecord0
-{
-    uint16_t age;
-    uint32_t weight;
-};
-
-struct MyRecord1 : MyRecord0
-{
-    string_t name;
-};
-
-struct MyRecord2 : MyRecord1
-{
-    list_t<string_t> friends;
-};
-
-TEST_CASE("Records")
+TEST_CASE("Tuples")
 {
     Heap heap(1024 * 1024);
     auto cx = createCallContext(&heap, Encoding::Utf8);
 
-    using R0 = record_t<uint16_t, uint32_t>;
+    using R0 = tuple_t<uint16_t, uint32_t>;
     auto flatTypes = ValTrait<R0>::flat_types;
     CHECK(flatTypes.size() == 2);
     R0 r0 = {42, 43};
     auto v = lower_flat(*cx, r0);
     auto rr = lift_flat<R0>(*cx, v);
     CHECK(r0 == rr);
-    auto str0 = to_struct<MyRecord0>(rr);
+    // auto str0 = to_struct<MyRecord0>(rr);
 
-    using R1 = record_t<uint16_t, uint32_t, string_t>;
+    using R1 = tuple_t<uint16_t, uint32_t, string_t>;
     R1 r1 = {142, 143, "Hello"};
     auto vv = lower_flat(*cx, r1);
     auto rr1 = lift_flat<R1>(*cx, vv);
     CHECK(r1 == rr1);
-    auto str1 = to_struct<MyRecord1>(rr1);
+    // auto str1 = to_struct<MyRecord1>(rr1);
 
-    using R2 = record_t<uint16_t, uint32_t, string_t, list_t<string_t>>;
+    using R2 = tuple_t<uint16_t, uint32_t, string_t, list_t<string_t>>;
     R2 r2 = {242, 243, "2Hello", {"2World", "!"}};
     auto vvv = lower_flat(*cx, r2);
     auto rr2 = lift_flat<R2>(*cx, vvv);
     CHECK(r2 == rr2);
-    auto str2 = to_struct<MyRecord2>(rr2);
+    // auto str2 = to_struct<MyRecord2>(rr2);
+}
+
+TEST_CASE("Records")
+{
+    Heap heap(1024 * 1024);
+    auto cx = createCallContext(&heap, Encoding::Utf8);
+
+    struct PersonStruct
+    {
+        string_t name;
+        uint16_t age;
+        uint32_t weight;
+    };
+    using Person = record_t<PersonStruct>;
+    Person p_in = {"John", 42, 200};
+    auto v = lower_flat(*cx, p_in);
+    auto p_out = lift_flat<Person>(*cx, v);
+    CHECK(p_in.name == p_out.name);
+    CHECK(p_in.age == p_out.age);
+    CHECK(p_in.weight == p_out.weight);
+
+    struct PersonExStruct
+    {
+        string_t name;
+        uint16_t age;
+        uint32_t weight;
+        string_t address;
+    };
+    using PersonEx = record_t<PersonExStruct>;
+    PersonEx pex_in = {"John", 42, 200, "123 Main St."};
+    v = lower_flat(*cx, pex_in);
+    auto pex_out = lift_flat<PersonEx>(*cx, v);
+    CHECK(pex_in.name == pex_out.name);
+    CHECK(pex_in.age == pex_out.age);
+    CHECK(pex_in.weight == pex_out.weight);
+    CHECK(pex_in.address == pex_out.address);
+
+    struct PersonEx2Struct
+    {
+        string_t name;
+        uint16_t age;
+        uint32_t weight;
+        string_t address;
+        list_t<string_t> phones;
+    };
+    using PersonEx2 = record_t<PersonEx2Struct>;
+    PersonEx2 pex2_in = {"John", 42, 200, "123 Main St.", {"555-1212", "555-1234"}};
+    v = lower_flat(*cx, pex2_in);
+    auto pex2_out = lift_flat<PersonEx2>(*cx, v);
+    CHECK(pex2_in.name == pex2_out.name);
+    CHECK(pex2_in.age == pex2_out.age);
+    CHECK(pex2_in.weight == pex2_out.weight);
+    CHECK(pex2_in.address == pex2_out.address);
+    CHECK(pex2_in.phones == pex2_out.phones);
+
+    struct PersonEx3Struct
+    {
+        string_t name;
+        uint16_t age;
+        uint32_t weight;
+        string_t address;
+        list_t<string_t> phones;
+        tuple_t<uint16_t, uint32_t> vital_stats;
+        Person p;
+    };
+    using PersonEx3 = record_t<PersonEx3Struct>;
+    PersonEx3 pex3_in = {"John", 42, 200, "123 Main St.", {"555-1212", "555-1234"}, {42, 43}, {"Jane", 43, 150}};
+    v = lower_flat(*cx, pex3_in);
+    auto pex3_out = lift_flat<PersonEx3>(*cx, v);
+    CHECK(pex3_in.name == pex3_out.name);
+    CHECK(pex3_in.age == pex3_out.age);
+    CHECK(pex3_in.weight == pex3_out.weight);
+    CHECK(pex3_in.address == pex3_out.address);
+    CHECK(pex3_in.phones == pex3_out.phones);
+    CHECK(pex3_in.vital_stats == pex3_out.vital_stats);
+    CHECK(pex3_in.p.name == pex3_out.p.name);
+    CHECK(pex3_in.p.age == pex3_out.p.age);
+    CHECK(pex3_in.p.weight == pex3_out.p.weight);
 }
 
 TEST_CASE("Variant")
@@ -467,18 +487,17 @@ TEST_CASE("Variant")
     auto v22 = lift_flat<V2>(*cx, vv2);
     CHECK(v2 == v22);
 
-    using V3 = variant_t<uint16_t, uint32_t, string_t, list_t<string_t>, record_t<uint16_t, uint32_t>>;
-    V3 v3 = record_t<uint16_t, uint32_t>{42, 43};
+    using V3 = variant_t<uint16_t, uint32_t, string_t, list_t<string_t>, tuple_t<uint16_t, uint32_t>>;
+    V3 v3 = tuple_t<uint16_t, uint32_t>{42, 43};
     CHECK(ValTrait<V3>::size == 5);
     auto vv3 = lower_flat(*cx, v3);
     auto v33 = lift_flat<V3>(*cx, vv3);
     CHECK(v3 == v33);
 
-    using V4 = variant_t<uint16_t, uint32_t, string_t, list_t<string_t>, record_t<uint16_t, uint32_t>, V3>;
-    V4 v4 = record_t<uint16_t, uint32_t>{42, 43};
+    using V4 = variant_t<uint16_t, uint32_t, string_t, list_t<string_t>, tuple_t<uint16_t, uint32_t>, V3>;
+    V4 v4 = tuple_t<uint16_t, uint32_t>{42, 43};
     auto vv4 = lower_flat(*cx, v4);
     auto v44 = lift_flat<V4>(*cx, vv4);
-    auto rr4 = std::get<record_t<uint16_t, uint32_t>>(v44);
-    auto rrr4 = to_struct<MyRecord0>(rr4);
+    auto rr4 = std::get<tuple_t<uint16_t, uint32_t>>(v44);
     CHECK(v4 == v44);
 }

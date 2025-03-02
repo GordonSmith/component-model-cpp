@@ -21,6 +21,7 @@ include_directories(
 
 add_executable(${PROJECT_NAME} 
   main.cpp
+  scratchpad.cpp
   host-util.hpp
   host-util.cpp
 )

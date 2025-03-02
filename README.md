@@ -77,4 +77,3 @@ TODO
     <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=GordonSmith/component-model-cpp&type=Date" />
   </picture>
 </a>
-
