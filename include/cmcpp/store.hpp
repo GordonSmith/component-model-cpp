@@ -36,7 +36,4 @@ namespace cmcpp
     inline void store(CallContext &cx, const T &v, uint32_t ptr);
 }
 
-#include "string.hpp"
-#include "variant.hpp"
-
 #endif

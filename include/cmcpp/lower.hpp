@@ -38,53 +38,28 @@ namespace cmcpp
     }
 
     template <SignedInteger T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v)
-    {
-        using WasmValType = WasmValTypeTrait<ValTrait<T>::flat_types[0]>::type;
-        return integer::lower_flat_signed(v, ValTrait<WasmValType>::size * 8);
-    }
+    inline WasmValVector lower_flat(CallContext &cx, const T &v);
 
     template <Float T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v)
-    {
-        return {float_::lower_flat<T>(v)};
-    }
+    inline WasmValVector lower_flat(CallContext &cx, const T &v);
 
     template <String T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v)
-    {
-        return string::lower_flat<T>(cx, v);
-    }
+    inline WasmValVector lower_flat(CallContext &cx, const T &v);
 
     template <List T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v)
-    {
-        return list::lower_flat_list(cx, v);
-    }
+    inline WasmValVector lower_flat(CallContext &cx, const T &v);
 
     template <Flags T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v)
-    {
-        return flags::lower_flat(cx, v);
-    }
+    inline WasmValVector lower_flat(CallContext &cx, const T &v);
 
     template <Tuple T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v)
-    {
-        return tuple::lower_flat_tuple(cx, v);
-    }
+    inline WasmValVector lower_flat(CallContext &cx, const T &v);
 
     template <Record T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v)
-    {
-        return tuple::lower_flat_tuple(cx, boost::pfr::structure_to_tuple((typename ValTrait<T>::inner_type)v));
-    }
+    inline WasmValVector lower_flat(CallContext &cx, const T &v);
 
     template <Variant T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v)
-    {
-        return variant::lower_flat_variant(cx, v);
-    }
+    inline WasmValVector lower_flat(CallContext &cx, const T &v);
 
 }
 

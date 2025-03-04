@@ -94,9 +94,21 @@ namespace cmcpp
     }
 
     template <List T>
+    inline WasmValVector lower_flat(CallContext &cx, const T &v)
+    {
+        return list::lower_flat_list(cx, v);
+    }
+
+    template <List T>
     inline T load(const CallContext &cx, uint32_t ptr)
     {
         return list::load<T>(cx, ptr);
+    }
+
+    template <List T>
+    inline T lift_flat(const CallContext &cx, const CoreValueIter &vi)
+    {
+        return list::lift_flat<typename ValTrait<T>::inner_type>(cx, vi);
     }
 }
 

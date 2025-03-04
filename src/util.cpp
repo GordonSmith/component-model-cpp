@@ -1,5 +1,5 @@
-#include "util.hpp"
-#include "float.hpp"
+#include <cmcpp/util.hpp>
+#include <cmcpp/float.hpp>
 
 namespace cmcpp
 {

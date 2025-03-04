@@ -59,9 +59,22 @@ namespace cmcpp
     }
 
     template <Flags T>
+    inline WasmValVector lower_flat(CallContext &cx, const T &v)
+    {
+        return flags::lower_flat(cx, v);
+    }
+
+    template <Flags T>
     inline T load(const CallContext &cx, uint32_t ptr)
     {
         return flags::load<T>(cx, ptr);
     }
+
+    template <Flags T>
+    inline T lift_flat(const CallContext &cx, const CoreValueIter &vi)
+    {
+        return flags::lift_flat<T>(cx, vi);
+    }
+
 }
 #endif

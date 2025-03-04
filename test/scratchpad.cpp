@@ -1,7 +1,5 @@
-#include "traits.hpp"
-#include "lift.hpp"
-#include "lower.hpp"
-#include "util.hpp"
+#include <cmcpp.hpp>
+
 #include "host-util.hpp"
 
 using namespace cmcpp;

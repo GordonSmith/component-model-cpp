@@ -1,16 +1,29 @@
-cmake_minimum_required(VERSION 3.14...3.22)
+cmake_minimum_required(VERSION 3.5...3.16)
 
-project(component-model LANGUAGES CXX)
+project(cmcpp)
 
-if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
-    message(FATAL_ERROR
-        "In-source builds not allowed. Please make a new directory (called a build directory) and run CMake from there."
-    )
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+find_package(Boost)
+
+add_library(cmcpp STATIC
+    src/context.cpp
+    src/util.cpp
+)
+
+target_include_directories(cmcpp
+    INTERFACE include
+    PRIVATE ${Boost_INCLUDE_DIR}
+)
+
+target_link_libraries(cmcpp 
+)
+
+include_directories(
+    include
+)
+
+if (BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test/CMakeLists.txt")
+    add_subdirectory(test)
 endif()
-
-enable_testing()
-
-set(ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-
-add_subdirectory(src)
-add_subdirectory(test)

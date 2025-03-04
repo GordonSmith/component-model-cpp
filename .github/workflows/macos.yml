@@ -25,9 +25,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Set up C++20 
-        uses: aminya/setup-cpp@v0.44.0
+        uses: aminya/setup-cpp@v1
         with: 
-          compiler: gcc 
+          compiler: gcc-13
           cmake: true 
           ninja: true 
       
@@ -42,7 +42,7 @@ jobs:
 
       - name: install dependencies
         run: |
-          brew install autoconf autoconf-archive automake coreutils libtool ninja
+          brew install pkg-config autoconf autoconf-archive automake coreutils libtool cmake ninja
 
       - name: configure
         run: |

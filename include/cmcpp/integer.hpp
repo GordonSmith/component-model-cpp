@@ -73,6 +73,13 @@ namespace cmcpp
         integer::store<T>(cx, v, ptr);
     }
 
+    template <SignedInteger T>
+    inline WasmValVector lower_flat(CallContext &cx, const T &v)
+    {
+        using WasmValType = WasmValTypeTrait<ValTrait<T>::flat_types[0]>::type;
+        return integer::lower_flat_signed(v, ValTrait<WasmValType>::size * 8);
+    }
+
     template <Boolean T>
     inline T load(const CallContext &cx, uint32_t ptr)
     {
@@ -89,6 +96,18 @@ namespace cmcpp
     inline T load(const CallContext &cx, uint32_t ptr)
     {
         return integer::load<T>(cx, ptr);
+    }
+
+    template <UnsignedInteger T>
+    inline T lift_flat(const CallContext &cx, const CoreValueIter &vi)
+    {
+        return integer::lift_flat_unsigned<T>(vi, ValTrait<T>::size * 8, 8);
+    }
+
+    template <SignedInteger T>
+    inline T lift_flat(const CallContext &cx, const CoreValueIter &vi)
+    {
+        return integer::lift_flat_signed<T>(vi, ValTrait<T>::size * 8, 8);
     }
 }
 

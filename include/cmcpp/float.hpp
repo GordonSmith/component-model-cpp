@@ -11,11 +11,33 @@ namespace cmcpp
 
     namespace float_
     {
-        int32_t encode_float_as_i32(float32_t f);
-        int64_t encode_float_as_i64(float64_t f);
-        float32_t decode_i32_as_float(int32_t i);
-        float64_t decode_i64_as_float(int64_t i);
-        float32_t core_f32_reinterpret_i32(int32_t i);
+        inline int32_t encode_float_as_i32(float32_t f)
+
+        {
+            return *reinterpret_cast<int32_t *>(&f);
+        }
+
+        inline int64_t encode_float_as_i64(float64_t f)
+        {
+            return *reinterpret_cast<int64_t *>(&f);
+        }
+
+        inline float32_t decode_i32_as_float(int32_t i)
+        {
+            return *reinterpret_cast<float32_t *>(&i);
+        }
+
+        inline float64_t decode_i64_as_float(int64_t i)
+        {
+            return *reinterpret_cast<float64_t *>(&i);
+        }
+
+        inline float32_t core_f32_reinterpret_i32(int32_t i)
+        {
+            float f;
+            std::memcpy(&f, &i, sizeof f);
+            return f;
+        }
 
         template <Float T>
         T canonicalize_nan(T f)
@@ -79,9 +101,22 @@ namespace cmcpp
     }
 
     template <Float T>
+    inline WasmValVector lower_flat(CallContext &cx, const T &v)
+    {
+        return {float_::lower_flat<T>(v)};
+    }
+
+    template <Float T>
     inline T load(const CallContext &cx, uint32_t ptr)
     {
         return float_::load<T>(cx, ptr);
+    }
+
+    template <Float T>
+    inline T lift_flat(const CallContext &cx, const CoreValueIter &vi)
+    {
+        using WasmValType = WasmValTypeTrait<ValTrait<T>::flat_types[0]>::type;
+        return float_::canonicalize_nan<T>(std::get<WasmValType>(vi.next(ValTrait<T>::flat_types[0])));
     }
 }
 

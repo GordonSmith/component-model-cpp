@@ -178,10 +178,23 @@ namespace cmcpp
     }
 
     template <Variant T>
+    inline WasmValVector lower_flat(CallContext &cx, const T &v)
+    {
+        return variant::lower_flat_variant(cx, v);
+    }
+
+    template <Variant T>
     inline T load(const CallContext &cx, uint32_t ptr)
     {
         return variant::load<T>(cx, ptr);
     }
+
+    template <Variant T>
+    inline T lift_flat(const CallContext &cx, const CoreValueIter &vi)
+    {
+        return variant::lift_flat<T>(cx, vi);
+    }
+
 }
 
 #endif
