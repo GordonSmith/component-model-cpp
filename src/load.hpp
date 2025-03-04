@@ -2,49 +2,40 @@
 #define CMCPP_LOAD_HPP
 
 #include "context.hpp"
-#include "integer.hpp"
-#include "float.hpp"
-#include "string.hpp"
-#include "flags.hpp"
-#include "util.hpp"
 
 namespace cmcpp
 {
     template <Boolean T>
-    inline T load(const CallContext &cx, uint32_t ptr)
-    {
-        return convert_int_to_bool(integer::load<uint8_t>(cx, ptr));
-    }
+    inline T load(const CallContext &cx, uint32_t ptr);
 
     template <Char T>
-    inline T load(const CallContext &cx, uint32_t ptr)
-    {
-        return convert_i32_to_char(cx, integer::load<uint32_t>(cx, ptr));
-    }
+    inline T load(const CallContext &cx, uint32_t ptr);
 
     template <Integer T>
-    inline T load(const CallContext &cx, uint32_t ptr)
-    {
-        return integer::load<T>(cx, ptr);
-    }
+    inline T load(const CallContext &cx, uint32_t ptr);
 
     template <Float T>
-    inline T load(const CallContext &cx, uint32_t ptr)
-    {
-        return float_::load<T>(cx, ptr);
-    }
+    inline T load(const CallContext &cx, uint32_t ptr);
 
     template <String T>
-    inline T load(const CallContext &cx, uint32_t ptr)
-    {
-        return string::load<T>(cx, ptr);
-    }
+    inline T load(const CallContext &cx, uint32_t ptr);
 
     template <Flags T>
-    inline T load(const CallContext &cx, uint32_t ptr)
-    {
-        return flags::load<T>(cx, ptr);
-    }
+    inline T load(const CallContext &cx, uint32_t ptr);
+
+    template <List T>
+    inline T load(const CallContext &cx, uint32_t ptr);
+
+    template <Tuple T>
+    inline T load(const CallContext &cx, uint32_t ptr);
+
+    template <Record T>
+    inline T load(const CallContext &cx, uint32_t ptr);
+
+    template <Variant T>
+    inline T load(const CallContext &cx, uint32_t ptr);
 }
+
+#include "string.hpp"
 
 #endif

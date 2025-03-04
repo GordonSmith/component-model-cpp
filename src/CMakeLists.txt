@@ -18,7 +18,6 @@ set(SRC
     list.hpp
     list.cpp
     load.hpp
-    load.cpp
     string.hpp
     string.cpp
     traits.hpp

@@ -51,5 +51,17 @@ namespace cmcpp
             return unpack_flags_from_int<T>(i);
         }
     }
+
+    template <Flags T>
+    inline void store(CallContext &cx, const T &v, uint32_t ptr)
+    {
+        flags::store(cx, v, ptr);
+    }
+
+    template <Flags T>
+    inline T load(const CallContext &cx, uint32_t ptr)
+    {
+        return flags::load<T>(cx, ptr);
+    }
 }
 #endif

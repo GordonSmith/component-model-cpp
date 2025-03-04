@@ -33,6 +33,7 @@ namespace cmcpp
         bool sync = true;
         bool always_task_return = false;
     };
+    ;
 
     struct InstanceContext
     {

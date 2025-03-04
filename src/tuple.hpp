@@ -75,6 +75,18 @@ namespace cmcpp
             return result;
         }
     }
+
+    template <Tuple T>
+    inline void store(CallContext &cx, const T &v, uint32_t ptr)
+    {
+        tuple::store(cx, v, ptr);
+    }
+
+    template <Tuple T>
+    inline T load(const CallContext &cx, uint32_t ptr)
+    {
+        return tuple::load<T>(cx, ptr);
+    }
 }
 
 #endif

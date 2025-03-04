@@ -1,19 +1,20 @@
 #include "traits.hpp"
 #include "lift.hpp"
 #include "lower.hpp"
-#include "util.hpp"
+
 #include "host-util.hpp"
 
 using namespace cmcpp;
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include <doctest/doctest.h>
-
 #include <iostream>
+#include <string>
 #include <vector>
 #include <utility>
 #include <cassert>
 // #include <fmt/core.h>
+
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include <doctest/doctest.h>
 
 TEST_CASE("Boolean")
 {
@@ -283,6 +284,18 @@ TEST_CASE("List")
 {
     Heap heap(1024 * 1024);
     auto cx = createCallContext(&heap, Encoding::Utf8);
+
+    using VariantList = list_t<variant_t<bool_t>>;
+    VariantList variants = {true, false};
+    auto vv5 = lower_flat(*cx, variants);
+    auto v55 = lift_flat<VariantList>(*cx, vv5);
+    CHECK(variants.size() == v55.size());
+    auto v0_ = std::get<bool_t>(v55[0]);
+    auto v1_ = std::get<bool_t>(v55[1]);
+    CHECK(variants[0] == v55[0]);
+    CHECK(variants[1] == v55[1]);
+    CHECK(variants == v55);
+
     list_t<string_t> strings = {"Hello", "World", "!"};
     auto v = lower_flat(*cx, strings);
     auto strs = lift_flat<list_t<string_t>>(*cx, v);
@@ -447,10 +460,10 @@ TEST_CASE("Records")
         string_t address;
         list_t<string_t> phones;
         tuple_t<uint16_t, uint32_t> vital_stats;
-        Person p;
+        record_t<PersonEx2Struct> p;
     };
     using PersonEx3 = record_t<PersonEx3Struct>;
-    PersonEx3 pex3_in = {"John", 42, 200, "123 Main St.", {"555-1212", "555-1234"}, {42, 43}, {"Jane", 43, 150}};
+    PersonEx3 pex3_in = {"John", 42, 200, "123 Main St.", {"555-1212", "555-1234"}, {42, 43}, {"Jane", 43, 150, "63 Elm St.", {"555-1212", "555-1234", "555-4321"}}};
     v = lower_flat(*cx, pex3_in);
     auto pex3_out = lift_flat<PersonEx3>(*cx, v);
     CHECK(pex3_in.name == pex3_out.name);
@@ -462,6 +475,8 @@ TEST_CASE("Records")
     CHECK(pex3_in.p.name == pex3_out.p.name);
     CHECK(pex3_in.p.age == pex3_out.p.age);
     CHECK(pex3_in.p.weight == pex3_out.p.weight);
+    CHECK(pex3_in.p.address == pex3_out.p.address);
+    CHECK(pex3_in.p.phones == pex3_out.p.phones);
 }
 
 TEST_CASE("Variant")
@@ -470,34 +485,55 @@ TEST_CASE("Variant")
     auto cx = createCallContext(&heap, Encoding::Utf8);
 
     using V0 = variant_t<uint16_t, uint32_t>;
+    auto x = ValTrait<ValTrait<V0>::discriminant_type>::size;
     V0 v0 = static_cast<uint32_t>(42);
     auto vv0 = lower_flat(*cx, v0);
     auto v00 = lift_flat<V0>(*cx, vv0);
     CHECK(v0 == v00);
 
     using V1 = variant_t<uint16_t, uint32_t, string_t>;
+    auto x1 = ValTrait<ValTrait<V1>::discriminant_type>::size;
     V1 v1 = "Hello";
     auto vv1 = lower_flat(*cx, v1);
     auto v11 = lift_flat<V1>(*cx, vv1);
     CHECK(v1 == v11);
 
     using V2 = variant_t<uint16_t, uint32_t, string_t, list_t<string_t>>;
+    auto x2 = ValTrait<ValTrait<V2>::discriminant_type>::size;
     V2 v2 = list_t<string_t>{"Hello", "World", "!"};
     auto vv2 = lower_flat(*cx, v2);
     auto v22 = lift_flat<V2>(*cx, vv2);
     CHECK(v2 == v22);
 
     using V3 = variant_t<uint16_t, uint32_t, string_t, list_t<string_t>, tuple_t<uint16_t, uint32_t>>;
+    auto x3 = ValTrait<ValTrait<V3>::discriminant_type>::size;
     V3 v3 = tuple_t<uint16_t, uint32_t>{42, 43};
-    CHECK(ValTrait<V3>::size == 5);
     auto vv3 = lower_flat(*cx, v3);
     auto v33 = lift_flat<V3>(*cx, vv3);
     CHECK(v3 == v33);
 
     using V4 = variant_t<uint16_t, uint32_t, string_t, list_t<string_t>, tuple_t<uint16_t, uint32_t>, V3>;
+    auto x4 = ValTrait<ValTrait<V4>::discriminant_type>::size;
     V4 v4 = tuple_t<uint16_t, uint32_t>{42, 43};
     auto vv4 = lower_flat(*cx, v4);
     auto v44 = lift_flat<V4>(*cx, vv4);
     auto rr4 = std::get<tuple_t<uint16_t, uint32_t>>(v44);
     CHECK(v4 == v44);
+
+    using VariantList = list_t<variant_t<bool_t>>;
+    VariantList variants = {true, false};
+    auto vv5 = lower_flat(*cx, variants);
+    auto v55 = lift_flat<VariantList>(*cx, vv5);
+    CHECK(variants.size() == v55.size());
+    auto v0_ = std::get<bool_t>(v55[0]);
+    auto v1_ = std::get<bool_t>(v55[1]);
+    CHECK(variants[0] == v55[0]);
+    CHECK(variants[1] == v55[1]);
+    CHECK(variants == v55);
+
+    using VariantList2 = list_t<variant_t<string_t>>;
+    VariantList2 variants2 = {"Hello World1"};
+    auto vv6 = lower_flat(*cx, variants2);
+    auto v66 = lift_flat<VariantList2>(*cx, vv6);
+    CHECK(variants2 == v66);
 }

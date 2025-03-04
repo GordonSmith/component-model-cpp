@@ -242,6 +242,18 @@ namespace cmcpp
             return load_from_range<T>(cx, ptr, packed_length);
         }
     }
+
+    template <String T>
+    inline void store(CallContext &cx, const T &v, uint32_t ptr)
+    {
+        string::store(cx, v, ptr);
+    }
+
+    template <String T>
+    inline T load(const CallContext &cx, uint32_t ptr)
+    {
+        return string::load<T>(cx, ptr);
+    }
 }
 
 #endif

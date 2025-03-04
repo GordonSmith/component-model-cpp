@@ -40,7 +40,7 @@ namespace cmcpp
     template <Float T>
     inline T lift_flat(const CallContext &cx, const CoreValueIter &vi)
     {
-        using WasmValType = ValTrait<T>::flat_type;
+        using WasmValType = WasmValTypeTrait<ValTrait<T>::flat_types[0]>::type;
         return float_::canonicalize_nan<T>(std::get<WasmValType>(vi.next(ValTrait<T>::flat_types[0])));
     }
 

@@ -2,7 +2,6 @@
 #define CMCPP_LIST_HPP
 
 #include "context.hpp"
-#include "integer.hpp"
 #include "store.hpp"
 #include "load.hpp"
 #include "util.hpp"
@@ -15,12 +14,6 @@ namespace cmcpp
 {
     using offset = uint32_t;
     using size = uint32_t;
-
-    template <List T>
-    inline void store(CallContext &cx, const list_t<typename ValTrait<T>::inner_type> &v, uint32_t ptr);
-
-    template <List T>
-    inline list_t<typename ValTrait<T>::inner_type> load(const CallContext &cx, uint32_t ptr);
 
     namespace list
     {
@@ -39,6 +32,7 @@ namespace cmcpp
         std::tuple<offset, size> store_into_range(CallContext &cx, const list_t<T> &v)
         {
             auto elem_type = ValTrait<T>::type;
+            ValType d = ValTrait<T>::type;
             size_t nbytes = ValTrait<T>::size;
             auto byte_length = v.size() * nbytes;
             trap_if(cx, byte_length > std::numeric_limits<size>::max(), "byte_length exceeds limit");
@@ -94,15 +88,15 @@ namespace cmcpp
     }
 
     template <List T>
-    inline void store(CallContext &cx, const list_t<typename ValTrait<T>::inner_type> &v, uint32_t ptr)
+    inline void store(CallContext &cx, const T &v, uint32_t ptr)
     {
         list::store(cx, v, ptr);
     }
 
     template <List T>
-    inline list_t<typename ValTrait<T>::inner_type> load(const CallContext &cx, uint32_t ptr)
+    inline T load(const CallContext &cx, uint32_t ptr)
     {
-        return list::load<typename ValTrait<T>::inner_type>(cx, ptr);
+        return list::load<T>(cx, ptr);
     }
 }
 

@@ -12,11 +12,6 @@ namespace cmcpp
         }
     }
 
-    uint32_t align_to(uint32_t ptr, uint8_t alignment)
-    {
-        return (ptr + static_cast<int32_t>(alignment) - 1) & ~(static_cast<int32_t>(alignment) - 1);
-    }
-
     ValType despecialize(const ValType t)
     {
         switch (t)

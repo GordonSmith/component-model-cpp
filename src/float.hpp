@@ -71,6 +71,18 @@ namespace cmcpp
             return decode_i64_as_float(integer::load<int64_t>(cx, ptr));
         }
     }
+
+    template <Float T>
+    inline void store(CallContext &cx, const T &v, uint32_t ptr)
+    {
+        float_::store<T>(cx, v, ptr);
+    }
+
+    template <Float T>
+    inline T load(const CallContext &cx, uint32_t ptr)
+    {
+        return float_::load<T>(cx, ptr);
+    }
 }
 
 #endif

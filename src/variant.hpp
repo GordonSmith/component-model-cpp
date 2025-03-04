@@ -16,16 +16,64 @@ namespace cmcpp
 {
     namespace variant
     {
+        template <Variant V>
+        struct LoadVisitor
+        {
+            const CallContext &cx;
+            V &variant;
+            size_t index_to_set;
+            size_t current_index;
+            int ptr;
+
+            LoadVisitor(const CallContext &cx, V &var, size_t idx, uint32_t ptr)
+                : cx(cx), variant(var), index_to_set(idx), current_index(0), ptr(ptr) {}
+
+            template <typename T>
+            void operator()(T &)
+            {
+                if (current_index == index_to_set)
+                {
+                    variant = load<T>(cx, ptr);
+                }
+                ++current_index;
+            }
+        };
 
         template <Variant T>
-        std::size_t max_case_alignment(const T &v)
+        T load(const CallContext &cx, uint32_t ptr)
         {
-            std::size_t a = 1;
-            std::visit([&](auto &&arg)
-                       {
-                using V = std::decay_t<decltype(arg)>;
-                a = std::max(a, alignment(arg)); }, v);
-            return a;
+            T retVal;
+            uint32_t disc_size = ValTrait<typename ValTrait<T>::discriminant_type>::size;
+            auto case_index = integer::load<typename ValTrait<T>::discriminant_type>(cx, ptr);
+            ptr += disc_size;
+            trap_if(cx, case_index >= std::variant_size_v<T>);
+            ptr = align_to(ptr, ValTrait<T>::max_case_alignment);
+            LoadVisitor<T> visitor(cx, retVal, case_index, ptr);
+            std::visit(visitor, retVal);
+            return retVal;
+        }
+
+        struct StoreVisitor
+        {
+            CallContext &cx;
+            uint32_t ptr;
+
+            template <typename T>
+            void operator()(T &&arg) const
+            {
+                store(cx, arg, ptr);
+            }
+        };
+
+        template <Variant T>
+        void store(CallContext &cx, const T &v, uint32_t ptr)
+        {
+            auto case_index = v.index();
+            uint32_t disc_size = ValTrait<typename ValTrait<T>::discriminant_type>::size;
+            integer::store(cx, case_index, ptr, disc_size);
+            ptr += disc_size;
+            ptr = align_to(ptr, ValTrait<T>::max_case_alignment);
+            std::visit(StoreVisitor{cx, ptr}, v);
         }
 
         struct LowerFlatVisitor
@@ -121,6 +169,18 @@ namespace cmcpp
             CoerceValueIter cvi(vi, flat_types);
             return lift_flat_helper<T>(cx, cvi, case_index);
         }
+    }
+
+    template <Variant T>
+    inline void store(CallContext &cx, const T &v, uint32_t ptr)
+    {
+        variant::store(cx, v, ptr);
+    }
+
+    template <Variant T>
+    inline T load(const CallContext &cx, uint32_t ptr)
+    {
+        return variant::load<T>(cx, ptr);
     }
 }
 

@@ -104,6 +104,5 @@ namespace cmcpp
             auto [ptr, packed_length] = store_into_range(cx, v);
             return {(int32_t)ptr, (int32_t)packed_length};
         }
-    };
-
+    }
 }
