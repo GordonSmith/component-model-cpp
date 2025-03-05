@@ -148,7 +148,7 @@ namespace cmcpp
     {
         static_assert(false, "T is not a valid type for ValTrait. Type: ");
         static constexpr ValType type = ValType::UNKNOWN;
-        using inner_type = void;
+        using inner_type = std::monostate;
         static constexpr uint32_t size = 0;
         static constexpr uint32_t alignment = 0;
         static constexpr std::array<WasmValType, 0> flat_types = {};
@@ -675,7 +675,20 @@ namespace cmcpp
     template <typename T>
     concept Variant = ValTrait<T>::type == ValType::Variant;
 
-    //  Other  --------------------------------------------------------------------
+    //  Option  --------------------------------------------------------------------
+    template <Field T>
+    using option_t = std::optional<T>;
+    template <Field T>
+    struct ValTrait<option_t<T>>
+    {
+        static constexpr ValType type = ValType::Option;
+        using inner_type = T;
+        static constexpr uint32_t size = ValTrait<variant_t<bool_t, T>>::size;
+        static constexpr uint32_t alignment = ValTrait<variant_t<bool_t, T>>::size;
+        static constexpr auto flat_types = ValTrait<variant_t<bool_t, T>>::flat_types;
+    };
+    template <typename T>
+    concept Option = ValTrait<T>::type == ValType::Option;
 
     //  --------------------------------------------------------------------
 

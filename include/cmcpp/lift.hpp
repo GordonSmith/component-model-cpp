@@ -45,6 +45,9 @@ namespace cmcpp
     template <Variant T>
     inline T lift_flat(const CallContext &cx, const CoreValueIter &vi);
 
+    template <Option T>
+    inline T lift_flat(const CallContext &cx, const CoreValueIter &vi);
+
 }
 
 #endif

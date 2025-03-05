@@ -61,6 +61,8 @@ namespace cmcpp
     template <Variant T>
     inline WasmValVector lower_flat(CallContext &cx, const T &v);
 
+    template <Option T>
+    inline WasmValVector lower_flat(CallContext &cx, const T &v);
 }
 
 #endif

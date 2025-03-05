@@ -491,6 +491,12 @@ TEST_CASE("Variant")
     Heap heap(1024 * 1024);
     auto cx = createCallContext(&heap, Encoding::Utf8);
 
+    using Vb = variant_t<bool_t, uint32_t>;
+    Vb vb = static_cast<uint32_t>(42);
+    auto vvb = lower_flat(*cx, vb);
+    auto vbb = lift_flat<Vb>(*cx, vvb);
+    CHECK(vb == vbb);
+
     using V0 = variant_t<uint16_t, uint32_t>;
     auto x = ValTrait<ValTrait<V0>::discriminant_type>::size;
     V0 v0 = static_cast<uint32_t>(42);
@@ -558,4 +564,32 @@ TEST_CASE("Variant")
     auto vv8 = lower_flat(*cx, variants4);
     auto v88 = lift_flat<VariantList4>(*cx, vv8);
     CHECK(variants4 == v88);
+}
+
+TEST_CASE("Option")
+{
+    Heap heap(1024 * 1024);
+    auto cx = createCallContext(&heap, Encoding::Utf8);
+
+    using O0 = option_t<uint32_t>;
+    O0 o0 = 42;
+    auto vv0 = lower_flat(*cx, o0);
+    auto v00 = lift_flat<O0>(*cx, vv0);
+    CHECK(o0 == v00);
+
+    O0 o1;
+    auto vv1 = lower_flat(*cx, o1);
+    auto v01 = lift_flat<O0>(*cx, vv1);
+    CHECK(o1 == v01);
+
+    using O1 = option_t<string_t>;
+    O1 o2 = "Hello";
+    auto vv2 = lower_flat(*cx, o2);
+    auto v02 = lift_flat<O1>(*cx, vv2);
+    CHECK(o2 == v02);
+
+    O1 o3;
+    auto vv3 = lower_flat(*cx, o3);
+    auto v03 = lift_flat<O1>(*cx, vv3);
+    CHECK(o3 == v03);
 }

@@ -87,7 +87,7 @@ namespace cmcpp
         };
 
         template <Variant T>
-        WasmValVector lower_flat_variant(CallContext &cx, const T &v)
+        WasmValVector lower_flat(CallContext &cx, const T &v)
         {
             auto case_index = v.index();
             WasmValTypeVector flat_types(ValTrait<T>::flat_types.begin(), ValTrait<T>::flat_types.end());
@@ -180,7 +180,22 @@ namespace cmcpp
     template <Variant T>
     inline WasmValVector lower_flat(CallContext &cx, const T &v)
     {
-        return variant::lower_flat_variant(cx, v);
+        return variant::lower_flat(cx, v);
+    }
+
+    template <Option T>
+    inline WasmValVector lower_flat(CallContext &cx, const T &v)
+    {
+        using V = variant_t<bool_t, typename ValTrait<T>::inner_type>;
+        if (v.has_value())
+        {
+            V v2 = v.value();
+            return variant::lower_flat(cx, v2);
+        }
+        else
+        {
+            return variant::lower_flat<V>(cx, false);
+        }
     }
 
     template <Variant T>
@@ -193,6 +208,19 @@ namespace cmcpp
     inline T lift_flat(const CallContext &cx, const CoreValueIter &vi)
     {
         return variant::lift_flat<T>(cx, vi);
+    }
+
+    template <Option T>
+    inline T lift_flat(const CallContext &cx, const CoreValueIter &vi)
+    {
+        T retVal;
+        using V = variant_t<bool_t, typename ValTrait<T>::inner_type>;
+        auto v = variant::lift_flat<V>(cx, vi);
+        if (v.index() == 1)
+        {
+            retVal = std::get<1>(v);
+        }
+        return retVal;
     }
 
 }
