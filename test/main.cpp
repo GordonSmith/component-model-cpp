@@ -106,6 +106,24 @@ TEST_CASE("Float")
     flat_v = lower_flat(*cx, std::numeric_limits<double>::infinity());
     b = lift_flat<float64_t>(*cx, flat_v);
     CHECK(std::isnan(b));
+
+    using FloatTuple = tuple_t<float32_t, float64_t>;
+    FloatTuple ft = {42.0, 43.0};
+    auto flat_ft = lower_flat(*cx, ft);
+    auto ft2 = lift_flat<FloatTuple>(*cx, flat_ft);
+    CHECK(ft == ft2);
+
+    using FloatList = list_t<float32_t>;
+    FloatList fl = {42.0, 43.0};
+    auto flat_fl = lower_flat(*cx, fl);
+    auto fl2 = lift_flat<FloatList>(*cx, flat_fl);
+    CHECK(fl == fl2);
+
+    using Float64List = list_t<float64_t>;
+    Float64List fl64 = {42.0, 43.0};
+    auto flat_fl64 = lower_flat(*cx, fl64);
+    auto fl642 = lift_flat<Float64List>(*cx, flat_fl64);
+    CHECK(fl64 == fl642);
 }
 
 const char *const hw = "hello World!";

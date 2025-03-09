@@ -24,8 +24,9 @@ namespace cmcpp
             return ValType::Variant;
         case ValType::Result:
             return ValType::Variant;
+        default:
+            return t;
         }
-        return t;
     }
 
     bool convert_int_to_bool(uint8_t i)
