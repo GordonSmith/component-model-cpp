@@ -543,45 +543,32 @@ TEST_CASE("Variant")
     CHECK(variants == v55);
 
     using VariantList2 = list_t<variant_t<string_t>>;
-    VariantList2 variants2 = {"Hello World1"};
+    VariantList2 variants2 = {"Hello World 1", "Hello World 2", "Hello World 3"};
     auto vv6 = lower_flat(*cx, variants2);
     auto v66 = lift_flat<VariantList2>(*cx, vv6);
     CHECK(variants2 == v66);
 
-    // using VariantList3 = list_t<variant_t<string_t, uint32_t>>;
-    // VariantList3 variants3 = {"Hello World2", (uint32_t)42};
-    // auto vv7 = lower_flat(*cx, variants3);
-    // auto v77 = lift_flat<VariantList3>(*cx, vv7);
-    // auto d1 = std::get<string_t>(v77[0]);
-    // auto d2v = v77[1];
-    // auto d2 = std::get<uint32_t>(d2v);
-    // CHECK(variants3 == v77);
+    using VariantList3 = list_t<variant_t<string_t, bool_t>>;
+    VariantList3 variants3 = {"Hello World 1", "Hello World 2", "Hello World 3"};
+    auto vv7 = lower_flat(*cx, variants3);
+    auto v77 = lift_flat<VariantList3>(*cx, vv7);
+    CHECK(variants3 == v77);
 
-    // using VariantList4 = list_t<variant_t<string_t, uint32_t, bool_t>>;
-    // VariantList4 variants4 = {"Hello World3", (uint32_t)42, true};
-    // auto vv8 = lower_flat(*cx, variants4);
-    // auto v88 = lift_flat<VariantList4>(*cx, vv8);
-    // CHECK(variants4 == v88);
+    VariantList3 variants3b = {true, false, true};
+    auto vv7b = lower_flat(*cx, variants3b);
+    auto v77b = lift_flat<VariantList3>(*cx, vv7b);
+    CHECK(variants3b == v77b);
 
-    //     using VariantList3 = list_t<variant_t<string_t, uint32_t>>;
-    //     VariantList3 variants3 = {"Hello World2", (uint32_t)42};
-    //     auto vv7 = lower_flat(*cx, variants3);
-    //     auto v77 = lift_flat<VariantList3>(*cx, vv7);
-    //     auto d1 = std::get<string_t>(v77[0]);
-    //     auto d2v = v77[1];
-    //     auto d2 = std::get<uint32_t>(d2v);
-    //     CHECK(variants3 == v77);
+    VariantList3 variants3c = {true, "false", true, "Hello World 1", "Hello World 2", "Hello World 3"};
+    auto vv7c = lower_flat(*cx, variants3b);
+    auto v77c = lift_flat<VariantList3>(*cx, vv7c);
+    CHECK(variants3b == v77c);
 
-    //     using VariantList = list_t<variant_t<bool_t>>;
-    //     VariantList variants = {true, false};
-    //     auto vv5 = lower_flat(*cx, variants);
-    //     auto v55 = lift_flat<VariantList>(*cx, vv5);
-    //     CHECK(variants.size() == v55.size());
-    //     auto v0_ = std::get<bool_t>(v55[0]);
-    //     auto v1_ = std::get<bool_t>(v55[1]);
-    //     CHECK(variants[0] == v55[0]);
-    //     CHECK(variants[1] == v55[1]);
-    //     CHECK(variants == v55);
+    using VariantList4 = list_t<variant_t<string_t, uint32_t, bool_t>>;
+    VariantList4 variants4 = {"Hello World3", (uint32_t)42, true};
+    auto vv8 = lower_flat(*cx, variants4);
+    auto v88 = lift_flat<VariantList4>(*cx, vv8);
+    CHECK(variants4 == v88);
 }
 
 TEST_CASE("Option")

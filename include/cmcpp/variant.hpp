@@ -2,8 +2,6 @@
 #define CMCPP_VARIANT_HPP
 
 #include "context.hpp"
-#include "integer.hpp"
-#include "float.hpp"
 #include "store.hpp"
 #include "load.hpp"
 #include "util.hpp"
@@ -16,28 +14,26 @@ namespace cmcpp
 {
     namespace variant
     {
-        template <Variant V>
-        struct LoadVisitor
+        template <size_t N, Variant T>
+        using variantT = typename std::variant_alternative<N, T>::type;
+
+        template <Variant T>
+        void setNthValue(T &var, size_t case_index, const CallContext &cx, uint32_t ptr)
         {
-            const CallContext &cx;
-            V &variant;
-            size_t index_to_set;
-            size_t current_index;
-            int ptr;
+            constexpr size_t variantSize = std::variant_size<T>::value;
 
-            LoadVisitor(const CallContext &cx, V &var, size_t idx, uint32_t ptr)
-                : cx(cx), variant(var), index_to_set(idx), current_index(0), ptr(ptr) {}
-
-            template <typename T>
-            void operator()(T &)
+            if (case_index >= variantSize)
             {
-                if (current_index == index_to_set)
-                {
-                    variant = load<T>(cx, ptr);
-                }
-                ++current_index;
+                throw std::out_of_range("Invalid case_index for variant");
             }
-        };
+
+            auto setter = [&]<size_t... Indices>(std::index_sequence<Indices...>)
+            {
+                ((case_index == Indices ? (var = load<variantT<Indices, T>>(cx, ptr), true) : false) || ...);
+            };
+
+            setter(std::make_index_sequence<variantSize>{});
+        }
 
         template <Variant T>
         T load(const CallContext &cx, uint32_t ptr)
@@ -48,8 +44,7 @@ namespace cmcpp
             ptr += disc_size;
             trap_if(cx, case_index >= std::variant_size_v<T>);
             ptr = align_to(ptr, ValTrait<T>::max_case_alignment);
-            LoadVisitor<T> visitor(cx, retVal, case_index, ptr);
-            std::visit(visitor, retVal);
+            setNthValue(retVal, case_index, cx, ptr);
             return retVal;
         }
 
