@@ -240,6 +240,13 @@ TEST_CASE("String-Latin1_Utf16")
     CHECK(hw16_ret == hw16);
     hw_l1_ret = lift_flat<latin1_u16string_t>(*cx, v);
     CHECK(hw_l1_ret.encoding == Encoding::Utf16);
+
+    // latin1_u16string_t l1u16 = u"Hello 🌍!";
+    // v = lower_flat(*cx, l1u16);
+    // hw16_ret = lift_flat<u16string_t>(*cx, v);
+    // CHECK(hw16_ret == hw16);
+    // hw_l1_ret = lift_flat<latin1_u16string_t>(*cx, v);
+    // CHECK(hw_l1_ret.encoding == Encoding::Utf16);
 }
 
 void testString(Encoding guestEncoding)

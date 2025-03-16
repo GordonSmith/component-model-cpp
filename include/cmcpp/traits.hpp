@@ -389,6 +389,45 @@ namespace cmcpp
         string_t str;
         u16string_t u16str;
 
+        latin1_u16string_t() = default;
+
+        latin1_u16string_t(const char *cstr)
+        {
+            encoding = Encoding::Latin1;
+            str = cstr;
+        }
+
+        latin1_u16string_t(const char16_t *cstr)
+        {
+            encoding = Encoding::Utf16;
+            u16str = cstr;
+        }
+
+        latin1_u16string_t &operator=(const latin1_u16string_t &other)
+        {
+            if (this != &other)
+            {
+                encoding = other.encoding;
+                str = other.str;
+                u16str = other.u16str;
+            }
+            return *this;
+        }
+
+        bool operator==(const latin1_u16string_t &other) const
+        {
+            if (encoding != other.encoding)
+            {
+                return false;
+            }
+            return encoding == Encoding::Latin1 ? str == other.str : u16str == other.u16str;
+        }
+
+        inline size_t size() const
+        {
+            return encoding == Encoding::Latin1 ? str.size() : u16str.size();
+        }
+
         inline void resize(size_t new_size)
         {
             encoding == Encoding::Latin1 ? str.resize(new_size) : u16str.resize(new_size);
