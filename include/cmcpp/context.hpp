@@ -1,18 +1,17 @@
 #ifndef CMCPP_CONTEXT_HPP
 #define CMCPP_CONTEXT_HPP
 
+#include "traits.hpp"
+
+#include <functional>
+#include <memory>
+#include <optional>
 #if __has_include(<span>)
 #include <span>
 #else
 #include <string>
 #include <sstream>
 #endif
-
-#include "traits.hpp"
-
-#include <functional>
-#include <memory>
-#include <optional>
 
 namespace cmcpp
 {
@@ -40,10 +39,27 @@ namespace cmcpp
         HostTrap trap;
         HostUnicodeConversion convert;
         GuestRealloc realloc;
-        std::unique_ptr<CallContext> createCallContext(const GuestMemory &memory, const Encoding &encoding = Encoding::Utf8, const GuestPostReturn &post_return = nullptr);
+        std::unique_ptr<CallContext> createCallContext(const GuestMemory &memory, const Encoding &guest_encoding = Encoding::Utf8, const GuestPostReturn &post_return = nullptr)
+        {
+            auto retVal = std::make_unique<CallContext>();
+            retVal->trap = trap;
+            retVal->convert = convert;
+            retVal->realloc = realloc;
+            retVal->memory = memory;
+            retVal->guest_encoding = guest_encoding;
+            retVal->post_return = post_return;
+            return retVal;
+        }
     };
 
-    std::unique_ptr<InstanceContext> createInstanceContext(const HostTrap &trap, HostUnicodeConversion convert, const GuestRealloc &realloc);
+    inline std::unique_ptr<InstanceContext> createInstanceContext(const HostTrap &trap, HostUnicodeConversion convert, const GuestRealloc &realloc)
+    {
+        auto retVal = std::make_unique<InstanceContext>();
+        retVal->trap = trap;
+        retVal->convert = convert;
+        retVal->realloc = realloc;
+        return retVal;
+    }
 }
 
 #endif

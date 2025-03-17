@@ -7,12 +7,42 @@ namespace cmcpp
 {
     const bool DETERMINISTIC_PROFILE = false;
 
-    void trap_if(const CallContext &cx, bool condition, const char *message = nullptr) noexcept(false);
+    inline void trap_if(const CallContext &cx, bool condition, const char *message = nullptr) noexcept(false)
+    {
+        if (condition)
+        {
+            cx.trap(message);
+        }
+    }
 
-    bool_t convert_int_to_bool(uint8_t i);
+    inline bool_t convert_int_to_bool(uint8_t i)
+    {
+        return i > 0;
+    }
 
-    char_t convert_i32_to_char(const CallContext &cx, int32_t i);
-    int32_t char_to_i32(const CallContext &cx, const char_t &v);
+    inline char_t convert_i32_to_char(const CallContext &cx, int32_t i)
+    {
+        trap_if(cx, i >= 0x110000);
+        trap_if(cx, 0xD800 <= i && i <= 0xDFFF);
+        return i;
+    }
+
+    inline int32_t char_to_i32(const CallContext &cx, const char_t &v)
+    {
+        uint32_t retVal = v;
+        trap_if(cx, retVal >= 0x110000);
+        trap_if(cx, 0xD800 <= retVal && retVal <= 0xDFFF);
+        return retVal;
+    }
+
+    inline int32_t wrap_i64_to_i32(int64_t x)
+    {
+        if (x < std::numeric_limits<int32_t>::lowest() || x > std::numeric_limits<int32_t>::max())
+        {
+            return std::numeric_limits<int32_t>::lowest();
+        }
+        return static_cast<int32_t>(x);
+    }
 
     class CoreValueIter
     {
@@ -20,26 +50,22 @@ namespace cmcpp
         WasmValVector::const_iterator end;
 
     public:
-        CoreValueIter(const WasmValVector &v);
+        CoreValueIter(const WasmValVector &v) : it(v.begin()), end(v.end())
+        {
+        }
 
         template <FlatValue T>
         T next() const
         {
             return std::get<T>(next(WasmValTrait<T>::type));
         }
-        virtual WasmVal next(const WasmValType &t) const;
+        virtual WasmVal next(const WasmValType &t) const
+        {
+            assert(it != end);
+            return *it++;
+        }
     };
 
-    class CoerceValueIter : public CoreValueIter
-    {
-        const CoreValueIter &vi;
-        WasmValTypeVector &flat_types;
-
-    public:
-        CoerceValueIter(const CoreValueIter &vi, WasmValTypeVector &flat_types);
-
-        virtual WasmVal next(const WasmValType &t) const override;
-    };
 }
 
 #endif

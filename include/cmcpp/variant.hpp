@@ -12,6 +12,45 @@
 
 namespace cmcpp
 {
+    class CoerceValueIter : public CoreValueIter
+    {
+        const CoreValueIter &vi;
+        WasmValTypeVector &flat_types;
+
+    public:
+        CoerceValueIter(const CoreValueIter &vi, WasmValTypeVector &flat_types) : CoreValueIter({}), vi(vi), flat_types(flat_types)
+        {
+        }
+
+        virtual WasmVal next(const WasmValType &want) const override
+        {
+            auto have = flat_types.front();
+            flat_types.erase(flat_types.begin());
+            auto x = vi.next(have);
+            if (have == WasmValType::i32 && want == WasmValType::f32)
+            {
+                return float_::decode_i32_as_float(std::get<int32_t>(x));
+            }
+            else if (have == WasmValType::i64 && want == WasmValType::i32)
+            {
+                return wrap_i64_to_i32(std::get<int64_t>(x));
+            }
+            else if (have == WasmValType::i64 && want == WasmValType::f32)
+            {
+                return float_::decode_i32_as_float(wrap_i64_to_i32(std::get<int64_t>(x)));
+            }
+            else if (have == WasmValType::i64 && want == WasmValType::f64)
+            {
+                return float_::decode_i64_as_float(std::get<int64_t>(x));
+            }
+            else
+            {
+                assert(have == want);
+                return x;
+            }
+        }
+    };
+
     namespace variant
     {
         template <size_t N, Variant T>

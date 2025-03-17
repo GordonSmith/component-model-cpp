@@ -26,7 +26,8 @@
             "installDir": "${sourceDir}/build/stage/Debug",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "BUILD_TESTING": "ON"
+                "BUILD_TESTING": "ON",
+                "BUILD_SAMPLES": "ON"
             },
             "hidden": true
         },
@@ -34,7 +35,8 @@
             "name": "Release",
             "installDir": "${sourceDir}/build/stage/Release",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
+                "CMAKE_BUILD_TYPE": "Release",
+                "BUILD_SAMPLES": "ON"
             },
             "hidden": true
         },
@@ -42,7 +44,8 @@
             "name": "RelWithDebInfo",
             "installDir": "${sourceDir}/build/stage/RelWithDebInfo",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "BUILD_SAMPLES": "ON"
             },
             "hidden": true
         },
@@ -50,7 +53,8 @@
             "name": "MinSizeRel",
             "installDir": "${sourceDir}/build/stage/MinSizeRel",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "MinSizeRel"
+                "CMAKE_BUILD_TYPE": "MinSizeRel",
+                "BUILD_SAMPLES": "ON"
             },
             "hidden": true
         },

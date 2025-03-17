@@ -14,16 +14,16 @@
             "preLaunchTask": "CMake: build"
         },
         {
-            "name": "(win) component-model-tests",
-            "type": "cppvsdbg",
+            "name": "(gdb) wamr-sample",
+            "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/test/Debug/component-model-test.exe",
+            "program": "${workspaceFolder}/build/samples/wamr/wamr",
             "args": [],
-            "console": "integratedTerminal",
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
+            "externalConsole": false,
             "preLaunchTask": "CMake: build"
-        }
+        },
     ]
 }

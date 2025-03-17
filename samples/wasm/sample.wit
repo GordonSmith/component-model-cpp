@@ -1,0 +1,16 @@
+package example:sample;
+
+interface boolean {
+  and: func(a: bool, b: bool) -> bool;
+  // export or: func(a: bool, b: bool) -> bool;
+  // export not: func(a: bool) -> bool;
+}
+
+interface strings {
+  reverse: func(a: string) -> string;
+}
+
+world sample {
+  export boolean;
+  export strings;
+}
