@@ -64,6 +64,10 @@ namespace cmcpp
             assert(it != end);
             return *it++;
         }
+        bool done() const
+        {
+            return !(it != end);
+        }
     };
 
 }

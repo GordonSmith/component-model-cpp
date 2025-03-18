@@ -82,6 +82,10 @@ namespace cmcpp
         list_t<T> lift_flat(const CallContext &cx, const CoreValueIter &vi)
         {
             auto ptr = vi.next<int32_t>();
+            if (vi.done())
+            {
+                return cmcpp::list::load<T>(cx, ptr);
+            }
             auto length = vi.next<int32_t>();
             return load_from_range<T>(cx, ptr, length);
         }

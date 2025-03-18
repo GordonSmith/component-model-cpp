@@ -137,6 +137,7 @@ namespace cmcpp
         Option,
         Result,
         Flags,
+        Func,
         Own,
         Borrow,
         LAST
@@ -689,6 +690,21 @@ namespace cmcpp
     };
     template <typename T>
     concept Option = ValTrait<T>::type == ValType::Option;
+
+    //  Func  --------------------------------------------------------------------
+    template <Field R, Field... Args>
+    using func_t = std::function<R(Args...)>;
+    template <Field R, Field... Args>
+    struct ValTrait<func_t<R, Args...>>
+    {
+        static constexpr ValType type = ValType::Func;
+        using params_t = tuple_t<Args...>;
+        using result_t = R;
+        static constexpr auto flat_params_types = ValTrait<params_t>::flat_types;
+        static constexpr auto flat_result_types = ValTrait<result_t>::flat_types;
+    };
+    template <typename T>
+    concept Func = ValTrait<T>::type == ValType::Func;
 
     //  --------------------------------------------------------------------
 

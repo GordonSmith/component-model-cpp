@@ -1,16 +1,35 @@
 package example:sample;
 
-interface boolean {
+interface booleans {
   and: func(a: bool, b: bool) -> bool;
   // export or: func(a: bool, b: bool) -> bool;
   // export not: func(a: bool) -> bool;
+}
+
+interface floats {
+  add: func(a: f64, b: f64) -> f64;
 }
 
 interface strings {
   reverse: func(a: string) -> string;
 }
 
+interface tuples {
+  reverse: func(a: tuple<bool, string>) -> tuple<string, bool>;
+}
+
+interface lists {
+  variant v {
+    b(bool),
+    s(string)
+  }
+  filter-bool: func(a: list<v>) -> list<string>;
+}
+
 world sample {
-  export boolean;
+  export booleans;
+  export floats;
   export strings;
+  export tuples;
+  export lists;
 }
