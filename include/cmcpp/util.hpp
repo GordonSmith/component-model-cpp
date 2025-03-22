@@ -11,7 +11,7 @@ namespace cmcpp
     {
         if (condition)
         {
-            cx.trap(message);
+            cx.trap(message == nullptr ? "Unknown trap" : message);
         }
     }
 
@@ -31,7 +31,7 @@ namespace cmcpp
     {
         uint32_t retVal = v;
         trap_if(cx, retVal >= 0x110000);
-        trap_if(cx, 0xD800 <= retVal && retVal <= 0xDFFF);
+        trap_if(cx, 0xD800 <= retVal && retVal <= 0xDFFF, "Invalid char value");
         return retVal;
     }
 

@@ -4,3 +4,8 @@
 /vcpkg_installed
 /test/wasm/build*
 .DS_Store
+
+
+# Added by cargo
+
+/target

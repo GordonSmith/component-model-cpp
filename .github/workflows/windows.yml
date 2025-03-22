@@ -30,10 +30,27 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: actions/cache@v3
+      - name: Cache Cargo registry
+        if: always() 
+        uses: actions/cache@v3
         with:
-          path: "build/vcpkg_installed/**/*"
-          key: ${{ matrix.os }}-vcpkg_installed
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('./Cargo.lock') }}
+          path: ~/.cargo/registry
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache vcpkg registry
+        if: always() 
+        uses: actions/cache@v3
+        with:
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('./vcpkg*.json') }}
+          path: build/vcpkg_installed/**/*
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-
+
+      - name: Install rust dependencies
+        run: |
+          cargo install wasm-tools wit-bindgen-cli 
 
       - name: configure
         run: |

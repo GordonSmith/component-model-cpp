@@ -320,10 +320,6 @@ namespace cmcpp
         T lift_flat(const CallContext &cx, const CoreValueIter &vi)
         {
             auto ptr = vi.next<int32_t>();
-            if (vi.done())
-            {
-                return cmcpp::string::load<T>(cx, ptr);
-            }
             auto packed_length = vi.next<int32_t>();
             return load_from_range<T>(cx, ptr, packed_length);
         }
