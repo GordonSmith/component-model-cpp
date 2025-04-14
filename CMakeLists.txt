@@ -1,6 +1,9 @@
-cmake_minimum_required(VERSION 3.5...3.16)
+cmake_minimum_required(VERSION 3.5)
 
 project(cmcpp LANGUAGES CXX)
+
+option(BUILD_SAMPLES "Build samples" ON)
+option(BUILD_TESTING "Build tests" ON)
 
 find_package(Boost REQUIRED)
 

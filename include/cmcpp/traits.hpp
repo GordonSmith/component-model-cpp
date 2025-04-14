@@ -692,6 +692,9 @@ namespace cmcpp
     concept Option = ValTrait<T>::type == ValType::Option;
 
     //  Func  --------------------------------------------------------------------
+    constexpr int MAX_FLAT_PARAMS = 16;
+    constexpr int MAX_FLAT_RESULTS = 1;
+
     template <Field R, Field... Args>
     using func_t = std::function<R(Args...)>;
     template <Field R, Field... Args>

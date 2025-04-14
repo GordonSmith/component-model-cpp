@@ -43,12 +43,12 @@ public:
     }
 };
 
-inline std::unique_ptr<CallContext> createCallContext(Heap *heap, Encoding encoding)
+inline std::unique_ptr<LiftLowerContext> createLiftLowerContext(Heap *heap, Encoding encoding)
 {
     std::unique_ptr<cmcpp::InstanceContext> instanceContext = std::make_unique<cmcpp::InstanceContext>(trap, convert,
                                                                                                        [heap](int original_ptr, int original_size, int alignment, int new_size) -> int
                                                                                                        {
                                                                                                            return heap->realloc(original_ptr, original_size, alignment, new_size);
                                                                                                        });
-    return instanceContext->createCallContext(heap->memory, encoding);
+    return instanceContext->createLiftLowerContext(heap->memory, encoding);
 }

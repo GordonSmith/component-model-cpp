@@ -7,7 +7,7 @@ namespace cmcpp
 {
     const bool DETERMINISTIC_PROFILE = false;
 
-    inline void trap_if(const CallContext &cx, bool condition, const char *message = nullptr) noexcept(false)
+    inline void trap_if(const LiftLowerContext &cx, bool condition, const char *message = nullptr) noexcept(false)
     {
         if (condition)
         {
@@ -20,14 +20,14 @@ namespace cmcpp
         return i > 0;
     }
 
-    inline char_t convert_i32_to_char(const CallContext &cx, int32_t i)
+    inline char_t convert_i32_to_char(const LiftLowerContext &cx, int32_t i)
     {
         trap_if(cx, i >= 0x110000);
         trap_if(cx, 0xD800 <= i && i <= 0xDFFF);
         return i;
     }
 
-    inline int32_t char_to_i32(const CallContext &cx, const char_t &v)
+    inline int32_t char_to_i32(const LiftLowerContext &cx, const char_t &v)
     {
         uint32_t retVal = v;
         trap_if(cx, retVal >= 0x110000);

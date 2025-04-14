@@ -57,7 +57,7 @@ namespace cmcpp
         using variantT = typename std::variant_alternative<N, T>::type;
 
         template <Variant T>
-        void setNthValue(T &var, size_t case_index, const CallContext &cx, uint32_t ptr)
+        void setNthValue(T &var, size_t case_index, const LiftLowerContext &cx, uint32_t ptr)
         {
             constexpr size_t variantSize = std::variant_size<T>::value;
 
@@ -75,7 +75,7 @@ namespace cmcpp
         }
 
         template <Variant T>
-        T load(const CallContext &cx, uint32_t ptr)
+        T load(const LiftLowerContext &cx, uint32_t ptr)
         {
             T retVal;
             uint32_t disc_size = ValTrait<typename ValTrait<T>::discriminant_type>::size;
@@ -89,7 +89,7 @@ namespace cmcpp
 
         struct StoreVisitor
         {
-            CallContext &cx;
+            LiftLowerContext &cx;
             uint32_t ptr;
 
             template <typename T>
@@ -100,7 +100,7 @@ namespace cmcpp
         };
 
         template <Variant T>
-        void store(CallContext &cx, const T &v, uint32_t ptr)
+        void store(LiftLowerContext &cx, const T &v, uint32_t ptr)
         {
             auto case_index = v.index();
             uint32_t disc_size = ValTrait<typename ValTrait<T>::discriminant_type>::size;
@@ -112,7 +112,7 @@ namespace cmcpp
 
         struct LowerFlatVisitor
         {
-            CallContext &cx;
+            LiftLowerContext &cx;
             template <typename T>
             WasmValVector operator()(T &&arg) const
             {
@@ -121,7 +121,7 @@ namespace cmcpp
         };
 
         template <Variant T>
-        WasmValVector lower_flat(CallContext &cx, const T &v)
+        WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
         {
             auto case_index = v.index();
             WasmValTypeVector flat_types(ValTrait<T>::flat_types.begin(), ValTrait<T>::flat_types.end());
@@ -172,7 +172,7 @@ namespace cmcpp
         }
 
         template <Variant T, std::size_t Index = 0>
-        T lift_flat_helper(const CallContext &cx, const CoreValueIter &vi, int32_t case_index)
+        T lift_flat_helper(const LiftLowerContext &cx, const CoreValueIter &vi, int32_t case_index)
         {
             if (case_index == Index)
             {
@@ -192,7 +192,7 @@ namespace cmcpp
         }
 
         template <Variant T>
-        inline T lift_flat(const CallContext &cx, const CoreValueIter &vi)
+        inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
         {
             WasmValTypeVector flat_types(ValTrait<T>::flat_types.begin(), ValTrait<T>::flat_types.end());
             auto top = flat_types.front();
@@ -206,19 +206,19 @@ namespace cmcpp
     }
 
     template <Variant T>
-    inline void store(CallContext &cx, const T &v, uint32_t ptr)
+    inline void store(LiftLowerContext &cx, const T &v, uint32_t ptr)
     {
         variant::store(cx, v, ptr);
     }
 
     template <Variant T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v)
+    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
     {
         return variant::lower_flat(cx, v);
     }
 
     template <Option T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v)
+    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
     {
         using V = variant_t<bool_t, typename ValTrait<T>::inner_type>;
         if (v.has_value())
@@ -233,19 +233,19 @@ namespace cmcpp
     }
 
     template <Variant T>
-    inline T load(const CallContext &cx, uint32_t ptr)
+    inline T load(const LiftLowerContext &cx, uint32_t ptr)
     {
         return variant::load<T>(cx, ptr);
     }
 
     template <Variant T>
-    inline T lift_flat(const CallContext &cx, const CoreValueIter &vi)
+    inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
     {
         return variant::lift_flat<T>(cx, vi);
     }
 
     template <Option T>
-    inline T lift_flat(const CallContext &cx, const CoreValueIter &vi)
+    inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
     {
         T retVal;
         using V = variant_t<bool_t, typename ValTrait<T>::inner_type>;

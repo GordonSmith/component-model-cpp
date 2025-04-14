@@ -17,7 +17,7 @@ namespace cmcpp
     {
 
         template <Tuple T>
-        void store(const CallContext &cx, const T &v, uint32_t ptr)
+        void store(const LiftLowerContext &cx, const T &v, uint32_t ptr)
         {
             auto process_field = [&](auto &&field)
             {
@@ -31,7 +31,7 @@ namespace cmcpp
         }
 
         template <Tuple T>
-        WasmValVector lower_flat_tuple(CallContext &cx, const T &v)
+        WasmValVector lower_flat_tuple(LiftLowerContext &cx, const T &v)
         {
             WasmValVector retVal = {};
             auto process_field = [&](auto &&field)
@@ -46,7 +46,7 @@ namespace cmcpp
         }
 
         template <Tuple T>
-        T load(const CallContext &cx, uint32_t ptr)
+        T load(const LiftLowerContext &cx, uint32_t ptr)
         {
             T result;
             auto process_field = [&](auto &&field)
@@ -62,7 +62,7 @@ namespace cmcpp
         }
 
         template <Tuple T>
-        inline T lift_flat_tuple(const CallContext &cx, const CoreValueIter &vi)
+        inline T lift_flat_tuple(const LiftLowerContext &cx, const CoreValueIter &vi)
         {
             T result;
             auto process_field = [&](auto &&field)
@@ -77,38 +77,38 @@ namespace cmcpp
     }
 
     template <Tuple T>
-    inline void store(CallContext &cx, const T &v, uint32_t ptr)
+    inline void store(LiftLowerContext &cx, const T &v, uint32_t ptr)
     {
         tuple::store(cx, v, ptr);
     }
 
     template <Tuple T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v)
+    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
     {
         return tuple::lower_flat_tuple(cx, v);
     }
 
     template <Record T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v)
+    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
     {
         return tuple::lower_flat_tuple(cx, boost::pfr::structure_to_tuple((typename ValTrait<T>::inner_type)v));
     }
 
     template <Tuple T>
-    inline T load(const CallContext &cx, uint32_t ptr)
+    inline T load(const LiftLowerContext &cx, uint32_t ptr)
     {
         return tuple::load<T>(cx, ptr);
     }
 
     template <Tuple T>
-    inline T lift_flat(const CallContext &cx, const CoreValueIter &vi)
+    inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
     {
         auto x = tuple::lift_flat_tuple<T>(cx, vi);
         return x;
     }
 
     template <Record T>
-    inline T lift_flat(const CallContext &cx, const CoreValueIter &vi)
+    inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
     {
         using TupleType = decltype(boost::pfr::structure_to_tuple(std::declval<typename ValTrait<T>::inner_type>()));
         TupleType x = tuple::lift_flat_tuple<TupleType>(cx, vi);

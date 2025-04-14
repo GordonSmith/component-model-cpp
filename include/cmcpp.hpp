@@ -10,5 +10,6 @@
 #include <cmcpp/variant.hpp>
 #include <cmcpp/lower.hpp>
 #include <cmcpp/lift.hpp>
+#include <cmcpp/func.hpp>
 
 #endif // CMCPP_HPP

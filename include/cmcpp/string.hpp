@@ -11,74 +11,74 @@ namespace cmcpp
     {
         const uint32_t MAX_STRING_BYTE_LENGTH = (1U << 31) - 1;
 
-        inline std::pair<uint32_t, uint32_t> store_string_copy(CallContext &cx, const void *src, uint32_t src_code_units, uint32_t dst_code_unit_size, uint32_t dst_alignment, Encoding dst_encoding)
+        inline std::pair<uint32_t, uint32_t> store_string_copy(LiftLowerContext &cx, const void *src, uint32_t src_code_units, uint32_t dst_code_unit_size, uint32_t dst_alignment, Encoding dst_encoding)
         {
             uint32_t dst_byte_length = dst_code_unit_size * src_code_units;
             trap_if(cx, dst_byte_length > MAX_STRING_BYTE_LENGTH);
             if (dst_byte_length > 0)
             {
-                uint32_t ptr = cx.realloc(0, 0, dst_alignment, dst_byte_length);
+                uint32_t ptr = cx.opts.realloc(0, 0, dst_alignment, dst_byte_length);
                 trap_if(cx, ptr != align_to(ptr, dst_alignment));
-                trap_if(cx, ptr + dst_byte_length > cx.memory.size());
-                std::memcpy(&cx.memory[ptr], src, dst_byte_length);
+                trap_if(cx, ptr + dst_byte_length > cx.opts.memory.size());
+                std::memcpy(&cx.opts.memory[ptr], src, dst_byte_length);
                 return std::make_pair(ptr, src_code_units);
             }
             return std::make_pair(0, 0);
         }
 
-        inline std::pair<uint32_t, uint32_t> store_string_to_utf8(CallContext &cx, Encoding src_encoding, const void *src, uint32_t src_byte_len, uint32_t worst_case_size)
+        inline std::pair<uint32_t, uint32_t> store_string_to_utf8(LiftLowerContext &cx, Encoding src_encoding, const void *src, uint32_t src_byte_len, uint32_t worst_case_size)
         {
             assert(worst_case_size <= MAX_STRING_BYTE_LENGTH);
-            uint32_t ptr = cx.realloc(0, 0, 1, worst_case_size);
-            trap_if(cx, ptr + src_byte_len > cx.memory.size());
-            auto encoded = cx.convert(&cx.memory[ptr], worst_case_size, src, src_byte_len, src_encoding, Encoding::Utf8);
+            uint32_t ptr = cx.opts.realloc(0, 0, 1, worst_case_size);
+            trap_if(cx, ptr + src_byte_len > cx.opts.memory.size());
+            auto encoded = cx.convert(&cx.opts.memory[ptr], worst_case_size, src, src_byte_len, src_encoding, Encoding::Utf8);
             if (worst_case_size > encoded.second)
             {
-                ptr = cx.realloc(ptr, worst_case_size, 1, encoded.second);
-                assert(ptr + encoded.second <= cx.memory.size());
+                ptr = cx.opts.realloc(ptr, worst_case_size, 1, encoded.second);
+                assert(ptr + encoded.second <= cx.opts.memory.size());
             }
             return std::make_pair(ptr, encoded.second);
         }
 
-        inline std::pair<uint32_t, uint32_t> store_utf16_to_utf8(CallContext &cx, const void *src, uint32_t src_code_units)
+        inline std::pair<uint32_t, uint32_t> store_utf16_to_utf8(LiftLowerContext &cx, const void *src, uint32_t src_code_units)
         {
             uint32_t worst_case_size = src_code_units * 3;
             return store_string_to_utf8(cx, Encoding::Utf16, src, src_code_units * 2, worst_case_size);
         }
 
-        inline std::pair<uint32_t, uint32_t> store_latin1_to_utf8(CallContext &cx, const void *src, uint32_t src_code_units)
+        inline std::pair<uint32_t, uint32_t> store_latin1_to_utf8(LiftLowerContext &cx, const void *src, uint32_t src_code_units)
         {
             uint32_t worst_case_size = src_code_units * 2;
             return store_string_to_utf8(cx, Encoding::Latin1, src, src_code_units, worst_case_size);
         }
 
-        inline std::pair<uint32_t, uint32_t> store_utf8_to_utf16(CallContext &cx, const void *src, uint32_t src_code_units)
+        inline std::pair<uint32_t, uint32_t> store_utf8_to_utf16(LiftLowerContext &cx, const void *src, uint32_t src_code_units)
         {
             uint32_t worst_case_size = 2 * src_code_units;
             trap_if(cx, worst_case_size > MAX_STRING_BYTE_LENGTH);
-            uint32_t ptr = cx.realloc(0, 0, 2, worst_case_size);
+            uint32_t ptr = cx.opts.realloc(0, 0, 2, worst_case_size);
             trap_if(cx, ptr != align_to(ptr, 2));
-            trap_if(cx, ptr + worst_case_size > cx.memory.size());
-            auto encoded = cx.convert(&cx.memory[ptr], worst_case_size, src, src_code_units, Encoding::Utf8, Encoding::Utf16);
+            trap_if(cx, ptr + worst_case_size > cx.opts.memory.size());
+            auto encoded = cx.convert(&cx.opts.memory[ptr], worst_case_size, src, src_code_units, Encoding::Utf8, Encoding::Utf16);
             if (encoded.second < worst_case_size)
             {
-                ptr = cx.realloc(ptr, worst_case_size, 2, encoded.second);
+                ptr = cx.opts.realloc(ptr, worst_case_size, 2, encoded.second);
                 assert(ptr == align_to(ptr, 2));
-                assert(ptr + encoded.second <= cx.memory.size());
+                assert(ptr + encoded.second <= cx.opts.memory.size());
             }
             uint32_t code_units = static_cast<uint32_t>(encoded.second / 2);
             return std::make_pair(ptr, code_units);
         }
 
-        inline std::pair<uint32_t, uint32_t> store_probably_utf16_to_latin1_or_utf16(CallContext &cx, const void *src, uint32_t src_code_units)
+        inline std::pair<uint32_t, uint32_t> store_probably_utf16_to_latin1_or_utf16(LiftLowerContext &cx, const void *src, uint32_t src_code_units)
         {
             uint32_t src_byte_length = 2 * src_code_units;
             trap_if(cx, src_byte_length > MAX_STRING_BYTE_LENGTH);
-            uint32_t ptr = cx.realloc(0, 0, 2, src_byte_length);
+            uint32_t ptr = cx.opts.realloc(0, 0, 2, src_byte_length);
             trap_if(cx, ptr != align_to(ptr, 2));
-            trap_if(cx, ptr + src_byte_length > cx.memory.size());
-            auto encoded = cx.convert(&cx.memory[ptr], src_byte_length, src, src_code_units, Encoding::Utf16, Encoding::Utf16);
-            const uint8_t *enc_src_ptr = &cx.memory[ptr];
+            trap_if(cx, ptr + src_byte_length > cx.opts.memory.size());
+            auto encoded = cx.convert(&cx.opts.memory[ptr], src_byte_length, src, src_code_units, Encoding::Utf16, Encoding::Utf16);
+            const uint8_t *enc_src_ptr = &cx.opts.memory[ptr];
             if (std::any_of(enc_src_ptr, enc_src_ptr + encoded.second,
                             [](unsigned c)
                             { return c >= (1 << 8); }))
@@ -88,14 +88,14 @@ namespace cmcpp
             }
             uint32_t latin1_size = static_cast<uint32_t>(encoded.second / 2);
             for (uint32_t i = 0; i < latin1_size; ++i)
-                cx.memory[ptr + i] = cx.memory[ptr + 2 * i];
-            ptr = cx.realloc(ptr, src_byte_length, 1, latin1_size);
-            trap_if(cx, ptr + latin1_size > cx.memory.size());
+                cx.opts.memory[ptr + i] = cx.opts.memory[ptr + 2 * i];
+            ptr = cx.opts.realloc(ptr, src_byte_length, 1, latin1_size);
+            trap_if(cx, ptr + latin1_size > cx.opts.memory.size());
             return std::make_pair(ptr, latin1_size);
         }
 
         template <String T>
-        std::pair<uint32_t, uint32_t> store_string_to_latin1_or_utf16(CallContext &cx, const T &v)
+        std::pair<uint32_t, uint32_t> store_string_to_latin1_or_utf16(LiftLowerContext &cx, const T &v)
         {
             Encoding src_encoding = ValTrait<T>::encoding;
             const auto *src = v.data();
@@ -103,16 +103,16 @@ namespace cmcpp
             const size_t src_byte_length = src_code_units * ValTrait<T>::char_size;
 
             assert(src_code_units <= MAX_STRING_BYTE_LENGTH);
-            uint32_t ptr = cx.realloc(0, 0, 2, src_byte_length);
+            uint32_t ptr = cx.opts.realloc(0, 0, 2, src_byte_length);
             trap_if(cx, ptr != align_to(ptr, 2));
-            trap_if(cx, ptr + src_code_units > cx.memory.size());
+            trap_if(cx, ptr + src_code_units > cx.opts.memory.size());
             uint32_t dst_byte_length = 0;
             for (unsigned usv : v)
             {
                 // Optimistically assume the character will fit in a single byte (Latin1)
                 if (usv < (1 << 8))
                 {
-                    cx.memory[ptr + dst_byte_length] = static_cast<uint32_t>(usv);
+                    cx.opts.memory[ptr + dst_byte_length] = static_cast<uint32_t>(usv);
                     dst_byte_length += 1;
                 }
                 else
@@ -120,18 +120,18 @@ namespace cmcpp
                     // If it doesn't, convert it to a UTF-16 sequence
                     uint32_t worst_case_size = 2 * src_code_units;
                     trap_if(cx, worst_case_size > MAX_STRING_BYTE_LENGTH, "Worst case size exceeds maximum string byte length");
-                    ptr = cx.realloc(ptr, src_byte_length, 2, worst_case_size);
+                    ptr = cx.opts.realloc(ptr, src_byte_length, 2, worst_case_size);
                     trap_if(cx, ptr != align_to(ptr, 2), "Pointer misaligned");
-                    trap_if(cx, ptr + worst_case_size > cx.memory.size(), "Out of bounds access");
+                    trap_if(cx, ptr + worst_case_size > cx.opts.memory.size(), "Out of bounds access");
 
 #ifdef SIMPLE_UTF16_CONVERSION
                     // Convert entire string to UTF-16 in one go, ignoring the previously computed data  ---
-                    auto encoded = cx.convert(&cx.memory[ptr], worst_case_size, src, src_code_units * ValTrait<T>::char_size, src_encoding, Encoding::Utf16);
+                    auto encoded = cx.convert(&cx.opts.memory[ptr], worst_case_size, src, src_code_units * ValTrait<T>::char_size, src_encoding, Encoding::Utf16);
                     if (encoded.second < worst_case_size)
                     {
-                        ptr = cx.realloc(ptr, worst_case_size, 2, encoded.second * 2);
+                        ptr = cx.opts.realloc(ptr, worst_case_size, 2, encoded.second * 2);
                         trap_if(cx, ptr != align_to(ptr, 2), "Pointer misaligned");
-                        trap_if(cx, ptr + encoded.second > cx.memory.size(), "Out of bounds access");
+                        trap_if(cx, ptr + encoded.second > cx.opts.memory.size(), "Out of bounds access");
                     }
                     uint32_t tagged_code_units = static_cast<uint32_t>(encoded.second / 2) | UTF16_TAG;
                     return std::make_pair(ptr, tagged_code_units);
@@ -139,8 +139,8 @@ namespace cmcpp
                     // Pad out existing non unicode characters  ---
                     for (signed j = dst_byte_length - 1; j >= 0; --j)
                     {
-                        cx.memory[ptr + 2 * j] = cx.memory[ptr + j];
-                        cx.memory[ptr + 2 * j + 1] = 0;
+                        cx.opts.memory[ptr + 2 * j] = cx.opts.memory[ptr + j];
+                        cx.opts.memory[ptr + 2 * j + 1] = 0;
                     }
 
                     // Convert the remaining portion  ---
@@ -148,7 +148,7 @@ namespace cmcpp
                     uint32_t destLen = worst_case_size - (2 * dst_byte_length);
                     void *srcPtr = (char *)src + dst_byte_length * ValTrait<T>::char_size;
                     uint32_t srcLen = (src_code_units - dst_byte_length) * ValTrait<T>::char_size;
-                    auto encoded = cx.convert(&cx.memory[destPtr], destLen, srcPtr, srcLen, src_encoding, Encoding::Utf16);
+                    auto encoded = cx.convert(&cx.opts.memory[destPtr], destLen, srcPtr, srcLen, src_encoding, Encoding::Utf16);
 
                     // Add special tag to indicate the string is a UTF-16 string  ---
                     uint32_t tagged_code_units = static_cast<uint32_t>(dst_byte_length + encoded.second / 2) | UTF16_TAG;
@@ -158,15 +158,15 @@ namespace cmcpp
             }
             if (dst_byte_length < src_code_units)
             {
-                ptr = cx.realloc(ptr, src_code_units, 2, dst_byte_length);
+                ptr = cx.opts.realloc(ptr, src_code_units, 2, dst_byte_length);
                 trap_if(cx, ptr != align_to(ptr, 2), "Pointer misaligned");
-                trap_if(cx, ptr + dst_byte_length > cx.memory.size(), "Out of bounds access");
+                trap_if(cx, ptr + dst_byte_length > cx.opts.memory.size(), "Out of bounds access");
             }
             return std::make_pair(ptr, dst_byte_length);
         }
 
         template <String T>
-        std::pair<offset, bytes> store_into_range(CallContext &cx, const T &v)
+        std::pair<offset, bytes> store_into_range(LiftLowerContext &cx, const T &v)
         {
             Encoding src_encoding = ValTrait<T>::encoding;
             auto *src = v.data();
@@ -193,7 +193,7 @@ namespace cmcpp
                 src_code_units = src_tagged_code_units;
             }
 
-            switch (cx.guest_encoding)
+            switch (cx.opts.string_encoding)
             {
             case Encoding::Latin1:
                 cx.trap("Invalid guest encoding, must be UTF8, UTF16 or Latin1/UTF16");
@@ -242,7 +242,7 @@ namespace cmcpp
         }
 
         template <String T>
-        inline void store(CallContext &cx, const T &v, uint32_t ptr)
+        inline void store(LiftLowerContext &cx, const T &v, uint32_t ptr)
         {
             auto [begin, tagged_code_units] = store_into_range(cx, v);
             integer::store(cx, begin, ptr);
@@ -250,19 +250,19 @@ namespace cmcpp
         }
 
         template <String T>
-        inline WasmValVector lower_flat(CallContext &cx, const T &v)
+        inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
         {
             auto [ptr, packed_length] = store_into_range(cx, v);
             return {(int32_t)ptr, (int32_t)packed_length};
         }
 
         template <String T>
-        T load_from_range(const CallContext &cx, uint32_t ptr, uint32_t tagged_code_units)
+        T load_from_range(const LiftLowerContext &cx, uint32_t ptr, uint32_t tagged_code_units)
         {
             uint32_t alignment = 0;
             uint32_t byte_length = 0;
             Encoding encoding = Encoding::Utf8;
-            switch (cx.guest_encoding)
+            switch (cx.opts.string_encoding)
             {
             case Encoding::Utf8:
                 alignment = 1;
@@ -291,7 +291,7 @@ namespace cmcpp
                 trap_if(cx, false);
             }
             trap_if(cx, ptr != align_to(ptr, alignment));
-            trap_if(cx, ptr + byte_length > cx.memory.size());
+            trap_if(cx, ptr + byte_length > cx.opts.memory.size());
             size_t char_size = ValTrait<T>::char_size;
             size_t host_byte_length = byte_length * 2;
             T retVal;
@@ -300,7 +300,7 @@ namespace cmcpp
                 retVal.encoding = encoding;
             }
             retVal.resize(host_byte_length);
-            auto decoded = cx.convert(retVal.data(), host_byte_length, (void *)&cx.memory[ptr], byte_length, encoding, ValTrait<T>::encoding == Encoding::Latin1_Utf16 ? encoding : ValTrait<T>::encoding);
+            auto decoded = cx.convert(retVal.data(), host_byte_length, (void *)&cx.opts.memory[ptr], byte_length, encoding, ValTrait<T>::encoding == Encoding::Latin1_Utf16 ? encoding : ValTrait<T>::encoding);
             if ((decoded.second / char_size) < host_byte_length)
             {
                 retVal.resize(decoded.second / char_size);
@@ -309,7 +309,7 @@ namespace cmcpp
         }
 
         template <String T>
-        T load(const CallContext &cx, offset offset)
+        T load(const LiftLowerContext &cx, offset offset)
         {
             auto begin = integer::load<uint32_t>(cx, offset);
             auto tagged_code_units = integer::load<uint32_t>(cx, offset + 4);
@@ -317,7 +317,7 @@ namespace cmcpp
         }
 
         template <String T>
-        T lift_flat(const CallContext &cx, const CoreValueIter &vi)
+        T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
         {
             auto ptr = vi.next<int32_t>();
             auto packed_length = vi.next<int32_t>();
@@ -326,25 +326,25 @@ namespace cmcpp
     }
 
     template <String T>
-    inline void store(CallContext &cx, const T &v, uint32_t ptr)
+    inline void store(LiftLowerContext &cx, const T &v, uint32_t ptr)
     {
         string::store(cx, v, ptr);
     }
 
     template <String T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v)
+    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
     {
         return string::lower_flat<T>(cx, v);
     }
 
     template <String T>
-    inline T load(const CallContext &cx, uint32_t ptr)
+    inline T load(const LiftLowerContext &cx, uint32_t ptr)
     {
         return string::load<T>(cx, ptr);
     }
 
     template <String T>
-    inline T lift_flat(const CallContext &cx, const CoreValueIter &vi)
+    inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
     {
         return string::lift_flat<T>(cx, vi);
     }

@@ -17,7 +17,7 @@ using namespace cmcpp;
 TEST_CASE("Boolean")
 {
     Heap heap(1024 * 1024);
-    auto cx = createCallContext(&heap, Encoding::Utf8);
+    auto cx = createLiftLowerContext(&heap, Encoding::Utf8);
     auto v = lower_flat(*cx, true);
     auto b = lift_flat<bool_t>(*cx, v);
     CHECK(b == true);
@@ -31,7 +31,7 @@ const char_t bad_chars[] = {0xD800, 0xDFFF, 0x110000, 0xFFFFFFFF};
 TEST_CASE("Char")
 {
     Heap heap(1024 * 1024);
-    auto cx = createCallContext(&heap, Encoding::Utf8);
+    auto cx = createLiftLowerContext(&heap, Encoding::Utf8);
     for (auto c : chars)
     {
         auto v = lower_flat(*cx, c);
@@ -54,7 +54,7 @@ TEST_CASE("Char")
 }
 
 template <typename T>
-void test_numeric(const std::unique_ptr<CallContext> &cx, T v = 42)
+void test_numeric(const std::unique_ptr<LiftLowerContext> &cx, T v = 42)
 {
     auto flat_v = lower_flat<T>(*cx, v);
     auto b = lift_flat<T>(*cx, flat_v);
@@ -72,7 +72,7 @@ void test_numeric(const std::unique_ptr<CallContext> &cx, T v = 42)
 TEST_CASE("Signed Integer")
 {
     Heap heap(1024 * 1024);
-    auto cx = createCallContext(&heap, Encoding::Utf8);
+    auto cx = createLiftLowerContext(&heap, Encoding::Utf8);
     test_numeric<int8_t>(cx);
     test_numeric<int16_t>(cx);
     test_numeric<int32_t>(cx);
@@ -86,7 +86,7 @@ TEST_CASE("Signed Integer")
 TEST_CASE("Unigned Integer")
 {
     Heap heap(1024 * 1024);
-    auto cx = createCallContext(&heap, Encoding::Utf8);
+    auto cx = createLiftLowerContext(&heap, Encoding::Utf8);
     test_numeric<uint8_t>(cx);
     test_numeric<uint16_t>(cx);
     test_numeric<uint32_t>(cx);
@@ -96,7 +96,7 @@ TEST_CASE("Unigned Integer")
 TEST_CASE("Float")
 {
     Heap heap(1024 * 1024);
-    auto cx = createCallContext(&heap, Encoding::Utf8);
+    auto cx = createLiftLowerContext(&heap, Encoding::Utf8);
     test_numeric<float32_t>(cx);
     test_numeric<float64_t>(cx);
 
@@ -182,7 +182,7 @@ const char16_t *const boundary_test_u16strings[] = {
 TEST_CASE("String-Utf16")
 {
     Heap heap(1024 * 1024);
-    auto cx = createCallContext(&heap, Encoding::Utf16);
+    auto cx = createLiftLowerContext(&heap, Encoding::Utf16);
     u16string_t hw16 = u"Hello World!";
     auto v = lower_flat(*cx, hw16);
     auto hw16_ret = lift_flat<u16string_t>(*cx, v);
@@ -197,7 +197,7 @@ TEST_CASE("String-Utf16")
 TEST_CASE("String-Utf8")
 {
     Heap heap(1024 * 1024);
-    auto cx = createCallContext(&heap, Encoding::Utf8);
+    auto cx = createLiftLowerContext(&heap, Encoding::Utf8);
     string_t hw = "Hello World!";
     auto v = lower_flat(*cx, hw);
     auto hw_ret = lift_flat<string_t>(*cx, v);
@@ -212,7 +212,7 @@ TEST_CASE("String-Utf8")
 TEST_CASE("String-Latin1_Utf16")
 {
     Heap heap(1024 * 1024);
-    auto cx = createCallContext(&heap, Encoding::Latin1_Utf16);
+    auto cx = createLiftLowerContext(&heap, Encoding::Latin1_Utf16);
     string_t hw = "Hello World!";
     auto v = lower_flat(*cx, hw);
     auto hw_ret = lift_flat<string_t>(*cx, v);
@@ -245,7 +245,7 @@ TEST_CASE("String-Latin1_Utf16")
 void testString(Encoding guestEncoding)
 {
     Heap heap(1024 * 1024);
-    auto cx = createCallContext(&heap, guestEncoding);
+    auto cx = createLiftLowerContext(&heap, guestEncoding);
 
     for (auto hw : unicode_test_strings)
     {
@@ -299,7 +299,7 @@ TEST_CASE("String-complex")
 TEST_CASE("List")
 {
     Heap heap(1024 * 1024);
-    auto cx = createCallContext(&heap, Encoding::Utf8);
+    auto cx = createLiftLowerContext(&heap, Encoding::Utf8);
 
     list_t<string_t> strings = {"Hello", "World", "!"};
     auto v = lower_flat(*cx, strings);
@@ -313,7 +313,7 @@ TEST_CASE("List")
 TEST_CASE("List-Latin1_Utf16")
 {
     Heap heap(1024 * 1024);
-    auto cx = createCallContext(&heap, Encoding::Latin1_Utf16);
+    auto cx = createLiftLowerContext(&heap, Encoding::Latin1_Utf16);
     list_t<string_t> strings = {"Hello", "World", "!"};
     auto v = lower_flat(*cx, strings);
     auto strs = lift_flat<list_t<string_t>>(*cx, v);
@@ -333,7 +333,7 @@ TEST_CASE("List-Latin1_Utf16")
 TEST_CASE("Flags")
 {
     Heap heap(1024 * 1024);
-    auto cx = createCallContext(&heap, Encoding::Latin1_Utf16);
+    auto cx = createLiftLowerContext(&heap, Encoding::Latin1_Utf16);
     using MyFlags = flags_t<"a", "bb", "ccc">;
     CHECK(ValTrait<MyFlags>::size == 1);
     CHECK(MyFlags::labelsSize == 3);
@@ -378,7 +378,7 @@ TEST_CASE("Flags")
 TEST_CASE("Tuples")
 {
     Heap heap(1024 * 1024);
-    auto cx = createCallContext(&heap, Encoding::Utf8);
+    auto cx = createLiftLowerContext(&heap, Encoding::Utf8);
 
     using R0 = tuple_t<uint16_t, uint32_t>;
     auto flatTypes = ValTrait<R0>::flat_types;
@@ -407,7 +407,7 @@ TEST_CASE("Tuples")
 TEST_CASE("Records")
 {
     Heap heap(1024 * 1024);
-    auto cx = createCallContext(&heap, Encoding::Utf8);
+    auto cx = createLiftLowerContext(&heap, Encoding::Utf8);
 
     struct PersonStruct
     {
@@ -487,7 +487,7 @@ TEST_CASE("Records")
 TEST_CASE("Variant")
 {
     Heap heap(1024 * 1024);
-    auto cx = createCallContext(&heap, Encoding::Utf8);
+    auto cx = createLiftLowerContext(&heap, Encoding::Utf8);
 
     using Vb = variant_t<bool_t, uint32_t>;
     Vb vb = static_cast<uint32_t>(42);
@@ -574,7 +574,7 @@ TEST_CASE("Variant")
 TEST_CASE("Option")
 {
     Heap heap(1024 * 1024);
-    auto cx = createCallContext(&heap, Encoding::Utf8);
+    auto cx = createLiftLowerContext(&heap, Encoding::Utf8);
 
     using O0 = option_t<uint32_t>;
     O0 o0 = 42;
@@ -597,4 +597,16 @@ TEST_CASE("Option")
     auto vv3 = lower_flat(*cx, o3);
     auto v03 = lift_flat<O1>(*cx, vv3);
     CHECK(o3 == v03);
+}
+
+TEST_CASE("Func")
+{
+    Heap heap(1024 * 1024);
+    auto cx = createLiftLowerContext(&heap, Encoding::Utf8);
+
+    using MyFunc = func_t<uint32_t, string_t, list_t<string_t>>;
+    MyFunc f = [](string_t b, list_t<string_t> c) -> uint32_t
+    {
+        return 42;
+    };
 }

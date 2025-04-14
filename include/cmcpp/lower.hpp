@@ -16,21 +16,21 @@
 namespace cmcpp
 {
     template <Boolean T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v)
+    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
     {
         using WasmValType = WasmValTypeTrait<ValTrait<T>::flat_types[0]>::type;
         return {static_cast<WasmValType>(v)};
     }
 
     template <Char T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v)
+    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
     {
         using WasmValType = WasmValTypeTrait<ValTrait<T>::flat_types[0]>::type;
         return {static_cast<WasmValType>(char_to_i32(cx, v))};
     }
 
     template <UnsignedInteger T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v)
+    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
     {
         using WasmValType = WasmValTypeTrait<ValTrait<T>::flat_types[0]>::type;
         WasmValType fv = v;
@@ -38,31 +38,31 @@ namespace cmcpp
     }
 
     template <SignedInteger T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v);
+    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v);
 
     template <Float T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v);
+    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v);
 
     template <String T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v);
+    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v);
 
     template <List T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v);
+    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v);
 
     template <Flags T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v);
+    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v);
 
     template <Tuple T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v);
+    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v);
 
     template <Record T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v);
+    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v);
 
     template <Variant T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v);
+    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v);
 
     template <Option T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v);
+    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v);
 }
 
 #endif

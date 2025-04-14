@@ -43,7 +43,7 @@ struct PersonEx : Person
 TEST_CASE("Records")
 {
     Heap heap(1024 * 1024);
-    auto cx = createCallContext(&heap, Encoding::Utf8);
+    auto cx = createLiftLowerContext(&heap, Encoding::Utf8);
 
     PersonEx p = {"John", 42, 200, "123 Main St."};
     auto x = boost::pfr::structure_to_tuple<Person>(p);

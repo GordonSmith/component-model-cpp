@@ -50,20 +50,20 @@ namespace cmcpp
         }
 
         template <typename T>
-        inline void store(CallContext &cx, const T &v, offset ptrnbytes)
+        inline void store(LiftLowerContext &cx, const T &v, offset ptrnbytes)
         {
             cx.trap("store of unsupported type");
             throw std::runtime_error("trap not terminating execution");
         }
 
         template <>
-        inline void store<float32_t>(CallContext &cx, const float32_t &v, offset ptr)
+        inline void store<float32_t>(LiftLowerContext &cx, const float32_t &v, offset ptr)
         {
             integer::store(cx, encode_float_as_i32(v), ptr);
         }
 
         template <>
-        inline void store<float64_t>(CallContext &cx, const float64_t &v, offset ptr)
+        inline void store<float64_t>(LiftLowerContext &cx, const float64_t &v, offset ptr)
         {
             integer::store(cx, encode_float_as_i64(v), ptr);
         }
@@ -75,45 +75,45 @@ namespace cmcpp
         }
 
         template <typename T>
-        T load(const CallContext &cx, offset ptr)
+        T load(const LiftLowerContext &cx, offset ptr)
         {
             cx.trap("load of unsupported type");
             throw std::runtime_error("trap not terminating execution");
         }
 
         template <>
-        inline float32_t load<float32_t>(const CallContext &cx, offset ptr)
+        inline float32_t load<float32_t>(const LiftLowerContext &cx, offset ptr)
         {
             return decode_i32_as_float(integer::load<int32_t>(cx, ptr));
         }
 
         template <>
-        inline float64_t load<float64_t>(const CallContext &cx, offset ptr)
+        inline float64_t load<float64_t>(const LiftLowerContext &cx, offset ptr)
         {
             return decode_i64_as_float(integer::load<int64_t>(cx, ptr));
         }
     }
 
     template <Float T>
-    inline void store(CallContext &cx, const T &v, uint32_t ptr)
+    inline void store(LiftLowerContext &cx, const T &v, uint32_t ptr)
     {
         float_::store<T>(cx, v, ptr);
     }
 
     template <Float T>
-    inline WasmValVector lower_flat(CallContext &cx, const T &v)
+    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
     {
         return {float_::lower_flat<T>(v)};
     }
 
     template <Float T>
-    inline T load(const CallContext &cx, uint32_t ptr)
+    inline T load(const LiftLowerContext &cx, uint32_t ptr)
     {
         return float_::load<T>(cx, ptr);
     }
 
     template <Float T>
-    inline T lift_flat(const CallContext &cx, const CoreValueIter &vi)
+    inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
     {
         using WasmValType = WasmValTypeTrait<ValTrait<T>::flat_types[0]>::type;
         return float_::canonicalize_nan<T>(std::get<WasmValType>(vi.next(ValTrait<T>::flat_types[0])));
