@@ -17,13 +17,14 @@ namespace cmcpp
     {
 
         template <Tuple T>
-        void store(const LiftLowerContext &cx, const T &v, uint32_t ptr)
+        void store(LiftLowerContext &cx, const T &v, uint32_t ptr)
         {
             auto process_field = [&](auto &&field)
             {
-                ptr = align_to(ptr, ValTrait<std::remove_reference_t<decltype(field)>>::alignment);
-                store(cx, field, ptr);
-                ptr += ValTrait<std::remove_reference_t<decltype(field)>>::size;
+                using field_type = std::remove_const_t<std::remove_reference_t<decltype(field)>>;
+                ptr = align_to(ptr, ValTrait<field_type>::alignment);
+                cmcpp::store(cx, field, ptr);
+                ptr += ValTrait<field_type>::size;
             };
 
             std::apply([&](auto &&...fields)

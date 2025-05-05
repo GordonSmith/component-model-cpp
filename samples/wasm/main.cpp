@@ -1,6 +1,7 @@
 #include "sample.h"
 
 #include <cstdlib>
+#include <cstring>
 
 bool exports_example_sample_booleans_and(bool a, bool b)
 {
@@ -20,6 +21,13 @@ void exports_example_sample_strings_reverse(sample_string_t *a, sample_string_t 
     {
         ret->ptr[i] = a->ptr[a->len - i - 1];
     }
+}
+
+uint32_t exports_example_sample_strings_lots(sample_string_t *p1, sample_string_t *p2, sample_string_t *p3, sample_string_t *p4, sample_string_t *p5, sample_string_t *p6, sample_string_t *p7, sample_string_t *p8, sample_string_t *p9, sample_string_t *p10, sample_string_t *p11, sample_string_t *p12, sample_string_t *p13, sample_string_t *p14, sample_string_t *p15, sample_string_t *p16, sample_string_t *p17)
+{
+    // Calculate total length
+    return p1->len + p2->len + p3->len + p4->len + p5->len + p6->len + p7->len + p8->len +
+           p9->len + p10->len + p11->len + p12->len + p13->len + p14->len + p15->len + p16->len + p17->len;
 }
 
 void exports_example_sample_tuples_reverse(sample_tuple2_bool_string_t *a, sample_tuple2_string_bool_t *ret)
