@@ -110,10 +110,6 @@ WasmValVector fromWamr(size_t count, const wasm_val_t *values)
             assert(false);
         }
     }
-    // for (size_t i = count; i < target_count; i++)
-    // {
-    //     result[i] = (int32_t)(std::get<int32_t>(result[count - 1]) + (i * alignment));
-    // }
     return result;
 }
 
@@ -163,17 +159,18 @@ int main()
 
     LiftLowerContext liftLowerContext(trap, convert, opts);
 
-    using and_func_t = std::function<bool_t(bool_t, bool_t)>;
+    using and_func_t = func_t<bool_t(bool_t, bool_t)>;
     auto and_func = wasm_runtime_lookup_function(module_inst, "example:sample/booleans#and");
     and_func_t call_and = [&](bool_t a, bool_t b) -> bool_t
     {
-        using inputs_t = ValTrait<and_func_t>::params_t;
-        using outputs_t = ValTrait<and_func_t>::result_t;
-        auto inputs = toWamr(lower_flat(liftLowerContext, inputs_t{a, b}));
+        using params_t = ValTrait<and_func_t>::params_t;
+        using results_t = ValTrait<and_func_t>::results_t;
+
+        auto inputs = toWamr(lower_flat_values(liftLowerContext, MAX_FLAT_PARAMS, params_t{a, b}));
         auto output_size = 1;
         wasm_val_t outputs[output_size];
         auto call_result = wasm_runtime_call_wasm_a(exec_env, and_func, output_size, outputs, inputs.size(), inputs.data());
-        auto result = lift_flat<outputs_t>(liftLowerContext, fromWamr<outputs_t>(output_size, outputs));
+        auto result = std::get<0>(lift_flat_values<results_t>(liftLowerContext, MAX_FLAT_RESULTS, fromWamr<results_t>(output_size, outputs)));
         std::cout << "and_func(" << a << ", " << b << "): " << result << std::endl;
         return result;
     };
@@ -182,57 +179,58 @@ int main()
     call_and(true, false);
     call_and(true, true);
 
-    using add_func_t = std::function<float64_t(float64_t, float64_t)>;
+    using add_func_t = func_t<float64_t(float64_t, float64_t)>;
     auto add_func = wasm_runtime_lookup_function(module_inst, "example:sample/floats#add");
     add_func_t call_add = [&](float64_t input1, float64_t input2) -> float64_t
     {
-        using inputs_t = ValTrait<add_func_t>::params_t;
-        using outputs_t = ValTrait<add_func_t>::result_t;
+        using params_t = ValTrait<add_func_t>::params_t;
+        using results_t = ValTrait<add_func_t>::results_t;
 
-        auto inputs = toWamr(lower_flat(liftLowerContext, inputs_t{input1, input2}));
+        auto inputs = toWamr(lower_flat_values(liftLowerContext, MAX_FLAT_PARAMS, params_t{input1, input2}));
         auto output_size = 1;
         wasm_val_t outputs[output_size];
         auto call_result = wasm_runtime_call_wasm_a(exec_env, add_func, output_size, outputs, inputs.size(), inputs.data());
-        auto result = lift_flat<outputs_t>(liftLowerContext, fromWamr<outputs_t>(output_size, outputs));
+        auto result = std::get<0>(lift_flat_values<results_t>(liftLowerContext, MAX_FLAT_RESULTS, fromWamr<results_t>(output_size, outputs)));
         std::cout << "add_func(" << input1 << ", " << input2 << "): " << result << std::endl;
         return result;
     };
     call_add(3.1, 0.2);
 
-    using reverse_func_t = std::function<string_t(string_t)>;
+    using reverse_func_t = func_t<string_t(string_t)>;
     auto reverse_func = wasm_runtime_lookup_function(module_inst, "example:sample/strings#reverse");
     auto reverse_cleanup_func = wasm_runtime_lookup_function(module_inst, "cabi_post_example:sample/strings#reverse");
     reverse_func_t call_reverse = [&](string_t input1) -> string_t
     {
-        using inputs_t = ValTrait<reverse_func_t>::params_t;
-        using outputs_t = ValTrait<reverse_func_t>::result_t;
+        auto flat_ft_lower = func::flatten<reverse_func_t>(liftLowerContext, func::ContextType::Lower);
+        auto flat_ft_lift = func::flatten<reverse_func_t>(liftLowerContext, func::ContextType::Lift);
 
-        auto inputs = toWamr(lower_flat(liftLowerContext, inputs_t{input1}));
+        using params_t = ValTrait<reverse_func_t>::params_t;
+        using results_t = ValTrait<reverse_func_t>::results_t;
+
+        auto inputs = toWamr(lower_flat_values(liftLowerContext, MAX_FLAT_PARAMS, params_t{input1}));
         auto output_size = 1;
         wasm_val_t outputs[output_size];
         auto call_result = wasm_runtime_call_wasm_a(exec_env, reverse_func, output_size, outputs, inputs.size(), inputs.data());
-        // auto result = load<outputs_t>(liftLowerContext, outputs[0].of.i32);
-        auto result = lift_flat<outputs_t>(liftLowerContext, fromWamr<outputs_t>(output_size, outputs));
+        auto result = std::get<0>(lift_flat_values<results_t>(liftLowerContext, MAX_FLAT_RESULTS, fromWamr<results_t>(output_size, outputs)));
         std::cout << "reverse_string(" << input1 << "): " << result << std::endl;
-        call_result = wasm_runtime_call_wasm_a(exec_env, reverse_cleanup_func, 0, nullptr, 1, outputs);
         return result;
     };
     auto call_reverse_result = call_reverse("Hello World!");
     call_reverse(call_reverse_result);
 
-    using reverse_tuple_func_t = std::function<tuple_t<string_t, bool_t>(tuple_t<bool_t, string_t>)>;
+    using reverse_tuple_func_t = func_t<tuple_t<string_t, bool_t>(tuple_t<bool_t, string_t>)>;
     auto reverse_tuple_func = wasm_runtime_lookup_function(module_inst, "example:sample/tuples#reverse");
     auto reverse_tuple_cleanup_func = wasm_runtime_lookup_function(module_inst, "cabi_post_example:sample/tuples#reverse");
     reverse_tuple_func_t call_reverse_tuple = [&](tuple_t<bool_t, string_t> a) -> tuple_t<string_t, bool_t>
     {
-        using inputs_t = ValTrait<reverse_tuple_func_t>::params_t;
-        using outputs_t = ValTrait<reverse_tuple_func_t>::result_t;
+        using params_t = ValTrait<reverse_tuple_func_t>::params_t;
+        using results_t = ValTrait<reverse_tuple_func_t>::results_t;
 
-        auto inputs = toWamr(lower_flat(liftLowerContext, a));
+        auto inputs = toWamr(lower_flat_values(liftLowerContext, MAX_FLAT_PARAMS, params_t{a}));
         auto output_size = 1;
         wasm_val_t outputs[output_size];
         auto call_result = wasm_runtime_call_wasm_a(exec_env, reverse_tuple_func, output_size, outputs, inputs.size(), inputs.data());
-        auto result = load<outputs_t>(liftLowerContext, outputs->of.i32);
+        auto result = std::get<0>(lift_flat_values<results_t>(liftLowerContext, MAX_FLAT_RESULTS, fromWamr<results_t>(output_size, outputs)));
         std::cout << "reverse_tuple(" << std::get<0>(a) << ", " << std::get<1>(a) << "): " << std::get<0>(result) << ", " << std::get<1>(result) << std::endl;
         call_result = wasm_runtime_call_wasm_a(exec_env, reverse_tuple_cleanup_func, 0, nullptr, 1, outputs);
         return result;
@@ -240,19 +238,19 @@ int main()
     auto call_reverse_tuple_result = call_reverse_tuple({false, "Hello World!"});
     // call_reverse_tuple({std::get<1>(call_reverse_tuple_result), std::get<0>(call_reverse_tuple_result}));
 
-    using list_filter_bool_func_t = std::function<list_t<string_t>(list_t<variant_t<bool_t, string_t>>)>;
+    using list_filter_bool_func_t = func_t<list_t<string_t>(list_t<variant_t<bool_t, string_t>>)>;
     auto list_filter_bool_func = wasm_runtime_lookup_function(module_inst, "example:sample/lists#filter-bool");
     auto list_filter_bool_cleanup_func = wasm_runtime_lookup_function(module_inst, "cabi_post_example:sample/lists#filter-bool");
     auto call_list_filter_bool = [&](list_t<variant_t<bool_t, string_t>> a) -> list_t<string_t>
     {
-        using inputs_t = ValTrait<list_filter_bool_func_t>::params_t;
-        using outputs_t = ValTrait<list_filter_bool_func_t>::result_t;
+        using params_t = ValTrait<list_filter_bool_func_t>::params_t;
+        using results_t = ValTrait<list_filter_bool_func_t>::results_t;
 
-        auto inputs = toWamr(lower_flat(liftLowerContext, a));
+        auto inputs = toWamr(lower_flat_values(liftLowerContext, MAX_FLAT_PARAMS, params_t{a}));
         auto output_size = 1;
         wasm_val_t outputs[output_size];
         auto call_result = wasm_runtime_call_wasm_a(exec_env, list_filter_bool_func, output_size, outputs, inputs.size(), inputs.data());
-        auto result = lift_flat<outputs_t>(liftLowerContext, fromWamr<outputs_t>(output_size, outputs));
+        auto result = std::get<0>(lift_flat_values<results_t>(liftLowerContext, MAX_FLAT_RESULTS, fromWamr<results_t>(output_size, outputs)));
         std::cout << "list_filter_bool(" << a.size() << "): " << result.size() << std::endl;
         call_result = wasm_runtime_call_wasm_a(exec_env, list_filter_bool_cleanup_func, 0, nullptr, 1, outputs);
         return result;

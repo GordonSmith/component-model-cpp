@@ -109,6 +109,12 @@ namespace cmcpp
         using type = float64_t;
     };
 
+    class core_func_t
+    {
+    public:
+        std::vector<WasmValType> params;
+        std::vector<WasmValType> results;
+    };
     //  --------------------------------------------------------------------
 
     enum class ValType : uint8_t
@@ -692,20 +698,32 @@ namespace cmcpp
     concept Option = ValTrait<T>::type == ValType::Option;
 
     //  Func  --------------------------------------------------------------------
-    constexpr int MAX_FLAT_PARAMS = 16;
-    constexpr int MAX_FLAT_RESULTS = 1;
+    constexpr uint MAX_FLAT_PARAMS = 16;
+    constexpr uint MAX_FLAT_RESULTS = 1;
+
+    template <typename>
+    struct func_t_impl;
 
     template <Field R, Field... Args>
-    using func_t = std::function<R(Args...)>;
+    struct func_t_impl<R(Args...)>
+    {
+        using type = std::function<R(Args...)>;
+    };
+
+    template <typename F>
+    using func_t = typename func_t_impl<F>::type;
+
     template <Field R, Field... Args>
-    struct ValTrait<func_t<R, Args...>>
+    struct ValTrait<std::function<R(Args...)>>
     {
         static constexpr ValType type = ValType::Func;
+        using inner_type = std::function<R(Args...)>;
         using params_t = tuple_t<Args...>;
-        using result_t = R;
+        using results_t = tuple_t<R>;
         static constexpr auto flat_params_types = ValTrait<params_t>::flat_types;
-        static constexpr auto flat_result_types = ValTrait<result_t>::flat_types;
+        static constexpr auto flat_result_types = ValTrait<results_t>::flat_types;
     };
+
     template <typename T>
     concept Func = ValTrait<T>::type == ValType::Func;
 

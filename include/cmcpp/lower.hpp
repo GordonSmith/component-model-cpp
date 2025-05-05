@@ -8,6 +8,7 @@
 #include "list.hpp"
 #include "flags.hpp"
 #include "tuple.hpp"
+#include "func.hpp"
 #include "util.hpp"
 
 #include <tuple>
@@ -63,6 +64,36 @@ namespace cmcpp
 
     template <Option T>
     inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v);
+
+    template <Tuple T>
+    inline WasmValVector lower_heap_values(LiftLowerContext &cx, const T &vs)
+    {
+        using tuple_type = tuple_t<T>;
+        tuple_type tuple_value = vs;
+        auto ptr = cx.opts.realloc(0, 0, ValTrait<T>::alignment, ValTrait<T>::size);
+        WasmValVector flat_vals = {ptr};
+        trap_if(cx, ptr != align_to(ptr, ValTrait<tuple_type>::alignment));
+        trap_if(cx, ptr + ValTrait<tuple_type>::size > cx.opts.memory.size());
+        return flat_vals;
+    }
+
+    template <Tuple T>
+    inline WasmValVector lower_flat_values(LiftLowerContext &cx, uint max_flat, const T &vs)
+    {
+        // cx.inst.may_leave=false;
+        WasmValVector retVal = {};
+        auto flat_types = ValTrait<T>::flat_types;
+        if (flat_types.size() > max_flat)
+        {
+            retVal = lower_heap_values(cx, vs);
+        }
+        else
+        {
+            retVal = lower_flat(cx, vs);
+        }
+        // cx.inst.may_leave=true;
+        return retVal;
+    }
 }
 
 #endif

@@ -604,8 +604,8 @@ TEST_CASE("Func")
     Heap heap(1024 * 1024);
     auto cx = createLiftLowerContext(&heap, Encoding::Utf8);
 
-    using MyFunc = func_t<uint32_t, string_t, list_t<string_t>>;
-    MyFunc f = [](string_t b, list_t<string_t> c) -> uint32_t
+    using MyFunc = func_t<uint32_t(string_t, string_t)>;
+    MyFunc f = [](string_t b, string_t c) -> uint32_t
     {
         return 42;
     };

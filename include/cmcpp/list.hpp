@@ -102,7 +102,7 @@ namespace cmcpp
     template <List T>
     inline T load(const LiftLowerContext &cx, uint32_t ptr)
     {
-        return list::load<T>(cx, ptr);
+        return list::load<typename ValTrait<T>::inner_type>(cx, ptr);
     }
 
     template <List T>
