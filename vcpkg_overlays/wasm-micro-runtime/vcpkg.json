@@ -5,7 +5,7 @@
   "description": "WebAssembly Micro Runtime (WAMR) is a lightweight standalone WebAssembly (Wasm) runtime with small footprint, high performance and highly configurable features.",
   "homepage": "https://github.com/bytecodealliance/wasm-micro-runtime",
   "license": "Apache-2.0",
-  "supports": "linux",
+  "supports": "linux | osx | windows",
   "dependencies": [
     {
       "name": "vcpkg-cmake",

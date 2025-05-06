@@ -95,6 +95,24 @@ namespace cmcpp
         // cx.inst.may_leave=true;
         return retVal;
     }
+
+    template <Field... Args>
+    inline WasmValVector lower_flat_values(LiftLowerContext &cx, uint max_flat, Args &&...args)
+    {
+        using tuple_type = std::tuple<std::decay_t<Args>...>;
+        tuple_type vs{std::forward<Args>(args)...};
+        WasmValVector retVal = {};
+        auto flat_types = ValTrait<tuple_type>::flat_types;
+        if (flat_types.size() > max_flat)
+        {
+            retVal = lower_heap_values(cx, vs);
+        }
+        else
+        {
+            retVal = lower_flat(cx, vs);
+        }
+        return retVal;
+    }
 }
 
 #endif

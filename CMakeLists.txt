@@ -5,8 +5,6 @@ project(cmcpp LANGUAGES CXX)
 option(BUILD_SAMPLES "Build samples" ON)
 option(BUILD_TESTING "Build tests" ON)
 
-find_package(Boost REQUIRED)
-
 add_library(cmcpp INTERFACE)
 
 target_include_directories(cmcpp INTERFACE

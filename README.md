@@ -43,26 +43,29 @@ This repository contains a C++ ABI implementation of the WebAssembly Component M
 - [x] Tuple
 - [x] Variant
 - [ ] Enum
-- [ ] Option
+- [x] Option
 - [ ] Result
 - [x] Flags
 - [ ] Own
 - [ ] Borrow
 
 ### Host Functions
-- [x] lower_values
-- [x] lift_values
+- [x] lower_flat_values
+- [x] lift_flat_values
 
-### Tests
+### Tests / Samples
 - [x] ABI
 - [ ] WasmTime
-- [ ] Wamr
+- [x] Wamr
 - [ ] WasmEdge
 
 ## Usage
 
-TODO
+This library is a header only library. To use it in your project, you can:
+- [x] Copy the contents of the `include` directory to your project.
+- [ ] Use `vcpkg` to install the library and its dependencies.
 
+ 
 ## Related projects
 
 - [**Component Model design and specification**](https://github.com/WebAssembly/component-model): Official Component Model specification.

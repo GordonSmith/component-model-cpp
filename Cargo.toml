@@ -5,4 +5,4 @@ edition = "2024"
 
 [dependencies]
 wasm-tools = "1.229.0"
-wit-bindgen-cli = "0.41.0"
+wit-bindgen-cli = "0.42.1"

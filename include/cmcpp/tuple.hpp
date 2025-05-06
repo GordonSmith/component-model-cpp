@@ -104,8 +104,7 @@ namespace cmcpp
     template <Tuple T>
     inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
     {
-        auto x = tuple::lift_flat_tuple<T>(cx, vi);
-        return x;
+        return tuple::lift_flat_tuple<T>(cx, vi);
     }
 
     template <Record T>
