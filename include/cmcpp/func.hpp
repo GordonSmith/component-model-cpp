@@ -5,7 +5,6 @@
 
 namespace cmcpp
 {
-
     namespace func
     {
         //     template <Flags T>

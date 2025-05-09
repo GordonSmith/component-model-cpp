@@ -26,6 +26,9 @@ namespace cmcpp
 {
     using float32_t = float;
     using float64_t = double;
+    using offset = uint32_t;
+    using bytes = uint32_t;
+    using size = uint32_t;
 
     enum class WasmValType : uint8_t
     {
@@ -728,9 +731,6 @@ namespace cmcpp
     concept Func = ValTrait<T>::type == ValType::Func;
 
     //  --------------------------------------------------------------------
-
-    using offset = uint32_t;
-    using bytes = uint32_t;
 }
 
 #endif

@@ -12,9 +12,6 @@
 
 namespace cmcpp
 {
-    using offset = uint32_t;
-    using size = uint32_t;
-
     namespace list
     {
         template <typename T>

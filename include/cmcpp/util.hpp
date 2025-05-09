@@ -44,6 +44,16 @@ namespace cmcpp
         return static_cast<int32_t>(x);
     }
 
+    inline float32_t decode_i32_as_float(int32_t i)
+    {
+        return *reinterpret_cast<float32_t *>(&i);
+    }
+
+    inline float64_t decode_i64_as_float(int64_t i)
+    {
+        return *reinterpret_cast<float64_t *>(&i);
+    }
+
     class CoreValueIter
     {
         mutable WasmValVector::const_iterator it;
@@ -67,6 +77,45 @@ namespace cmcpp
         bool done() const
         {
             return !(it != end);
+        }
+    };
+
+    class CoerceValueIter : public CoreValueIter
+    {
+        const CoreValueIter &vi;
+        WasmValTypeVector &flat_types;
+
+    public:
+        CoerceValueIter(const CoreValueIter &vi, WasmValTypeVector &flat_types) : CoreValueIter({}), vi(vi), flat_types(flat_types)
+        {
+        }
+
+        virtual WasmVal next(const WasmValType &want) const override
+        {
+            auto have = flat_types.front();
+            flat_types.erase(flat_types.begin());
+            auto x = vi.next(have);
+            if (have == WasmValType::i32 && want == WasmValType::f32)
+            {
+                return decode_i32_as_float(std::get<int32_t>(x));
+            }
+            else if (have == WasmValType::i64 && want == WasmValType::i32)
+            {
+                return wrap_i64_to_i32(std::get<int64_t>(x));
+            }
+            else if (have == WasmValType::i64 && want == WasmValType::f32)
+            {
+                return decode_i32_as_float(wrap_i64_to_i32(std::get<int64_t>(x)));
+            }
+            else if (have == WasmValType::i64 && want == WasmValType::f64)
+            {
+                return decode_i64_as_float(std::get<int64_t>(x));
+            }
+            else
+            {
+                assert(have == want);
+                return x;
+            }
         }
     };
 

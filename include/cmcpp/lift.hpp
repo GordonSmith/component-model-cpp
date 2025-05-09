@@ -8,16 +8,10 @@
 namespace cmcpp
 {
     template <Boolean T>
-    inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
-    {
-        return convert_int_to_bool(vi.next<int32_t>());
-    }
+    inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi);
 
     template <Char T>
-    inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
-    {
-        return convert_i32_to_char(cx, vi.next<int32_t>());
-    }
+    inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi);
 
     template <UnsignedInteger T>
     inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi);

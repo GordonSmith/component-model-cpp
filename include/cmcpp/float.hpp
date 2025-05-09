@@ -8,7 +8,6 @@
 
 namespace cmcpp
 {
-
     namespace float_
     {
         inline int32_t encode_float_as_i32(float32_t f)
@@ -20,16 +19,6 @@ namespace cmcpp
         inline int64_t encode_float_as_i64(float64_t f)
         {
             return *reinterpret_cast<int64_t *>(&f);
-        }
-
-        inline float32_t decode_i32_as_float(int32_t i)
-        {
-            return *reinterpret_cast<float32_t *>(&i);
-        }
-
-        inline float64_t decode_i64_as_float(int64_t i)
-        {
-            return *reinterpret_cast<float64_t *>(&i);
         }
 
         inline float32_t core_f32_reinterpret_i32(int32_t i)

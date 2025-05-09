@@ -10,8 +10,6 @@
 
 namespace cmcpp
 {
-    using offset = uint32_t;
-
     namespace integer
     {
         template <typename T>
@@ -96,6 +94,40 @@ namespace cmcpp
     inline T load(const LiftLowerContext &cx, uint32_t ptr)
     {
         return integer::load<T>(cx, ptr);
+    }
+
+    template <Boolean T>
+    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
+    {
+        using WasmValType = WasmValTypeTrait<ValTrait<T>::flat_types[0]>::type;
+        return {static_cast<WasmValType>(v)};
+    }
+
+    template <Char T>
+    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
+    {
+        using WasmValType = WasmValTypeTrait<ValTrait<T>::flat_types[0]>::type;
+        return {static_cast<WasmValType>(char_to_i32(cx, v))};
+    }
+
+    template <UnsignedInteger T>
+    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
+    {
+        using WasmValType = WasmValTypeTrait<ValTrait<T>::flat_types[0]>::type;
+        WasmValType fv = v;
+        return {fv};
+    }
+
+    template <Boolean T>
+    inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
+    {
+        return convert_int_to_bool(vi.next<int32_t>());
+    }
+
+    template <Char T>
+    inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
+    {
+        return convert_i32_to_char(cx, vi.next<int32_t>());
     }
 
     template <UnsignedInteger T>
