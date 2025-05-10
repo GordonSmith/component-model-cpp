@@ -1,20 +1,13 @@
 #ifndef CMCPP_TRAITS_HPP
 #define CMCPP_TRAITS_HPP
 
-#include <cstdint>
-#include <vector>
-#include <map>
-#include <string_view>
+#include <cassert>
+#include <cstring>
+#include <cmath>
 #include <bitset>
 #include <optional>
 #include <variant>
-#include <memory>
-#include <stdexcept>
-#include <array>
-#include <cassert>
 #include <limits>
-#include <cstring>
-#include <cmath>
 
 #include "boost/pfr.hpp"
 

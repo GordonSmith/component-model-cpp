@@ -4,8 +4,6 @@
 #include "context.hpp"
 #include "integer.hpp"
 
-#include <cmath>
-
 namespace cmcpp
 {
     namespace float_

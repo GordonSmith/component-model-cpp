@@ -1,7 +1,7 @@
-#include <iostream>
-
 #include "wasm_export.h"
 #include "cmcpp.hpp"
+
+#include <iostream>
 
 using namespace cmcpp;
 

@@ -4,10 +4,6 @@
 #include "context.hpp"
 #include "util.hpp"
 
-#include <cstring>
-#include <iostream>
-#include <cassert>
-
 namespace cmcpp
 {
     namespace integer
@@ -53,18 +49,58 @@ namespace cmcpp
         }
     }
 
+    //  Boolean  ------------------------------------------------------------------
     template <Boolean T>
     inline void store(LiftLowerContext &cx, const T &v, uint32_t ptr)
     {
         integer::store<T>(cx, v, ptr);
     }
+    template <Boolean T>
+    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
+    {
+        using WasmValType = WasmValTypeTrait<ValTrait<T>::flat_types[0]>::type;
+        return {static_cast<WasmValType>(v)};
+    }
 
+    template <Boolean T>
+    inline T load(const LiftLowerContext &cx, uint32_t ptr)
+    {
+        return convert_int_to_bool(integer::load<uint8_t>(cx, ptr));
+    }
+
+    template <Boolean T>
+    inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
+    {
+        return convert_int_to_bool(vi.next<int32_t>());
+    }
+
+    //  Char  ------------------------------------------------------------------
     template <Char T>
     inline void store(LiftLowerContext &cx, const T &v, uint32_t ptr)
     {
         integer::store<T>(cx, char_to_i32(cx, v), ptr);
     }
 
+    template <Char T>
+    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
+    {
+        using WasmValType = WasmValTypeTrait<ValTrait<T>::flat_types[0]>::type;
+        return {static_cast<WasmValType>(char_to_i32(cx, v))};
+    }
+
+    template <Char T>
+    inline T load(const LiftLowerContext &cx, uint32_t ptr)
+    {
+        return convert_i32_to_char(cx, integer::load<uint32_t>(cx, ptr));
+    }
+
+    template <Char T>
+    inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
+    {
+        return convert_i32_to_char(cx, vi.next<int32_t>());
+    }
+
+    //  Integer  ------------------------------------------------------------------
     template <Integer T>
     inline void store(LiftLowerContext &cx, const T &v, uint32_t ptr)
     {
@@ -78,38 +114,6 @@ namespace cmcpp
         return integer::lower_flat_signed(v, ValTrait<WasmValType>::size * 8);
     }
 
-    template <Boolean T>
-    inline T load(const LiftLowerContext &cx, uint32_t ptr)
-    {
-        return convert_int_to_bool(integer::load<uint8_t>(cx, ptr));
-    }
-
-    template <Char T>
-    inline T load(const LiftLowerContext &cx, uint32_t ptr)
-    {
-        return convert_i32_to_char(cx, integer::load<uint32_t>(cx, ptr));
-    }
-
-    template <Integer T>
-    inline T load(const LiftLowerContext &cx, uint32_t ptr)
-    {
-        return integer::load<T>(cx, ptr);
-    }
-
-    template <Boolean T>
-    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
-    {
-        using WasmValType = WasmValTypeTrait<ValTrait<T>::flat_types[0]>::type;
-        return {static_cast<WasmValType>(v)};
-    }
-
-    template <Char T>
-    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
-    {
-        using WasmValType = WasmValTypeTrait<ValTrait<T>::flat_types[0]>::type;
-        return {static_cast<WasmValType>(char_to_i32(cx, v))};
-    }
-
     template <UnsignedInteger T>
     inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
     {
@@ -118,16 +122,10 @@ namespace cmcpp
         return {fv};
     }
 
-    template <Boolean T>
-    inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
+    template <Integer T>
+    inline T load(const LiftLowerContext &cx, uint32_t ptr)
     {
-        return convert_int_to_bool(vi.next<int32_t>());
-    }
-
-    template <Char T>
-    inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
-    {
-        return convert_i32_to_char(cx, vi.next<int32_t>());
+        return integer::load<T>(cx, ptr);
     }
 
     template <UnsignedInteger T>

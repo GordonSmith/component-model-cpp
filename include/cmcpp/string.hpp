@@ -1,9 +1,9 @@
 #ifndef CMCPP_STRING_HPP
 #define CMCPP_STRING_HPP
 
-#include <cmcpp/context.hpp>
-#include <cmcpp/integer.hpp>
-#include <cmcpp/util.hpp>
+#include "context.hpp"
+#include "integer.hpp"
+#include "util.hpp"
 
 namespace cmcpp
 {

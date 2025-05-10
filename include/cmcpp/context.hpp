@@ -3,9 +3,6 @@
 
 #include "traits.hpp"
 
-#include <functional>
-#include <memory>
-#include <optional>
 #include <future>
 #if __has_include(<span>)
 #include <span>

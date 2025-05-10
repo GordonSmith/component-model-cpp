@@ -49,38 +49,38 @@ namespace cmcpp
         //         return unpack_flags_from_int<T>(i);
         //     }
 
-        enum class ContextType
-        {
-            Lift,
-            Lower
-        };
+        // enum class ContextType
+        // {
+        //     Lift,
+        //     Lower
+        // };
 
-        template <Func T>
-        inline core_func_t flatten(LiftLowerContext &cx, ContextType context)
-        {
-            std::vector<WasmValType> flat_params(ValTrait<T>::flat_params_types.begin(), ValTrait<T>::flat_params_types.end());
-            std::vector<WasmValType> flat_results(ValTrait<T>::flat_result_types.begin(), ValTrait<T>::flat_result_types.end());
-            // if (cx.opts.sync == true)
-            {
-                if (flat_params.size() > MAX_FLAT_PARAMS)
-                {
-                    flat_params = {WasmValType::i32};
-                }
-                if (flat_results.size() > MAX_FLAT_RESULTS)
-                {
-                    switch (context)
-                    {
-                    case ContextType::Lift:
-                        flat_results = {WasmValType::i32};
-                        break;
-                    case ContextType::Lower:
-                        flat_params.push_back(WasmValType::i32);
-                        flat_results = {};
-                    }
-                }
-            }
-            return {flat_params, flat_results};
-        }
+        // template <Func T>
+        // inline core_func_t flatten(LiftLowerContext &cx, ContextType context)
+        // {
+        //     std::vector<WasmValType> flat_params(ValTrait<T>::flat_params_types.begin(), ValTrait<T>::flat_params_types.end());
+        //     std::vector<WasmValType> flat_results(ValTrait<T>::flat_result_types.begin(), ValTrait<T>::flat_result_types.end());
+        //     // if (cx.opts.sync == true)
+        //     {
+        //         if (flat_params.size() > MAX_FLAT_PARAMS)
+        //         {
+        //             flat_params = {WasmValType::i32};
+        //         }
+        //         if (flat_results.size() > MAX_FLAT_RESULTS)
+        //         {
+        //             switch (context)
+        //             {
+        //             case ContextType::Lift:
+        //                 flat_results = {WasmValType::i32};
+        //                 break;
+        //             case ContextType::Lower:
+        //                 flat_params.push_back(WasmValType::i32);
+        //                 flat_results = {};
+        //             }
+        //         }
+        //     }
+        //     return {flat_params, flat_results};
+        // }
 
         // template <Flags T>
         // inline void store(LiftLowerContext &cx, const T &v, uint32_t ptr)

@@ -6,10 +6,6 @@
 #include "load.hpp"
 #include "util.hpp"
 
-#include <tuple>
-#include <limits>
-#include <cassert>
-
 namespace cmcpp
 {
     namespace list
@@ -48,7 +44,7 @@ namespace cmcpp
         }
 
         template <typename T>
-        WasmValVector lower_flat_list(LiftLowerContext &cx, const list_t<T> &v)
+        WasmValVector lower_flat(LiftLowerContext &cx, const list_t<T> &v)
         {
             auto [ptr, length] = store_into_range(cx, v);
             return {static_cast<int32_t>(ptr), static_cast<int32_t>(length)};
@@ -93,7 +89,7 @@ namespace cmcpp
     template <List T>
     inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
     {
-        return list::lower_flat_list(cx, v);
+        return list::lower_flat(cx, v);
     }
 
     template <List T>
