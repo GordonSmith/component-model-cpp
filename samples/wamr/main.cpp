@@ -117,7 +117,7 @@ template <typename F>
 func_t<F> attach(const wasm_module_inst_t &module_inst, const wasm_exec_env_t &exec_env, LiftLowerContext &liftLowerContext, const char *name)
 {
     using params_t = typename ValTrait<func_t<F>>::params_t;
-    using results_t = typename ValTrait<func_t<F>>::results_t;
+    using result_t = typename ValTrait<func_t<F>>::result_t;
 
     wasm_function_inst_t guest_func = wasm_runtime_lookup_function(module_inst, name);
     wasm_function_inst_t guest_cleanup_func = wasm_runtime_lookup_function(module_inst, (std::string("cabi_post_") + name).c_str());
@@ -130,7 +130,7 @@ func_t<F> attach(const wasm_module_inst_t &module_inst, const wasm_exec_env_t &e
             {std::forward<decltype(args)>(args)...});
         std::vector<wasm_val_t> inputs = toWamr(lowered_args);
 
-        constexpr size_t output_size = std::tuple_size<results_t>::value;
+        constexpr size_t output_size = std::is_same<result_t, void>::value ? 0 : 1;
         wasm_val_t outputs[output_size];
 
         bool success = wasm_runtime_call_wasm_a(exec_env, guest_func,
@@ -144,15 +144,15 @@ func_t<F> attach(const wasm_module_inst_t &module_inst, const wasm_exec_env_t &e
             liftLowerContext.trap(exception ? exception : "Unknown WAMR execution error");
         }
 
-        WasmValVector flat_results = fromWamr<results_t>(output_size, outputs);
-        auto output = lift_flat_values<results_t>(liftLowerContext, MAX_FLAT_RESULTS, flat_results);
+        WasmValVector flat_results = fromWamr<result_t>(output_size, outputs);
+        auto output = lift_flat_values<result_t>(liftLowerContext, MAX_FLAT_RESULTS, flat_results);
 
         if (guest_cleanup_func)
         {
             wasm_runtime_call_wasm_a(exec_env, guest_cleanup_func, 0, nullptr, output_size, outputs);
         }
 
-        return std::get<0>(output);
+        return output;
     };
 }
 

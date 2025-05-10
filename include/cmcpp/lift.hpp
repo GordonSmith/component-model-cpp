@@ -43,18 +43,16 @@ namespace cmcpp
     template <Option T>
     inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi);
 
-    template <Tuple T>
+    template <Field T>
     inline T lift_heap_values(const LiftLowerContext &cx, const CoreValueIter &vi)
     {
         uint32_t ptr = vi.next<int32_t>();
-        using tuple_type = typename std::tuple_element<0, typename ValTrait<T>::inner_type>::type;
-        trap_if(cx, ptr != align_to(ptr, ValTrait<tuple_type>::alignment));
-        trap_if(cx, ptr + ValTrait<tuple_type>::size > cx.opts.memory.size());
-        auto retVal = load<tuple_type>(cx, ptr);
-        return retVal;
+        trap_if(cx, ptr != align_to(ptr, ValTrait<T>::alignment));
+        trap_if(cx, ptr + ValTrait<T>::size > cx.opts.memory.size());
+        return load<T>(cx, ptr);
     }
 
-    template <Tuple T>
+    template <Field T>
     inline T lift_flat_values(const LiftLowerContext &cx, uint max_flat, const CoreValueIter &vi)
     {
         auto flat_types = ValTrait<T>::flat_types;

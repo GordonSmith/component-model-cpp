@@ -722,9 +722,9 @@ namespace cmcpp
         static constexpr ValType type = ValType::Func;
         using inner_type = std::function<R(Args...)>;
         using params_t = tuple_t<Args...>;
-        using results_t = tuple_t<R>;
+        using result_t = R;
         static constexpr auto flat_params_types = ValTrait<params_t>::flat_types;
-        static constexpr auto flat_result_types = ValTrait<results_t>::flat_types;
+        static constexpr auto flat_result_types = ValTrait<result_t>::flat_types;
     };
 
     template <typename T>
