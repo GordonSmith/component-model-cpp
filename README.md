@@ -42,7 +42,7 @@ This repository contains a C++ ABI implementation of the WebAssembly Component M
 - [x] Record
 - [x] Tuple
 - [x] Variant
-- [ ] Enum
+- [x] Enum
 - [x] Option
 - [x] Result
 - [x] Flags

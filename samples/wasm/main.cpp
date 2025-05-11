@@ -98,3 +98,8 @@ void exports_example_sample_variants_variant_func(exports_example_sample_variant
         a->val.u = a->val.u * 2;
     }
 }
+
+exports_example_sample_enums_e_t exports_example_sample_enums_enum_func(exports_example_sample_enums_e_t a)
+{
+    return a;
+}

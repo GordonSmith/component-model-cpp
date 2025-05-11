@@ -265,6 +265,18 @@ int main()
     auto call_list_filter_result = call_list_filter({{false}, {"Hello World!"}, {"Another String"}, {true}, {false}});
     std::cout << "call_list_filter result: " << call_list_filter_result.size() << std::endl;
 
+    enum e
+    {
+        a,
+        b,
+        c
+    };
+
+    auto enum_func = attach<enum_t<e>(enum_t<e>)>(module_inst, exec_env, liftLowerContext, "example:sample/enums#enum-func");
+    std::cout << "enum_func(e::a): " << enum_func(e::a) << std::endl;
+    std::cout << "enum_func(e::b): " << enum_func(e::b) << std::endl;
+    std::cout << "enum_func(e::c): " << enum_func(e::c) << std::endl;
+
     wasm_runtime_destroy_exec_env(exec_env);
     wasm_runtime_deinstantiate(module_inst);
     wasm_runtime_unload(module);

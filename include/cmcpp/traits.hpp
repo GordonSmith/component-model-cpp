@@ -714,6 +714,10 @@ namespace cmcpp
     template <Field Ok, Field Err>
     using result_t = variant_t<Ok, Err>;
 
+    //  Enum  --------------------------------------------------------------------
+    template <typename T>
+    using enum_t = uint32_t;
+
     //  Func  --------------------------------------------------------------------
     constexpr uint MAX_FLAT_PARAMS = 16;
     constexpr uint MAX_FLAT_RESULTS = 1;

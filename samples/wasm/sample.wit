@@ -40,6 +40,15 @@ interface variants {
   variant-func: func(a: v) -> v;
 }
 
+interface enums {
+  enum e {
+    a,
+    b,
+    c
+  }
+  enum-func: func(a: e) -> e;
+}
+
 world sample {
   export booleans;
   export floats;
@@ -47,6 +56,7 @@ world sample {
   export tuples;
   export lists;
   export variants;
+  export enums;
 
   export void-func: func();
   export ok-func: func(a:u32, b:u32) -> result<u32, string>;
