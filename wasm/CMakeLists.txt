@@ -24,6 +24,7 @@ add_executable(wasmtests
     list.cpp
     string.cpp
     uint.cpp
+    func.cpp
     util.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/tests.c
     ${CMAKE_CURRENT_BINARY_DIR}/tests.h

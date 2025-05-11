@@ -116,6 +116,7 @@ namespace cmcpp
     enum class ValType : uint8_t
     {
         UNKNOWN,
+        Void,
         Bool,
         S8,
         U8,
@@ -156,6 +157,21 @@ namespace cmcpp
         static constexpr uint32_t alignment = 0;
         static constexpr std::array<WasmValType, 0> flat_types = {};
     };
+
+    //  Void  --------------------------------------------------------------------
+    using void_t = void;
+
+    template <>
+    struct ValTrait<void_t>
+    {
+        static constexpr ValType type = ValType::Void;
+        using inner_type = void;
+        static constexpr uint32_t size = 0;
+        static constexpr uint32_t alignment = 1;
+        static constexpr std::array<WasmValType, 0> flat_types = {};
+    };
+    template <typename T>
+    concept Void = ValTrait<T>::type == ValType::Void;
 
     //  Boolean  --------------------------------------------------------------------
     using bool_t = bool;
@@ -686,12 +702,17 @@ namespace cmcpp
     {
         static constexpr ValType type = ValType::Option;
         using inner_type = T;
-        static constexpr uint32_t size = ValTrait<variant_t<bool_t, T>>::size;
-        static constexpr uint32_t alignment = ValTrait<variant_t<bool_t, T>>::size;
-        static constexpr auto flat_types = ValTrait<variant_t<bool_t, T>>::flat_types;
+        using variant_type = variant_t<bool_t, T>;
+        static constexpr uint32_t size = ValTrait<variant_type>::size;
+        static constexpr uint32_t alignment = ValTrait<variant_type>::alignment;
+        static constexpr auto flat_types = ValTrait<variant_type>::flat_types;
     };
     template <typename T>
     concept Option = ValTrait<T>::type == ValType::Option;
+
+    //  Result  --------------------------------------------------------------------
+    template <Field Ok, Field Err>
+    using result_t = variant_t<Ok, Err>;
 
     //  Func  --------------------------------------------------------------------
     constexpr uint MAX_FLAT_PARAMS = 16;

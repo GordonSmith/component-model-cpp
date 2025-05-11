@@ -60,7 +60,7 @@ namespace cmcpp
         WasmValVector flat_vals = {ptr};
         trap_if(cx, ptr != align_to(ptr, ValTrait<tuple_type>::alignment));
         trap_if(cx, ptr + ValTrait<tuple_type>::size > cx.opts.memory.size());
-        store<tuple_type>(cx, std::forward<Ts>(vs)..., ptr);
+        store<tuple_type>(cx, {std::forward<Ts>(vs)...}, ptr);
         return flat_vals;
     }
 

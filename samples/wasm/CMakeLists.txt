@@ -2,16 +2,18 @@ function(wit2code witFile)
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${witFile}/${witFile}.c ${CMAKE_CURRENT_BINARY_DIR}/${witFile}/${witFile}.h ${CMAKE_CURRENT_BINARY_DIR}/${witFile}/${witFile}_component_type.o
         # COMMAND wit-bindgen markdown ${CMAKE_CURRENT_SOURCE_DIR}/${witFile}.wit
-        COMMAND export
-         COMMAND ${CMAKE_COMMAND} -E env PATH=$ENV{HOME}/.cargo/bin:$ENV{PATH} wit-bindgen c --out-dir "${CMAKE_CURRENT_BINARY_DIR}/${witFile}" "${CMAKE_CURRENT_SOURCE_DIR}/${witFile}.wit"
+        COMMAND ${CMAKE_COMMAND} -E env PATH=$ENV{HOME}/.cargo/bin:$ENV{PATH} wit-bindgen c --out-dir "${CMAKE_CURRENT_BINARY_DIR}/${witFile}" "${CMAKE_CURRENT_SOURCE_DIR}/${witFile}.wit"
         # COMMAND wit-bindgen rust --ownership owning --out-dir ${CMAKE_CURRENT_BINARY_DIR}/${witFile}/rust ${CMAKE_CURRENT_SOURCE_DIR}/${witFile}.wit
         # COMMAND wit-bindgen teavm-java --out-dir ${CMAKE_CURRENT_BINARY_DIR}/${witFile}/java ${CMAKE_CURRENT_SOURCE_DIR}/${witFile}.wit
         # COMMAND wit-bindgen tiny-go --out-dir ${CMAKE_CURRENT_BINARY_DIR}/${witFile}/go ${CMAKE_CURRENT_SOURCE_DIR}/${witFile}.wit
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     )
-    add_custom_target(wit-generate-${witFile} ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${witFile}/${witFile}.c)
+    add_custom_target(wit-generate-${witFile} ALL
+        DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${witFile}/${witFile}.c
+                ${CMAKE_CURRENT_BINARY_DIR}/${witFile}/${witFile}.h
+                ${CMAKE_CURRENT_BINARY_DIR}/${witFile}/${witFile}_component_type.o
+    )
 endfunction()
-
-wit2code(sample)
 
 project(sample)
 
@@ -29,6 +31,8 @@ set(CMAKE_SHARED_LIBRARY_SUFFIX ".wasm")
 
 set(CMAKE_EXECUTABLE_SUFFIX ".wasm")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -nostartfiles -fno-exceptions --sysroot=${WASI_SDK_PREFIX}/share/wasi-sysroot -Wl,--no-entry")
+
+wit2code(sample)
 
 include_directories(
     ${CMAKE_CURRENT_BINARY_DIR}/sample

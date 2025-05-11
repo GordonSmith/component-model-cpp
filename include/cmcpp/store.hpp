@@ -34,6 +34,10 @@ namespace cmcpp
 
     template <Variant T>
     inline void store(LiftLowerContext &cx, const T &v, uint32_t ptr);
+
+    template <Option T>
+    inline void store(LiftLowerContext &cx, const T &v, uint32_t ptr);
+
 }
 
 #endif

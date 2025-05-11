@@ -13,6 +13,19 @@ double exports_example_sample_floats_add(double a, double b)
     return a + b;
 }
 
+void exports_example_sample_variants_variant_func(exports_example_sample_variants_v_t *a, exports_example_sample_variants_v_t *ret)
+{
+    ret->tag = a->tag;
+    if (a->tag == EXPORTS_EXAMPLE_SAMPLE_VARIANTS_V_B)
+    {
+        ret->val.b = !a->val.b;
+    }
+    else if (a->tag == EXPORTS_EXAMPLE_SAMPLE_VARIANTS_V_U)
+    {
+        ret->val.u = a->val.u * 2;
+    }
+}
+
 void exports_example_sample_strings_reverse(sample_string_t *a, sample_string_t *ret)
 {
     ret->ptr = (uint8_t *)malloc(a->len);
@@ -46,5 +59,42 @@ void exports_example_sample_lists_filter_bool(exports_example_sample_lists_list_
         {
             ret->ptr[ret->len++] = a->ptr[i].val.s;
         }
+    }
+}
+
+void exports_sample_void_func(void) {}
+bool exports_sample_ok_func(uint32_t a, uint32_t b, uint32_t *ret, sample_string_t *err)
+{
+    *ret = a + b;
+    return true;
+}
+
+bool exports_sample_err_func(uint32_t a, uint32_t b, uint32_t *ret, sample_string_t *err)
+{
+    err->ptr = (uint8_t *)malloc(5);
+    err->len = 5;
+    std::memcpy(err->ptr, "error", 5);
+    return false;
+}
+
+bool exports_sample_option_func(uint32_t *maybe_a, uint32_t *ret)
+{
+    if (maybe_a)
+    {
+        *ret = *maybe_a * 2;
+        return true;
+    }
+    return false;
+}
+
+void exports_example_sample_variants_variant_func(exports_example_sample_variants_v_t *a)
+{
+    if (a->tag == EXPORTS_EXAMPLE_SAMPLE_VARIANTS_V_B)
+    {
+        a->val.b = !a->val.b;
+    }
+    else if (a->tag == EXPORTS_EXAMPLE_SAMPLE_VARIANTS_V_U)
+    {
+        a->val.u = a->val.u * 2;
     }
 }

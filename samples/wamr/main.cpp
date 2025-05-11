@@ -53,61 +53,60 @@ std::pair<void *, size_t> convert(void *dest, uint32_t dest_byte_len, const void
 
 std::vector<wasm_val_t> toWamr(const WasmValVector &values)
 {
-    std::vector<wasm_val_t> result(values.size());
-    for (size_t i = 0; i < values.size(); i++)
+    std::vector<wasm_val_t> result;
+    result.reserve(values.size());
+
+    for (const auto &val_variant : values)
     {
-        switch (values[i].index())
-        {
-        case WASM_I32:
-            result[i].kind = WASM_I32;
-            result[i].of.i32 = std::get<int32_t>(values[i]);
-            break;
-        case WASM_I64:
-            result[i].kind = WASM_I64;
-            result[i].of.i64 = std::get<int64_t>(values[i]);
-            break;
-        case WASM_F32:
-            result[i].kind = WASM_F32;
-            result[i].of.f32 = std::get<float>(values[i]);
-            break;
-        case WASM_F64:
-            result[i].kind = WASM_F64;
-            result[i].of.f64 = std::get<double>(values[i]);
-            break;
-        default:
-            assert(false);
-        }
+        result.emplace_back(std::visit([](auto &&arg) -> wasm_val_t
+                                       {
+            wasm_val_t w_val{}; // Value-initialize
+            using T = std::decay_t<decltype(arg)>;
+
+            if constexpr (std::is_same_v<T, int32_t>) {
+                w_val.kind = WASM_I32;
+                w_val.of.i32 = arg;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                w_val.kind = WASM_I64;
+                w_val.of.i64 = arg;
+            } else if constexpr (std::is_same_v<T, float>) {
+                w_val.kind = WASM_F32;
+                w_val.of.f32 = arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                w_val.kind = WASM_F64;
+                w_val.of.f64 = arg;
+            } else {
+                assert(false && "Unsupported type in WasmVal variant");
+            }
+            return w_val; }, val_variant));
     }
     return result;
 }
 
-template <typename T>
 WasmValVector fromWamr(size_t count, const wasm_val_t *values)
 {
-    auto size = ValTrait<T>::size;
-    auto alignment = ValTrait<T>::alignment;
-    auto target_count = ValTrait<T>::flat_types.size();
+    WasmValVector result;
+    result.reserve(count);
 
-    WasmValVector result(count);
-    for (size_t i = 0; i < count; i++)
+    for (size_t i = 0; i < count; ++i)
     {
         switch (values[i].kind)
         {
         case WASM_I32:
-            result[i] = values[i].of.i32;
+            result.emplace_back(values[i].of.i32);
             break;
         case WASM_I64:
-            result[i] = values[i].of.i64;
+            result.emplace_back(values[i].of.i64);
             break;
         case WASM_F32:
-            result[i] = values[i].of.f32;
+            result.emplace_back(values[i].of.f32);
             break;
         case WASM_F64:
-            result[i] = values[i].of.f64;
+            result.emplace_back(values[i].of.f64);
             break;
         default:
-            std::cout << "values[i].kind: " << values[i].kind << std::endl;
-            assert(false);
+            assert(false && "fromWamr: Unexpected wasm_val_t kind.");
+            break;
         }
     }
     return result;
@@ -116,18 +115,23 @@ WasmValVector fromWamr(size_t count, const wasm_val_t *values)
 template <typename F>
 func_t<F> attach(const wasm_module_inst_t &module_inst, const wasm_exec_env_t &exec_env, LiftLowerContext &liftLowerContext, const char *name)
 {
-    using params_t = typename ValTrait<func_t<F>>::params_t;
     using result_t = typename ValTrait<func_t<F>>::result_t;
 
     wasm_function_inst_t guest_func = wasm_runtime_lookup_function(module_inst, name);
+    if (!guest_func)
+    {
+        wasm_module_inst_t current_module_inst = wasm_runtime_get_module_inst(exec_env);
+        const char *exception = wasm_runtime_get_exception(current_module_inst);
+        liftLowerContext.trap(exception ? exception : "Unable to find function");
+    }
     wasm_function_inst_t guest_cleanup_func = wasm_runtime_lookup_function(module_inst, (std::string("cabi_post_") + name).c_str());
 
-    return [guest_func, guest_cleanup_func, exec_env, &liftLowerContext](auto &&...args) -> auto
+    return [guest_func, guest_cleanup_func, exec_env, &liftLowerContext](auto &&...args) -> result_t
     {
-        WasmValVector lowered_args = lower_flat_values<params_t>(
+        WasmValVector lowered_args = lower_flat_values(
             liftLowerContext,
             MAX_FLAT_PARAMS,
-            {std::forward<decltype(args)>(args)...});
+            std::forward<decltype(args)>(args)...);
         std::vector<wasm_val_t> inputs = toWamr(lowered_args);
 
         constexpr size_t output_size = std::is_same<result_t, void>::value ? 0 : 1;
@@ -144,15 +148,17 @@ func_t<F> attach(const wasm_module_inst_t &module_inst, const wasm_exec_env_t &e
             liftLowerContext.trap(exception ? exception : "Unknown WAMR execution error");
         }
 
-        WasmValVector flat_results = fromWamr<result_t>(output_size, outputs);
-        auto output = lift_flat_values<result_t>(liftLowerContext, MAX_FLAT_RESULTS, flat_results);
-
-        if (guest_cleanup_func)
+        if constexpr (output_size > 0)
         {
-            wasm_runtime_call_wasm_a(exec_env, guest_cleanup_func, 0, nullptr, output_size, outputs);
-        }
+            auto output = lift_flat_values<result_t>(liftLowerContext, MAX_FLAT_RESULTS, fromWamr(output_size, outputs));
 
-        return output;
+            if (guest_cleanup_func)
+            {
+                wasm_runtime_call_wasm_a(exec_env, guest_cleanup_func, 0, nullptr, output_size, outputs);
+            }
+
+            return output;
+        }
     };
 }
 
@@ -201,6 +207,27 @@ int main()
     LiftLowerOptions opts(Encoding::Utf8, std::span<uint8_t>(static_cast<uint8_t *>(wasm_memory_get_base_address(memory)), 999999), realloc);
 
     LiftLowerContext liftLowerContext(trap, convert, opts);
+
+    auto variant_func = attach<variant_t<bool_t, uint32_t>(variant_t<bool_t, uint32_t>)>(module_inst, exec_env, liftLowerContext, "example:sample/variants#variant-func");
+    std::cout << "variant_func((uint32_t)40)" << std::get<1>(variant_func((uint32_t)40)) << std::endl;
+    std::cout << "variant_func((bool_t)true)" << std::get<0>(variant_func((bool_t) true)) << std::endl;
+    std::cout << "variant_func((bool_t)false)" << std::get<0>(variant_func((bool_t) false)) << std::endl;
+
+    auto option_func = attach<option_t<uint32_t>(option_t<uint32_t>)>(module_inst, exec_env, liftLowerContext, "option-func");
+    std::cout << "option_func((uint32_t)40).has_value()" << option_func((uint32_t)40).has_value() << std::endl;
+    std::cout << "option_func((uint32_t)40).value()" << option_func((uint32_t)40).value() << std::endl;
+    std::cout << "option_func(std::nullopt).has_value()" << option_func(std::nullopt).has_value() << std::endl;
+
+    auto void_func = attach<void()>(module_inst, exec_env, liftLowerContext, "void-func");
+    void_func();
+
+    auto ok_func = attach<result_t<uint32_t, string_t>(uint32_t, uint32_t)>(module_inst, exec_env, liftLowerContext, "ok-func");
+    auto ok_func_result = ok_func(40, 2);
+    std::cout << "ok_func result: " << std::get<uint32_t>(ok_func_result) << std::endl;
+
+    auto err_func = attach<result_t<uint32_t, string_t>(uint32_t, uint32_t)>(module_inst, exec_env, liftLowerContext, "err-func");
+    auto err_func_result = err_func(40, 2);
+    std::cout << "err_func result: " << std::get<string_t>(err_func_result) << std::endl;
 
     auto call_and = attach<bool_t(bool_t, bool_t)>(module_inst, exec_env, liftLowerContext,
                                                    "example:sample/booleans#and");

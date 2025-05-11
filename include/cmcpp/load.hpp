@@ -34,6 +34,9 @@ namespace cmcpp
 
     template <Variant T>
     inline T load(const LiftLowerContext &cx, uint32_t ptr);
+
+    template <Option T>
+    inline T load(const LiftLowerContext &cx, uint32_t ptr);
 }
 
 #include "string.hpp"

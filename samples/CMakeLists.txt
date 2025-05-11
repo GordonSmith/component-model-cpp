@@ -3,7 +3,7 @@ include(ExternalProject)
 ExternalProject_Add(wasm
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/wasm
     BUILD_ALWAYS TRUE
-    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/wasm
+    PREFIX wasm
     CMAKE_ARGS 
         -DHPCC_WASM_ROOT=${HPCC_WASM_ROOT}
         -DWASI_SDK_PREFIX=${WASI_SDK_PREFIX}
@@ -14,3 +14,5 @@ ExternalProject_Add(wasm
 )
 
 add_subdirectory(wamr)
+
+add_dependencies(wamr wasm)

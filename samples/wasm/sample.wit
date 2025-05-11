@@ -32,10 +32,24 @@ interface lists {
   filter-bool: func(a: list<v>) -> list<string>;
 }
 
+interface variants {
+  variant v {
+    b(bool),
+    u(u32)
+  }
+  variant-func: func(a: v) -> v;
+}
+
 world sample {
   export booleans;
   export floats;
   export strings;
   export tuples;
   export lists;
+  export variants;
+
+  export void-func: func();
+  export ok-func: func(a:u32, b:u32) -> result<u32, string>;
+  export err-func: func(a:u32, b:u32) -> result<u32, string>;
+  export option-func: func(a: option<u32>) -> option<u32>;
 }

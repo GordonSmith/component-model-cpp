@@ -35,4 +35,3 @@ target_link_libraries(wamr
     PRIVATE ${IWASM_LIB}
     PRIVATE ${VMLIB_LIB}
 )
-

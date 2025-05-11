@@ -166,26 +166,30 @@ namespace cmcpp
         }
     }
 
-    template <Variant T>
+    //  Option ------------------------------------------------------------------
+    template <Option T>
     inline void store(LiftLowerContext &cx, const T &v, uint32_t ptr)
     {
-        variant::store(cx, v, ptr);
-    }
-
-    template <Variant T>
-    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
-    {
-        return variant::lower_flat(cx, v);
+        using V = variant_t<bool_t, typename ValTrait<T>::inner_type>;
+        if (v.has_value())
+        {
+            variant::store<V>(cx, v.value(), ptr);
+        }
+        else
+        {
+            variant::store<V>(cx, false, ptr);
+        }
     }
 
     template <Option T>
     inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
     {
-        using V = variant_t<bool_t, typename ValTrait<T>::inner_type>;
+        using V = typename ValTrait<T>::variant_type;
         if (v.has_value())
         {
+            auto v3 = v.value();
             V v2 = v.value();
-            return variant::lower_flat(cx, v2);
+            return variant::lower_flat<V>(cx, v2);
         }
         else
         {
@@ -193,16 +197,17 @@ namespace cmcpp
         }
     }
 
-    template <Variant T>
+    template <Option T>
     inline T load(const LiftLowerContext &cx, uint32_t ptr)
     {
-        return variant::load<T>(cx, ptr);
-    }
-
-    template <Variant T>
-    inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
-    {
-        return variant::lift_flat<T>(cx, vi);
+        T retVal;
+        using V = variant_t<bool_t, typename ValTrait<T>::inner_type>;
+        auto v = variant::load<V>(cx, ptr);
+        if (v.index() == 1)
+        {
+            retVal = std::get<1>(v);
+        }
+        return retVal;
     }
 
     template <Option T>
@@ -218,6 +223,30 @@ namespace cmcpp
         return retVal;
     }
 
+    //  Variant ------------------------------------------------------------------
+    template <Variant T>
+    inline void store(LiftLowerContext &cx, const T &v, uint32_t ptr)
+    {
+        variant::store(cx, v, ptr);
+    }
+
+    template <Variant T>
+    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
+    {
+        return variant::lower_flat(cx, v);
+    }
+
+    template <Variant T>
+    inline T load(const LiftLowerContext &cx, uint32_t ptr)
+    {
+        return variant::load<T>(cx, ptr);
+    }
+
+    template <Variant T>
+    inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
+    {
+        return variant::lift_flat<T>(cx, vi);
+    }
 }
 
 #endif
