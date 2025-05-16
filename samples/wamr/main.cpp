@@ -69,10 +69,10 @@ std::vector<wasm_val_t> toWamr(const WasmValVector &values)
             } else if constexpr (std::is_same_v<T, int64_t>) {
                 w_val.kind = WASM_I64;
                 w_val.of.i64 = arg;
-            } else if constexpr (std::is_same_v<T, float>) {
+            } else if constexpr (std::is_same_v<T, float32_t>) {
                 w_val.kind = WASM_F32;
                 w_val.of.f32 = arg;
-            } else if constexpr (std::is_same_v<T, double>) {
+            } else if constexpr (std::is_same_v<T, float64_t>) {
                 w_val.kind = WASM_F64;
                 w_val.of.f64 = arg;
             } else {
@@ -162,6 +162,102 @@ func_t<F> attach(const wasm_module_inst_t &module_inst, const wasm_exec_env_t &e
     };
 }
 
+template <typename T>
+constexpr char wamrSignatureChar()
+{
+
+    if constexpr (std::is_same_v<T, int32_t>)
+    {
+        return 'i';
+    }
+    else if constexpr (std::is_same_v<T, int64_t>)
+    {
+        return 'I';
+    }
+    else if constexpr (std::is_same_v<T, float32_t>)
+    {
+        return 'f';
+    }
+    else if constexpr (std::is_same_v<T, float64_t>)
+    {
+        return 'F';
+    }
+    else
+    {
+        assert(false && "Unsupported type in WasmVal variant");
+        return '?';
+    }
+}
+
+template <FlatValue R, FlatValue... Ps>
+NativeSymbol wamrSymbol(const char *symbol, void *func_ptr, std::string &signature)
+{
+    NativeSymbol retVal;
+    retVal.symbol = symbol;
+    retVal.func_ptr = func_ptr;
+    signature = "(";
+    // Use an initializer list to expand the parameter pack
+    (void)std::initializer_list<int>{(signature += wamrSignatureChar<Ps>(), 0)...};
+    signature += ")";
+    signature += wamrSignatureChar<R>();
+
+    retVal.signature = signature.c_str();
+    return retVal;
+}
+
+// template <typename F>
+// bool host(LiftLowerContext &liftLowerContext, const char *name, func_t<F> &func)
+// {
+//     using params_t = typename ValTrait<func_t<F>>::params_t;
+//     using result_t = typename ValTrait<func_t<F>>::result_t;
+//     std::string signature;
+
+//     auto lowered_func = [&liftLowerContext, &func](wasm_exec_env_t exec_env, auto... args)
+//     {
+//         auto params = lift_flat_values<params_t>(liftLowerContext, MAX_FLAT_PARAMS, std::forward<decltype(args)>(args)...);
+//         auto result = func(std::forward<decltype(args)>(args)...);
+//     };
+//     auto symbol = [&]<std::size_t... I>(std::index_sequence<I...>)
+//     {
+//         return wamrSymbol<result_t, std::remove_reference_t<std::tuple_element_t<I, params_t>>...>(name, (void *)&lowered_func, signature);
+//     }(std::make_index_sequence<ValTrait<result_t>::flat_types.size()>{});
+
+//     return wasm_runtime_register_natives(name, &symbol, 1);
+// }
+
+using MyFunc = std::function<void(wasm_exec_env_t, int32_t, unsigned char *, size_t, unsigned char *)>;
+MyFunc my_func = [](wasm_exec_env_t exec_env, int32_t a, unsigned char *b, size_t c, unsigned char *d)
+{
+    throw std::runtime_error("test");
+};
+
+template <typename F>
+void reverse(wasm_exec_env_t exec_env, uint64_t *args)
+{
+    using params_t = typename ValTrait<func_t<F>>::params_t;
+    using result_t = typename ValTrait<func_t<F>>::result_t;
+
+    native_raw_return_type(int32_t, args);
+
+    for (int i = 0; i < ValTrait<result_t>::flat_types.size(); i++)
+    {
+        std::cout << i << std::endl;
+        // native_raw_return_type(ValTrait<result_t>::flat_types[i], args);
+    }
+    for (int i = 0; i < ValTrait<params_t>::flat_types.size(); i++)
+    {
+        std::cout << i << std::endl;
+        // native_raw_return_type(ValTrait<params_t>::flat_types[i], args);
+    }
+    native_raw_get_arg(int, x, args);
+    native_raw_get_arg(int, y, args);
+    void *attachment = wasm_runtime_get_function_attachment(exec_env);
+    int res = x + y;
+    native_raw_set_return(res);
+}
+int mol = 42;
+NativeSymbol symbol[] = {{"reverse", (void *)reverse<tuple_t<string_t, bool_t>(tuple_t<bool_t, string_t>)>, "(i*i*)", &mol}};
+
 int main()
 {
     char *buffer, error_buf[128];
@@ -178,7 +274,8 @@ int main()
     buffer = read_wasm_binary_to_buffer("build/samples/wasm/src/wasm-build/sample.wasm", &size);
 
     // /* add line below if we want to export native functions to WASM app */
-    // wasm_runtime_register_natives(...);
+
+    bool success = wasm_runtime_register_natives_raw("example:sample/tuples", symbol, 1);
 
     // /* parse the WASM file from buffer and create a WASM module */
     module = wasm_runtime_load((uint8_t *)buffer, size, error_buf, sizeof(error_buf));
@@ -256,6 +353,13 @@ int main()
         "p9", "p10", "p11", "p12", "p13", "p14", "p15", "p16", "p17");
     std::cout << "call_lots result: " << call_lots_result << std::endl;
 
+    func_t<tuple_t<string_t, bool_t>(tuple_t<bool_t, string_t>)> host_reverse_tuple = [](tuple_t<bool_t, string_t> a) -> tuple_t<string_t, bool_t>
+    {
+        return {std::get<string_t>(a), std::get<bool_t>(a)};
+    };
+    // auto xxxx = host<tuple_t<string_t, bool_t>(tuple_t<bool_t, string_t>)>(liftLowerContext,
+    //                                                                        "example:sample/tuples#reverse",
+    //                                                                        host_reverse_tuple);
     auto call_reverse_tuple = attach<tuple_t<string_t, bool_t>(tuple_t<bool_t, string_t>)>(module_inst, exec_env, liftLowerContext,
                                                                                            "example:sample/tuples#reverse");
     auto call_reverse_tuple_result = call_reverse_tuple({false, "Hello World!"});
