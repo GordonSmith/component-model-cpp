@@ -1,16 +1,17 @@
 #include "sample.h"
 
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
 bool exports_example_sample_booleans_and(bool a, bool b)
 {
-    return a && b;
+    return example_sample_booleans_and(a, b);
 }
 
 double exports_example_sample_floats_add(double a, double b)
 {
-    return a + b;
+    return example_sample_floats_add(a, b);
 }
 
 void exports_example_sample_variants_variant_func(exports_example_sample_variants_v_t *a, exports_example_sample_variants_v_t *ret)
@@ -28,19 +29,19 @@ void exports_example_sample_variants_variant_func(exports_example_sample_variant
 
 void exports_example_sample_strings_reverse(sample_string_t *a, sample_string_t *ret)
 {
-    ret->ptr = (uint8_t *)malloc(a->len);
-    ret->len = a->len;
-    for (size_t i = 0; i < a->len; ++i)
+    sample_string_t buff;
+    example_sample_strings_reverse(a, &buff);
+    ret->ptr = (uint8_t *)malloc(buff.len);
+    ret->len = buff.len;
+    for (size_t i = 0; i < buff.len; ++i)
     {
-        ret->ptr[i] = a->ptr[a->len - i - 1];
+        ret->ptr[i] = buff.ptr[buff.len - i - 1];
     }
 }
 
 uint32_t exports_example_sample_strings_lots(sample_string_t *p1, sample_string_t *p2, sample_string_t *p3, sample_string_t *p4, sample_string_t *p5, sample_string_t *p6, sample_string_t *p7, sample_string_t *p8, sample_string_t *p9, sample_string_t *p10, sample_string_t *p11, sample_string_t *p12, sample_string_t *p13, sample_string_t *p14, sample_string_t *p15, sample_string_t *p16, sample_string_t *p17)
 {
-    // Calculate total length
-    return p1->len + p2->len + p3->len + p4->len + p5->len + p6->len + p7->len + p8->len +
-           p9->len + p10->len + p11->len + p12->len + p13->len + p14->len + p15->len + p16->len + p17->len;
+    return example_sample_strings_lots(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17);
 }
 
 void exports_example_sample_tuples_reverse(sample_tuple2_bool_string_t *a, sample_tuple2_string_bool_t *ret)
@@ -62,7 +63,11 @@ void exports_example_sample_lists_filter_bool(exports_example_sample_lists_list_
     }
 }
 
-void exports_sample_void_func(void) {}
+void exports_sample_void_func(void)
+{
+    sample_void_func();
+}
+
 bool exports_sample_ok_func(uint32_t a, uint32_t b, uint32_t *ret, sample_string_t *err)
 {
     *ret = a + b;

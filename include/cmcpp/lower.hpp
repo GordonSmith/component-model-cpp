@@ -53,26 +53,37 @@ namespace cmcpp
     inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v);
 
     template <Field... Ts>
-    inline WasmValVector lower_heap_values(LiftLowerContext &cx, Ts &&...vs)
+    inline WasmValVector lower_heap_values(LiftLowerContext &cx, uint32_t *out_param, Ts &&...vs)
     {
         using tuple_type = tuple_t<Ts...>;
-        auto ptr = cx.opts.realloc(0, 0, ValTrait<tuple_type>::alignment, ValTrait<tuple_type>::size);
-        WasmValVector flat_vals = {ptr};
+        tuple_type tuple_value = {std::forward<Ts>(vs)...};
+        uint32_t ptr;
+        WasmValVector flat_vals = {};
+        if (out_param == nullptr)
+        {
+            ptr = cx.opts.realloc(0, 0, ValTrait<tuple_type>::alignment, ValTrait<tuple_type>::size);
+            flat_vals = {ptr};
+        }
+        else
+        {
+            ptr = *out_param;
+            flat_vals = {};
+        }
         trap_if(cx, ptr != align_to(ptr, ValTrait<tuple_type>::alignment));
         trap_if(cx, ptr + ValTrait<tuple_type>::size > cx.opts.memory.size());
-        store<tuple_type>(cx, {std::forward<Ts>(vs)...}, ptr);
+        store<tuple_type>(cx, tuple_value, ptr);
         return flat_vals;
     }
 
     template <Field... Ts>
-    inline WasmValVector lower_flat_values(LiftLowerContext &cx, uint max_flat, Ts &&...vs)
+    inline WasmValVector lower_flat_values(LiftLowerContext &cx, uint max_flat, uint32_t *out_param, Ts &&...vs)
     {
         WasmValVector retVal = {};
         // cx.inst.may_leave=false;
         constexpr auto flat_types = ValTrait<tuple_t<Ts...>>::flat_types;
         if (flat_types.size() > max_flat)
         {
-            retVal = lower_heap_values(cx, std::forward<Ts>(vs)...);
+            retVal = lower_heap_values(cx, out_param, std::forward<Ts>(vs)...);
         }
         else
         {

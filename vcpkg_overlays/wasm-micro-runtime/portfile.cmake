@@ -30,36 +30,18 @@ vcpkg_check_features(OUT_FEATURE_OPTIONS FEATURE_OPTIONS
     llvm-jit WAMR_BUILD_JIT
     fast-jit WAMR_BUILD_FAST_JIT
 )
+string(REPLACE "=ON" "=1" FEATURE_OPTIONS "${FEATURE_OPTIONS}")
+
+message("FEATURE_OPTIONS:  ${FEATURE_OPTIONS}")
 
 if (WAMR_BUILD_FAST_INTERP)
     set(WAMR_BUILD_INTERP ON)
 endif ()
 
-# # disabled due to build failure
-# list(APPEND WASMEDGE_CMAKE_OPTIONS "-DWASMEDGE_BUILD_EXAMPLE=OFF")
-
-# set(WASMEDGE_PLUGIN_WASI_NN_BACKEND "")
-
-# if("plugin-wasi-nn-backend-openvino" IN_LIST FEATURES)
-#     list(APPEND WASMEDGE_PLUGIN_WASI_NN_BACKEND "OpenVINO")
-# endif()
-# if("plugin-wasi-nn-backend-pytorch" IN_LIST FEATURES)
-#     list(APPEND WASMEDGE_PLUGIN_WASI_NN_BACKEND "PyTorch")
-# endif()
-# if("plugin-wasi-nn-backend-tensorflow-lite" IN_LIST FEATURES)
-#     list(APPEND WASMEDGE_PLUGIN_WASI_NN_BACKEND "TensorflowLite")
-# endif()
-
-# if(NOT WASMEDGE_PLUGIN_WASI_NN_BACKEND STREQUAL "")
-#     list(JOIN WASMEDGE_PLUGIN_WASI_NN_BACKEND "," WASMEDGE_PLUGIN_WASI_NN_BACKEND)
-#     list(APPEND WASMEDGE_CMAKE_OPTIONS "-WASMEDGE_PLUGIN_WASI_NN_BACKEND=${WASMEDGE_PLUGIN_WASI_NN_BACKEND}")
-# endif()
-
 vcpkg_cmake_configure(
     SOURCE_PATH "${SOURCE_PATH}"
     OPTIONS
-        ${WASMEDGE_CMAKE_OPTIONS}
-        # ${FEATURE_OPTIONS}
+        ${FEATURE_OPTIONS}
     # OPTIONS_RELEASE
     #     -DCMAKE_INSTALL_BINDIR=${CURRENT_PACKAGES_DIR}/tools
     # OPTIONS_DEBUG

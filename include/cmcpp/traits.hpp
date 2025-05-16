@@ -48,6 +48,11 @@ namespace cmcpp
     {
         static constexpr WasmValType type = WasmValType::i32;
         static constexpr uint32_t size = 4;
+        using inner_type = int32_t;
+        int32_t get(const WasmVal &val)
+        {
+            return std::get<int32_t>(val);
+        }
     };
 
     template <>
@@ -55,6 +60,11 @@ namespace cmcpp
     {
         static constexpr WasmValType type = WasmValType::i64;
         static constexpr uint32_t size = 8;
+        using inner_type = int64_t;
+        int64_t get(const WasmVal &val)
+        {
+            return std::get<int64_t>(val);
+        }
     };
 
     template <>
@@ -62,6 +72,11 @@ namespace cmcpp
     {
         static constexpr WasmValType type = WasmValType::f32;
         static constexpr uint32_t size = 4;
+        using inner_type = float32_t;
+        float32_t get(const WasmVal &val)
+        {
+            return std::get<float32_t>(val);
+        }
     };
 
     template <>
@@ -69,6 +84,11 @@ namespace cmcpp
     {
         static constexpr WasmValType type = WasmValType::f64;
         static constexpr uint32_t size = 8;
+        using inner_type = float64_t;
+        float64_t get(const WasmVal &val)
+        {
+            return std::get<float64_t>(val);
+        }
     };
 
     template <typename T>
@@ -542,7 +562,7 @@ namespace cmcpp
 
     //  Field  --------------------------------------------------------------------
     template <typename T>
-    concept Field = ValTrait<T>::type != ValType::UNKNOWN;
+    concept Field = ValTrait<std::remove_cvref_t<T>>::type != ValType::UNKNOWN;
 
     //  Tuple  --------------------------------------------------------------------
     inline constexpr uint32_t align_to(uint32_t ptr, uint8_t alignment)
@@ -739,10 +759,42 @@ namespace cmcpp
     {
         static constexpr ValType type = ValType::Func;
         using inner_type = std::function<R(Args...)>;
-        using params_t = tuple_t<Args...>;
-        using result_t = R;
+        using params_t = tuple_t<std::remove_cvref_t<Args>...>;
+        using result_t = std::remove_cvref_t<R>;
         static constexpr auto flat_params_types = ValTrait<params_t>::flat_types;
         static constexpr auto flat_result_types = ValTrait<result_t>::flat_types;
+
+        static constexpr size_t host_flat_params_types_size = (ValTrait<result_t>::flat_types.size() > MAX_FLAT_RESULTS)
+                                                                  ? (ValTrait<params_t>::flat_types.size() + 1)
+                                                                  : ValTrait<params_t>::flat_types.size();
+        static constexpr auto host_flat_params_types = []() constexpr
+        {
+            std::array<WasmValType, host_flat_params_types_size> arr{};
+            for (size_t i = 0; i < ValTrait<params_t>::flat_types.size(); ++i)
+            {
+                arr[i] = ValTrait<params_t>::flat_types[i];
+            }
+            if constexpr (ValTrait<result_t>::flat_types.size() > MAX_FLAT_RESULTS)
+            {
+                arr[ValTrait<params_t>::flat_types.size()] = WasmValType::i32;
+            }
+            return arr;
+        }();
+        static constexpr size_t host_flat_result_types_size = (ValTrait<result_t>::flat_types.size() > MAX_FLAT_RESULTS)
+                                                                  ? 0
+                                                                  : ValTrait<result_t>::flat_types.size();
+        static constexpr auto host_flat_result_types = []() constexpr
+        {
+            std::array<WasmValType, host_flat_result_types_size> arr{};
+            if constexpr (ValTrait<result_t>::flat_types.size() <= MAX_FLAT_RESULTS)
+            {
+                for (size_t i = 0; i < ValTrait<result_t>::flat_types.size(); ++i)
+                {
+                    arr[i] = ValTrait<result_t>::flat_types[i];
+                }
+            }
+            return arr;
+        }();
     };
 
     template <typename T>

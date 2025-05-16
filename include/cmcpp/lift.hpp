@@ -62,6 +62,7 @@ namespace cmcpp
         }
         return lift_flat<T>(cx, vi);
     }
+
 }
 
 #endif
