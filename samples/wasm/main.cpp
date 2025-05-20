@@ -46,8 +46,8 @@ uint32_t exports_example_sample_strings_lots(sample_string_t *p1, sample_string_
 void exports_example_sample_tuples_reverse(sample_tuple2_bool_string_t *a, sample_tuple2_string_bool_t *ret)
 {
     example_sample_tuples_reverse(a, ret);
-    ret->f1 = !a->f0;
-    exports_example_sample_strings_reverse(&a->f1, &ret->f0);
+    // ret->f1 = !a->f0;
+    // exports_example_sample_strings_reverse(&a->f1, &ret->f0);
 }
 
 void exports_example_sample_lists_filter_bool(exports_example_sample_lists_list_v_t *a, sample_list_string_t *ret)

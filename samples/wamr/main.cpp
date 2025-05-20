@@ -231,32 +231,91 @@ MyFunc my_func = [](wasm_exec_env_t exec_env, int32_t a, unsigned char *b, size_
     throw std::runtime_error("test");
 };
 
-template <typename F>
-void reverse(wasm_exec_env_t exec_env, uint64_t *args)
+template <Field T>
+WasmValVector rawWamr2Wasm(wasm_exec_env_t exec_env, uint64_t *args)
 {
-    using params_t = typename ValTrait<func_t<F>>::params_t;
-    using result_t = typename ValTrait<func_t<F>>::result_t;
+    WasmValVector retVal;
+    for (int i = 0; i < ValTrait<T>::flat_types.size(); i++)
+    {
+        std::cout << i << std::endl;
+        switch (ValTrait<T>::flat_types[i])
+        {
+        case WasmValType::i32:
+        {
+            native_raw_get_arg(int32_t, p, args);
+            retVal.push_back(p);
+            break;
+        }
+        case WasmValType::i64:
+        {
 
+            native_raw_get_arg(int64_t, p, args);
+            retVal.push_back(p);
+            break;
+        }
+        case WasmValType::f32:
+        {
+            native_raw_get_arg(float32_t, p, args);
+            retVal.push_back(p);
+            break;
+        }
+        case WasmValType::f64:
+        {
+            native_raw_get_arg(float64_t, p, args);
+            retVal.push_back(p);
+            break;
+        }
+        }
+    }
+    return retVal;
+}
+
+template <typename F>
+void export_func(wasm_exec_env_t exec_env, uint64_t *args)
+{
     native_raw_return_type(int32_t, args);
+    void *attachment = wasm_runtime_get_function_attachment(exec_env);
+
+    using params_t_outer = typename ValTrait<func_t<F>>::params_t;
+    using params_t = typename ValTrait<params_t_outer>::inner_type;
+    auto params = rawWamr2Wasm<params_t>(exec_env, args);
+
+    wasm_module_inst_t module_inst = wasm_runtime_get_module_inst(exec_env);
+    wasm_memory_inst_t memory = wasm_runtime_lookup_memory(module_inst, "memory");
+    wasm_function_inst_t cabi_realloc = wasm_runtime_lookup_function(module_inst, "cabi_realloc");
+    GuestRealloc realloc = [exec_env, cabi_realloc](int original_ptr, int original_size, int alignment, int new_size) -> int
+    {
+        uint32_t argv[4];
+        argv[0] = original_ptr;
+        argv[1] = original_size;
+        argv[2] = alignment;
+        argv[3] = new_size;
+        wasm_runtime_call_wasm(exec_env, cabi_realloc, 4, argv);
+        return argv[0];
+    };
+    LiftLowerOptions opts(Encoding::Utf8, std::span<uint8_t>(static_cast<uint8_t *>(wasm_memory_get_base_address(memory)), 999999), realloc);
+    LiftLowerContext liftLowerContext(trap, convert, opts);
+    auto xxx = lift_flat_values<params_t>(liftLowerContext, MAX_FLAT_PARAMS, params);
+    auto yyy = std::get<0>(xxx);
+    std::cout << std::get<0>(yyy) << std::string(", ") << std::get<1>(yyy) << std::endl;
+
+    using result_t = typename ValTrait<func_t<F>>::result_t;
+    result_t res = {std::get<1>(yyy), std::get<0>(yyy)};
+    auto result = lower_flat_values<std::tuple<result_t>>(liftLowerContext, MAX_FLAT_RESULTS, std::move(res));
 
     for (int i = 0; i < ValTrait<result_t>::flat_types.size(); i++)
     {
         std::cout << i << std::endl;
         // native_raw_return_type(ValTrait<result_t>::flat_types[i], args);
     }
-    for (int i = 0; i < ValTrait<params_t>::flat_types.size(); i++)
-    {
-        std::cout << i << std::endl;
-        // native_raw_return_type(ValTrait<params_t>::flat_types[i], args);
-    }
-    native_raw_get_arg(int, x, args);
-    native_raw_get_arg(int, y, args);
-    void *attachment = wasm_runtime_get_function_attachment(exec_env);
-    int res = x + y;
-    native_raw_set_return(res);
+    std::cout << result.size() << std::endl;
+    native_raw_set_return(std::get<int32_t>(result[0]));
 }
 int mol = 42;
-NativeSymbol symbol[] = {{"reverse", (void *)reverse<tuple_t<string_t, bool_t>(tuple_t<bool_t, string_t>)>, "(i*i*)", &mol}};
+NativeSymbol symbol[] = {
+    {"reverse", (void *)export_func<tuple_t<string_t, bool_t>(tuple_t<bool_t, string_t>)>, "(iiii)", &mol},
+    {"reverse2", (void *)export_func<tuple_t<string_t, bool_t>(tuple_t<bool_t, string_t>)>, "(i*i*)", &mol},
+};
 
 int main()
 {
