@@ -1,7 +1,4 @@
-#include "wasm_export.h"
-#include "cmcpp.hpp"
-
-#include <iostream>
+#include "wamr.hpp"
 
 using namespace cmcpp;
 
@@ -29,137 +26,6 @@ char *read_wasm_binary_to_buffer(const char *filename, uint32_t *size)
 
     fclose(file);
     return buffer;
-}
-
-void trap(const char *msg)
-{
-    throw new std::runtime_error(msg);
-}
-
-std::pair<void *, size_t> convert(void *dest, uint32_t dest_byte_len, const void *src, uint32_t src_byte_len, Encoding from_encoding, Encoding to_encoding)
-{
-    if (from_encoding == to_encoding)
-    {
-        assert(dest_byte_len >= src_byte_len);
-        if (src_byte_len > 0)
-        {
-            std::memcpy(dest, src, src_byte_len);
-            return std::make_pair(dest, src_byte_len);
-        }
-        return std::make_pair(nullptr, 0);
-    }
-    assert(false);
-}
-
-std::vector<wasm_val_t> toWamr(const WasmValVector &values)
-{
-    std::vector<wasm_val_t> result;
-    result.reserve(values.size());
-
-    for (const auto &val_variant : values)
-    {
-        result.emplace_back(std::visit([](auto &&arg) -> wasm_val_t
-                                       {
-            wasm_val_t w_val{}; // Value-initialize
-            using T = std::decay_t<decltype(arg)>;
-
-            if constexpr (std::is_same_v<T, int32_t>) {
-                w_val.kind = WASM_I32;
-                w_val.of.i32 = arg;
-            } else if constexpr (std::is_same_v<T, int64_t>) {
-                w_val.kind = WASM_I64;
-                w_val.of.i64 = arg;
-            } else if constexpr (std::is_same_v<T, float32_t>) {
-                w_val.kind = WASM_F32;
-                w_val.of.f32 = arg;
-            } else if constexpr (std::is_same_v<T, float64_t>) {
-                w_val.kind = WASM_F64;
-                w_val.of.f64 = arg;
-            } else {
-                assert(false && "Unsupported type in WasmVal variant");
-            }
-            return w_val; }, val_variant));
-    }
-    return result;
-}
-
-WasmValVector fromWamr(size_t count, const wasm_val_t *values)
-{
-    WasmValVector result;
-    result.reserve(count);
-
-    for (size_t i = 0; i < count; ++i)
-    {
-        switch (values[i].kind)
-        {
-        case WASM_I32:
-            result.emplace_back(values[i].of.i32);
-            break;
-        case WASM_I64:
-            result.emplace_back(values[i].of.i64);
-            break;
-        case WASM_F32:
-            result.emplace_back(values[i].of.f32);
-            break;
-        case WASM_F64:
-            result.emplace_back(values[i].of.f64);
-            break;
-        default:
-            assert(false && "fromWamr: Unexpected wasm_val_t kind.");
-            break;
-        }
-    }
-    return result;
-}
-
-template <typename F>
-func_t<F> attach(const wasm_module_inst_t &module_inst, const wasm_exec_env_t &exec_env, LiftLowerContext &liftLowerContext, const char *name)
-{
-    using result_t = typename ValTrait<func_t<F>>::result_t;
-
-    wasm_function_inst_t guest_func = wasm_runtime_lookup_function(module_inst, name);
-    if (!guest_func)
-    {
-        wasm_module_inst_t current_module_inst = wasm_runtime_get_module_inst(exec_env);
-        const char *exception = wasm_runtime_get_exception(current_module_inst);
-        liftLowerContext.trap(exception ? exception : "Unable to find function");
-    }
-    wasm_function_inst_t guest_cleanup_func = wasm_runtime_lookup_function(module_inst, (std::string("cabi_post_") + name).c_str());
-
-    return [guest_func, guest_cleanup_func, exec_env, &liftLowerContext](auto &&...args) -> result_t
-    {
-        WasmValVector lowered_args = lower_flat_values(
-            liftLowerContext,
-            MAX_FLAT_PARAMS,
-            std::forward<decltype(args)>(args)...);
-        std::vector<wasm_val_t> inputs = toWamr(lowered_args);
-
-        constexpr size_t output_size = std::is_same<result_t, void>::value ? 0 : 1;
-        wasm_val_t outputs[output_size];
-
-        bool success = wasm_runtime_call_wasm_a(exec_env, guest_func,
-                                                output_size, outputs,
-                                                inputs.size(), inputs.data());
-
-        if (!success)
-        {
-            wasm_module_inst_t current_module_inst = wasm_runtime_get_module_inst(exec_env);
-            const char *exception = wasm_runtime_get_exception(current_module_inst);
-            liftLowerContext.trap(exception ? exception : "Unknown WAMR execution error");
-        }
-
-        if constexpr (output_size > 0)
-        {
-            auto output = lift_flat_values<result_t>(liftLowerContext, MAX_FLAT_RESULTS, fromWamr(output_size, outputs));
-
-            if (guest_cleanup_func)
-            {
-                wasm_runtime_call_wasm_a(exec_env, guest_cleanup_func, 0, nullptr, output_size, outputs);
-            }
-
-            return output;
-        }
-    };
 }
 
 template <typename T>
@@ -231,90 +97,13 @@ MyFunc my_func = [](wasm_exec_env_t exec_env, int32_t a, unsigned char *b, size_
     throw std::runtime_error("test");
 };
 
-template <Field T>
-WasmValVector rawWamr2Wasm(wasm_exec_env_t exec_env, uint64_t *args)
+std::function<bool_t(bool_t, bool_t)> and_func = [](bool_t a, bool_t b) -> bool_t
 {
-    WasmValVector retVal;
-    for (int i = 0; i < ValTrait<T>::flat_types.size(); i++)
-    {
-        std::cout << i << std::endl;
-        switch (ValTrait<T>::flat_types[i])
-        {
-        case WasmValType::i32:
-        {
-            native_raw_get_arg(int32_t, p, args);
-            retVal.push_back(p);
-            break;
-        }
-        case WasmValType::i64:
-        {
+    return a && b;
+};
 
-            native_raw_get_arg(int64_t, p, args);
-            retVal.push_back(p);
-            break;
-        }
-        case WasmValType::f32:
-        {
-            native_raw_get_arg(float32_t, p, args);
-            retVal.push_back(p);
-            break;
-        }
-        case WasmValType::f64:
-        {
-            native_raw_get_arg(float64_t, p, args);
-            retVal.push_back(p);
-            break;
-        }
-        }
-    }
-    return retVal;
-}
-
-template <typename F>
-void export_func(wasm_exec_env_t exec_env, uint64_t *args)
-{
-    native_raw_return_type(int32_t, args);
-    void *attachment = wasm_runtime_get_function_attachment(exec_env);
-
-    using params_t_outer = typename ValTrait<func_t<F>>::params_t;
-    using params_t = typename ValTrait<params_t_outer>::inner_type;
-    auto params = rawWamr2Wasm<params_t>(exec_env, args);
-
-    wasm_module_inst_t module_inst = wasm_runtime_get_module_inst(exec_env);
-    wasm_memory_inst_t memory = wasm_runtime_lookup_memory(module_inst, "memory");
-    wasm_function_inst_t cabi_realloc = wasm_runtime_lookup_function(module_inst, "cabi_realloc");
-    GuestRealloc realloc = [exec_env, cabi_realloc](int original_ptr, int original_size, int alignment, int new_size) -> int
-    {
-        uint32_t argv[4];
-        argv[0] = original_ptr;
-        argv[1] = original_size;
-        argv[2] = alignment;
-        argv[3] = new_size;
-        wasm_runtime_call_wasm(exec_env, cabi_realloc, 4, argv);
-        return argv[0];
-    };
-    LiftLowerOptions opts(Encoding::Utf8, std::span<uint8_t>(static_cast<uint8_t *>(wasm_memory_get_base_address(memory)), 999999), realloc);
-    LiftLowerContext liftLowerContext(trap, convert, opts);
-    auto xxx = lift_flat_values<params_t>(liftLowerContext, MAX_FLAT_PARAMS, params);
-    auto yyy = std::get<0>(xxx);
-    std::cout << std::get<0>(yyy) << std::string(", ") << std::get<1>(yyy) << std::endl;
-
-    using result_t = typename ValTrait<func_t<F>>::result_t;
-    result_t res = {std::get<1>(yyy), std::get<0>(yyy)};
-    auto result = lower_flat_values<std::tuple<result_t>>(liftLowerContext, MAX_FLAT_RESULTS, std::move(res));
-
-    for (int i = 0; i < ValTrait<result_t>::flat_types.size(); i++)
-    {
-        std::cout << i << std::endl;
-        // native_raw_return_type(ValTrait<result_t>::flat_types[i], args);
-    }
-    std::cout << result.size() << std::endl;
-    native_raw_set_return(std::get<int32_t>(result[0]));
-}
-int mol = 42;
 NativeSymbol symbol[] = {
-    {"reverse", (void *)export_func<tuple_t<string_t, bool_t>(tuple_t<bool_t, string_t>)>, "(iiii)", &mol},
-    {"reverse2", (void *)export_func<tuple_t<string_t, bool_t>(tuple_t<bool_t, string_t>)>, "(i*i*)", &mol},
+    {"and", (void *)export_func<bool_t(bool_t, bool_t)>, "(ii)i", &and_func},
 };
 
 int main()
@@ -335,6 +124,7 @@ int main()
     // /* add line below if we want to export native functions to WASM app */
 
     bool success = wasm_runtime_register_natives_raw("example:sample/tuples", symbol, 1);
+    success = wasm_runtime_register_natives_raw("example:sample/booleans", symbol, 1);
 
     // /* parse the WASM file from buffer and create a WASM module */
     module = wasm_runtime_load((uint8_t *)buffer, size, error_buf, sizeof(error_buf));
@@ -360,50 +150,53 @@ int main()
         return argv[0];
     };
 
-    LiftLowerOptions opts(Encoding::Utf8, std::span<uint8_t>(static_cast<uint8_t *>(wasm_memory_get_base_address(memory)), 999999), realloc);
+    uint8_t *mem_start_addr = (uint8_t *)wasm_memory_get_base_address(memory);
+    uint8_t *mem_end_addr = NULL;
+    wasm_runtime_get_native_addr_range(module_inst, mem_start_addr, NULL, &mem_end_addr);
+    LiftLowerOptions opts(Encoding::Utf8, std::span<uint8_t>(mem_start_addr, mem_end_addr - mem_start_addr), realloc);
 
     LiftLowerContext liftLowerContext(trap, convert, opts);
 
-    auto variant_func = attach<variant_t<bool_t, uint32_t>(variant_t<bool_t, uint32_t>)>(module_inst, exec_env, liftLowerContext, "example:sample/variants#variant-func");
+    auto variant_func = guest_function<variant_t<bool_t, uint32_t>(variant_t<bool_t, uint32_t>)>(module_inst, exec_env, liftLowerContext, "example:sample/variants#variant-func");
     std::cout << "variant_func((uint32_t)40)" << std::get<1>(variant_func((uint32_t)40)) << std::endl;
     std::cout << "variant_func((bool_t)true)" << std::get<0>(variant_func((bool_t) true)) << std::endl;
     std::cout << "variant_func((bool_t)false)" << std::get<0>(variant_func((bool_t) false)) << std::endl;
 
-    auto option_func = attach<option_t<uint32_t>(option_t<uint32_t>)>(module_inst, exec_env, liftLowerContext, "option-func");
+    auto option_func = guest_function<option_t<uint32_t>(option_t<uint32_t>)>(module_inst, exec_env, liftLowerContext, "option-func");
     std::cout << "option_func((uint32_t)40).has_value()" << option_func((uint32_t)40).has_value() << std::endl;
     std::cout << "option_func((uint32_t)40).value()" << option_func((uint32_t)40).value() << std::endl;
     std::cout << "option_func(std::nullopt).has_value()" << option_func(std::nullopt).has_value() << std::endl;
 
-    auto void_func = attach<void()>(module_inst, exec_env, liftLowerContext, "void-func");
+    auto void_func = guest_function<void()>(module_inst, exec_env, liftLowerContext, "void-func");
     void_func();
 
-    auto ok_func = attach<result_t<uint32_t, string_t>(uint32_t, uint32_t)>(module_inst, exec_env, liftLowerContext, "ok-func");
+    auto ok_func = guest_function<result_t<uint32_t, string_t>(uint32_t, uint32_t)>(module_inst, exec_env, liftLowerContext, "ok-func");
     auto ok_func_result = ok_func(40, 2);
     std::cout << "ok_func result: " << std::get<uint32_t>(ok_func_result) << std::endl;
 
-    auto err_func = attach<result_t<uint32_t, string_t>(uint32_t, uint32_t)>(module_inst, exec_env, liftLowerContext, "err-func");
+    auto err_func = guest_function<result_t<uint32_t, string_t>(uint32_t, uint32_t)>(module_inst, exec_env, liftLowerContext, "err-func");
     auto err_func_result = err_func(40, 2);
     std::cout << "err_func result: " << std::get<string_t>(err_func_result) << std::endl;
 
-    auto call_and = attach<bool_t(bool_t, bool_t)>(module_inst, exec_env, liftLowerContext,
-                                                   "example:sample/booleans#and");
+    auto call_and = guest_function<bool_t(bool_t, bool_t)>(module_inst, exec_env, liftLowerContext,
+                                                           "example:sample/booleans#and");
     std::cout << "call_and(false, false): " << call_and(false, false) << std::endl;
     std::cout << "call_and(false, true): " << call_and(false, true) << std::endl;
     std::cout << "call_and(true, false): " << call_and(true, false) << std::endl;
     std::cout << "call_and(true, true): " << call_and(true, true) << std::endl;
 
-    auto call_add = attach<float64_t(float64_t, float64_t)>(module_inst, exec_env, liftLowerContext,
-                                                            "example:sample/floats#add");
+    auto call_add = guest_function<float64_t(float64_t, float64_t)>(module_inst, exec_env, liftLowerContext,
+                                                                    "example:sample/floats#add");
     std::cout << "call_add(3.1, 0.2): " << call_add(3.1, 0.2) << std::endl;
     std::cout << "call_add(1.5, 2.5): " << call_add(1.5, 2.5) << std::endl;
 
-    auto call_reverse = attach<string_t(string_t)>(module_inst, exec_env, liftLowerContext,
-                                                   "example:sample/strings#reverse");
+    auto call_reverse = guest_function<string_t(string_t)>(module_inst, exec_env, liftLowerContext,
+                                                           "example:sample/strings#reverse");
     auto call_reverse_result = call_reverse("Hello World!");
     std::cout << "call_reverse(\"Hello World!\"): " << call_reverse_result << std::endl;
     std::cout << "call_reverse(call_reverse(\"Hello World!\")): " << call_reverse(call_reverse_result) << std::endl;
 
-    auto call_lots = attach<uint32_t(string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t)>(
+    auto call_lots = guest_function<uint32_t(string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t)>(
         module_inst, exec_env, liftLowerContext,
         "example:sample/strings#lots");
 
@@ -419,12 +212,12 @@ int main()
     // auto xxxx = host<tuple_t<string_t, bool_t>(tuple_t<bool_t, string_t>)>(liftLowerContext,
     //                                                                        "example:sample/tuples#reverse",
     //                                                                        host_reverse_tuple);
-    auto call_reverse_tuple = attach<tuple_t<string_t, bool_t>(tuple_t<bool_t, string_t>)>(module_inst, exec_env, liftLowerContext,
-                                                                                           "example:sample/tuples#reverse");
+    auto call_reverse_tuple = guest_function<tuple_t<string_t, bool_t>(tuple_t<bool_t, string_t>)>(module_inst, exec_env, liftLowerContext,
+                                                                                                   "example:sample/tuples#reverse");
     auto call_reverse_tuple_result = call_reverse_tuple({false, "Hello World!"});
     std::cout << "call_reverse_tuple({false, \"Hello World!\"}): " << std::get<0>(call_reverse_tuple_result) << ", " << std::get<1>(call_reverse_tuple_result) << std::endl;
 
-    auto call_list_filter = attach<list_t<string_t>(list_t<variant_t<bool_t, string_t>>)>(module_inst, exec_env, liftLowerContext, "example:sample/lists#filter-bool");
+    auto call_list_filter = guest_function<list_t<string_t>(list_t<variant_t<bool_t, string_t>>)>(module_inst, exec_env, liftLowerContext, "example:sample/lists#filter-bool");
     auto call_list_filter_result = call_list_filter({{false}, {"Hello World!"}, {"Another String"}, {true}, {false}});
     std::cout << "call_list_filter result: " << call_list_filter_result.size() << std::endl;
 
@@ -435,7 +228,7 @@ int main()
         c
     };
 
-    auto enum_func = attach<enum_t<e>(enum_t<e>)>(module_inst, exec_env, liftLowerContext, "example:sample/enums#enum-func");
+    auto enum_func = guest_function<enum_t<e>(enum_t<e>)>(module_inst, exec_env, liftLowerContext, "example:sample/enums#enum-func");
     std::cout << "enum_func(e::a): " << enum_func(e::a) << std::endl;
     std::cout << "enum_func(e::b): " << enum_func(e::b) << std::endl;
     std::cout << "enum_func(e::c): " << enum_func(e::c) << std::endl;

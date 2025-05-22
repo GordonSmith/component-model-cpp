@@ -17,6 +17,8 @@
     }
   ],
   "default-features": [
+    "aot",
+    "classic-interpreter",
     "fast-interpreter"
   ],
   "features": {
