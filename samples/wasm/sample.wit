@@ -63,5 +63,8 @@ world sample {
   export err-func: func(a:u32, b:u32) -> result<u32, string>;
   export option-func: func(a: option<u32>) -> option<u32>;
  
+  import void-func: func();
   import booleans;
+  import floats;
+  import strings;
 }

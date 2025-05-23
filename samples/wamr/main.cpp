@@ -1,4 +1,5 @@
 #include "wamr.hpp"
+#include <cfloat>
 
 using namespace cmcpp;
 
@@ -28,49 +29,6 @@ char *read_wasm_binary_to_buffer(const char *filename, uint32_t *size)
     return buffer;
 }
 
-template <typename T>
-constexpr char wamrSignatureChar()
-{
-
-    if constexpr (std::is_same_v<T, int32_t>)
-    {
-        return 'i';
-    }
-    else if constexpr (std::is_same_v<T, int64_t>)
-    {
-        return 'I';
-    }
-    else if constexpr (std::is_same_v<T, float32_t>)
-    {
-        return 'f';
-    }
-    else if constexpr (std::is_same_v<T, float64_t>)
-    {
-        return 'F';
-    }
-    else
-    {
-        assert(false && "Unsupported type in WasmVal variant");
-        return '?';
-    }
-}
-
-template <FlatValue R, FlatValue... Ps>
-NativeSymbol wamrSymbol(const char *symbol, void *func_ptr, std::string &signature)
-{
-    NativeSymbol retVal;
-    retVal.symbol = symbol;
-    retVal.func_ptr = func_ptr;
-    signature = "(";
-    // Use an initializer list to expand the parameter pack
-    (void)std::initializer_list<int>{(signature += wamrSignatureChar<Ps>(), 0)...};
-    signature += ")";
-    signature += wamrSignatureChar<R>();
-
-    retVal.signature = signature.c_str();
-    return retVal;
-}
-
 // template <typename F>
 // bool host(LiftLowerContext &liftLowerContext, const char *name, func_t<F> &func)
 // {
@@ -91,19 +49,37 @@ NativeSymbol wamrSymbol(const char *symbol, void *func_ptr, std::string &signatu
 //     return wasm_runtime_register_natives(name, &symbol, 1);
 // }
 
-using MyFunc = std::function<void(wasm_exec_env_t, int32_t, unsigned char *, size_t, unsigned char *)>;
-MyFunc my_func = [](wasm_exec_env_t exec_env, int32_t a, unsigned char *b, size_t c, unsigned char *d)
+std::function<void_t()> void_func = []() -> void_t
 {
-    throw std::runtime_error("test");
+    std::cout << "Hello, Void_Func!" << std::endl;
+};
+NativeSymbol root_symbol[] = {
+    {"void-func", (void *)export_func<bool_t(bool_t, bool_t)>, NULL, &void_func},
 };
 
 std::function<bool_t(bool_t, bool_t)> and_func = [](bool_t a, bool_t b) -> bool_t
 {
     return a && b;
 };
+NativeSymbol booleans_symbol[] = {
+    {"and", (void *)export_func<bool_t(bool_t, bool_t)>, NULL, &and_func},
+};
 
-NativeSymbol symbol[] = {
-    {"and", (void *)export_func<bool_t(bool_t, bool_t)>, "(ii)i", &and_func},
+std::function<float64_t(float64_t, float64_t)> add_func = [](float64_t a, float64_t b) -> float64_t
+{
+    return a + b;
+};
+NativeSymbol floats_symbol[] = {
+    {"add", (void *)export_func<float64_t(float64_t, float64_t)>, NULL, &add_func},
+};
+
+std::function<string_t(string_t)> strings_reverse_func = [](string_t a) -> string_t
+{
+    std::cout << "Reversing string: " << a << std::endl;
+    return "abc";
+};
+NativeSymbol strings_symbol[] = {
+    {"reverse", (void *)export_func<string_t(string_t)>, NULL, &strings_reverse_func},
 };
 
 int main()
@@ -122,9 +98,10 @@ int main()
     buffer = read_wasm_binary_to_buffer("build/samples/wasm/src/wasm-build/sample.wasm", &size);
 
     // /* add line below if we want to export native functions to WASM app */
-
-    bool success = wasm_runtime_register_natives_raw("example:sample/tuples", symbol, 1);
-    success = wasm_runtime_register_natives_raw("example:sample/booleans", symbol, 1);
+    bool success = wasm_runtime_register_natives_raw("$root", root_symbol, sizeof(root_symbol) / sizeof(NativeSymbol));
+    success = wasm_runtime_register_natives_raw("example:sample/booleans", booleans_symbol, sizeof(booleans_symbol) / sizeof(NativeSymbol));
+    success = wasm_runtime_register_natives_raw("example:sample/floats", floats_symbol, sizeof(booleans_symbol) / sizeof(NativeSymbol));
+    success = wasm_runtime_register_natives_raw("example:sample/strings", strings_symbol, sizeof(strings_symbol) / sizeof(NativeSymbol));
 
     // /* parse the WASM file from buffer and create a WASM module */
     module = wasm_runtime_load((uint8_t *)buffer, size, error_buf, sizeof(error_buf));
@@ -189,6 +166,8 @@ int main()
                                                                     "example:sample/floats#add");
     std::cout << "call_add(3.1, 0.2): " << call_add(3.1, 0.2) << std::endl;
     std::cout << "call_add(1.5, 2.5): " << call_add(1.5, 2.5) << std::endl;
+    std::cout << "call_add(DBL_MAX, 0.0): " << call_add(DBL_MAX / 2, 0.0) << std::endl;
+    std::cout << "call_add(DBL_MAX / 2, DBL_MAX / 2): " << call_add(DBL_MAX / 2, DBL_MAX / 2) << std::endl;
 
     auto call_reverse = guest_function<string_t(string_t)>(module_inst, exec_env, liftLowerContext,
                                                            "example:sample/strings#reverse");
@@ -234,6 +213,7 @@ int main()
     std::cout << "enum_func(e::c): " << enum_func(e::c) << std::endl;
 
     wasm_runtime_destroy_exec_env(exec_env);
+    wasm_runtime_unregister_natives("example:sample/booleans", booleans_symbol);
     wasm_runtime_deinstantiate(module_inst);
     wasm_runtime_unload(module);
     wasm_runtime_destroy();

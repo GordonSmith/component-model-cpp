@@ -122,6 +122,49 @@ namespace cmcpp
         };
     }
 
+    template <typename T>
+    constexpr char wamrSignatureChar()
+    {
+
+        if constexpr (std::is_same_v<T, int32_t>)
+        {
+            return 'i';
+        }
+        else if constexpr (std::is_same_v<T, int64_t>)
+        {
+            return 'I';
+        }
+        else if constexpr (std::is_same_v<T, float32_t>)
+        {
+            return 'f';
+        }
+        else if constexpr (std::is_same_v<T, float64_t>)
+        {
+            return 'F';
+        }
+        else
+        {
+            assert(false && "Unsupported type in WasmVal variant");
+            return '?';
+        }
+    }
+
+    template <FlatValue R, FlatValue... Ps>
+    NativeSymbol wamrSymbol(const char *symbol, void *func_ptr, std::string &signature)
+    {
+        NativeSymbol retVal;
+        retVal.symbol = symbol;
+        retVal.func_ptr = func_ptr;
+        signature = "(";
+        // Use an initializer list to expand the parameter pack
+        (void)std::initializer_list<int>{(signature += wamrSignatureChar<Ps>(), 0)...};
+        signature += ")";
+        signature += wamrSignatureChar<R>();
+
+        retVal.signature = signature.c_str();
+        return retVal;
+    }
+
     std::pair<void *, size_t> convert(void *dest, uint32_t dest_byte_len, const void *src, uint32_t src_byte_len, Encoding from_encoding, Encoding to_encoding)
     {
         if (from_encoding == to_encoding)
@@ -138,12 +181,11 @@ namespace cmcpp
     }
 
     template <Field T>
-    WasmValVector rawWamr2Wasm(wasm_exec_env_t exec_env, uint64_t *args)
+    WasmValVector rawWamrArg2Wasm(wasm_exec_env_t exec_env, uint64_t *args)
     {
         WasmValVector retVal;
         for (int i = 0; i < ValTrait<T>::flat_types.size(); i++)
         {
-            // std::cout << i << std::endl;
             switch (ValTrait<T>::flat_types[i])
             {
             case WasmValType::i32:
@@ -179,12 +221,14 @@ namespace cmcpp
     template <typename F>
     void export_func(wasm_exec_env_t exec_env, uint64_t *args)
     {
-        native_raw_return_type(int32_t, args);
-        std::function<F> *and_func = (std::function<F> *)wasm_runtime_get_function_attachment(exec_env);
+        using result_t = typename ValTrait<func_t<F>>::result_t;
+        using lower_result_t = typename WasmValTypeTrait<ValTrait<result_t>::flat_types[0]>::type;
+        native_raw_return_type(lower_result_t, args);
+        std::function<F> *func = (std::function<F> *)wasm_runtime_get_function_attachment(exec_env);
 
         using params_t_outer = typename ValTrait<func_t<F>>::params_t;
         using params_t = typename ValTrait<params_t_outer>::inner_type;
-        auto lower_params = rawWamr2Wasm<params_t>(exec_env, args);
+        auto lower_params = rawWamrArg2Wasm<params_t>(exec_env, args);
 
         wasm_module_inst_t module_inst = wasm_runtime_get_module_inst(exec_env);
         wasm_memory_inst_t memory = wasm_runtime_lookup_memory(module_inst, "memory");
@@ -207,11 +251,11 @@ namespace cmcpp
         LiftLowerContext liftLowerContext(trap, convert, opts);
         auto params = lift_flat_values<params_t>(liftLowerContext, MAX_FLAT_PARAMS, lower_params);
 
-        using result_t = typename ValTrait<func_t<F>>::result_t;
-        result_t res = std::apply(*and_func, params);
-        auto result = lower_flat_values<result_t>(liftLowerContext, MAX_FLAT_RESULTS, std::move(res));
+        result_t result = std::apply(*func, params);
+        std::cout << "result: (ValType=" << static_cast<int>(ValTrait<result_t>::type) << "): " << result << std::endl;
+        auto lower_results = lower_flat_values<result_t>(liftLowerContext, MAX_FLAT_RESULTS, std::forward<result_t>(result));
 
-        auto lower_result = std::get<int32_t>(result[0]);
+        auto lower_result = std::get<typename WasmValTypeTrait<ValTrait<result_t>::flat_types[0]>::type>(lower_results[0]);
         native_raw_set_return(lower_result);
     }
 }

@@ -48,6 +48,11 @@ namespace cmcpp
     {
         static constexpr WasmValType type = WasmValType::i32;
         static constexpr uint32_t size = 4;
+        using inner_type = int32_t;
+        int32_t get(const WasmVal &val)
+        {
+            return std::get<int32_t>(val);
+        }
     };
 
     template <>
@@ -55,6 +60,11 @@ namespace cmcpp
     {
         static constexpr WasmValType type = WasmValType::i64;
         static constexpr uint32_t size = 8;
+        using inner_type = int64_t;
+        int64_t get(const WasmVal &val)
+        {
+            return std::get<int64_t>(val);
+        }
     };
 
     template <>
@@ -62,6 +72,11 @@ namespace cmcpp
     {
         static constexpr WasmValType type = WasmValType::f32;
         static constexpr uint32_t size = 4;
+        using inner_type = float32_t;
+        float32_t get(const WasmVal &val)
+        {
+            return std::get<float32_t>(val);
+        }
     };
 
     template <>
@@ -69,6 +84,11 @@ namespace cmcpp
     {
         static constexpr WasmValType type = WasmValType::f64;
         static constexpr uint32_t size = 8;
+        using inner_type = float64_t;
+        float64_t get(const WasmVal &val)
+        {
+            return std::get<float64_t>(val);
+        }
     };
 
     template <typename T>

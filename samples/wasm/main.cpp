@@ -10,7 +10,7 @@ bool exports_example_sample_booleans_and(bool a, bool b)
 
 double exports_example_sample_floats_add(double a, double b)
 {
-    return a + b;
+    return example_sample_floats_add(a, b);
 }
 
 void exports_example_sample_variants_variant_func(exports_example_sample_variants_v_t *a, exports_example_sample_variants_v_t *ret)
@@ -28,12 +28,7 @@ void exports_example_sample_variants_variant_func(exports_example_sample_variant
 
 void exports_example_sample_strings_reverse(sample_string_t *a, sample_string_t *ret)
 {
-    ret->ptr = (uint8_t *)malloc(a->len);
-    ret->len = a->len;
-    for (size_t i = 0; i < a->len; ++i)
-    {
-        ret->ptr[i] = a->ptr[a->len - i - 1];
-    }
+    example_sample_strings_reverse(a, ret);
 }
 
 uint32_t exports_example_sample_strings_lots(sample_string_t *p1, sample_string_t *p2, sample_string_t *p3, sample_string_t *p4, sample_string_t *p5, sample_string_t *p6, sample_string_t *p7, sample_string_t *p8, sample_string_t *p9, sample_string_t *p10, sample_string_t *p11, sample_string_t *p12, sample_string_t *p13, sample_string_t *p14, sample_string_t *p15, sample_string_t *p16, sample_string_t *p17)
@@ -62,7 +57,11 @@ void exports_example_sample_lists_filter_bool(exports_example_sample_lists_list_
     }
 }
 
-void exports_sample_void_func(void) {}
+void exports_sample_void_func(void)
+{
+    sample_void_func();
+}
+
 bool exports_sample_ok_func(uint32_t a, uint32_t b, uint32_t *ret, sample_string_t *err)
 {
     *ret = a + b;
