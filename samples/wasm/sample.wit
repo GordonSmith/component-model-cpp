@@ -49,6 +49,15 @@ interface enums {
   enum-func: func(a: e) -> e;
 }
 
+interface logging {
+  log-bool: func(a: bool, s: string);
+  log-u32: func(a: u32, s: string);
+  log-u64: func(a: u64, s: string);
+  log-f32: func(a: f32, s: string);
+  log-f64: func(a: f64, s: string);
+  log-str: func(a: string, s: string);
+}
+
 world sample {
   export booleans;
   export floats;
@@ -63,6 +72,7 @@ world sample {
   export err-func: func(a:u32, b:u32) -> result<u32, string>;
   export option-func: func(a: option<u32>) -> option<u32>;
  
+  import logging;
   import void-func: func();
   import booleans;
   import floats;

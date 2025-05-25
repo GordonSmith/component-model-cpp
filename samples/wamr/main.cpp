@@ -54,7 +54,7 @@ std::function<void_t()> void_func = []() -> void_t
     std::cout << "Hello, Void_Func!" << std::endl;
 };
 NativeSymbol root_symbol[] = {
-    {"void-func", (void *)export_func<bool_t(bool_t, bool_t)>, NULL, &void_func},
+    {"void-func", (void *)export_func<void_t()>, NULL, &void_func},
 };
 
 std::function<bool_t(bool_t, bool_t)> and_func = [](bool_t a, bool_t b) -> bool_t
@@ -75,11 +75,19 @@ NativeSymbol floats_symbol[] = {
 
 std::function<string_t(string_t)> strings_reverse_func = [](string_t a) -> string_t
 {
-    std::cout << "Reversing string: " << a << std::endl;
+    std::cout << "in host reversing string: " << a << std::endl;
     return "abc";
 };
 NativeSymbol strings_symbol[] = {
     {"reverse", (void *)export_func<string_t(string_t)>, NULL, &strings_reverse_func},
+};
+
+std::function<void_t(uint32_t, string_t)> log_u32 = [](uint32_t a, string_t b) -> void_t
+{
+    std::cout << "wasm-log:  " << b << a << std::endl;
+};
+NativeSymbol logging_symbol[] = {
+    {"log-u32", (void *)export_func<void_t(uint32_t, string_t)>, NULL, &log_u32},
 };
 
 int main()
@@ -102,6 +110,7 @@ int main()
     success = wasm_runtime_register_natives_raw("example:sample/booleans", booleans_symbol, sizeof(booleans_symbol) / sizeof(NativeSymbol));
     success = wasm_runtime_register_natives_raw("example:sample/floats", floats_symbol, sizeof(booleans_symbol) / sizeof(NativeSymbol));
     success = wasm_runtime_register_natives_raw("example:sample/strings", strings_symbol, sizeof(strings_symbol) / sizeof(NativeSymbol));
+    success = wasm_runtime_register_natives_raw("example:sample/logging", logging_symbol, sizeof(logging_symbol) / sizeof(NativeSymbol));
 
     // /* parse the WASM file from buffer and create a WASM module */
     module = wasm_runtime_load((uint8_t *)buffer, size, error_buf, sizeof(error_buf));

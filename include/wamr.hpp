@@ -91,6 +91,7 @@ namespace cmcpp
             WasmValVector lowered_args = lower_flat_values(
                 liftLowerContext,
                 MAX_FLAT_PARAMS,
+                nullptr,
                 std::forward<decltype(args)>(args)...);
             std::vector<wasm_val_t> inputs = wasmVal2wam_val_t(lowered_args);
 
@@ -222,8 +223,7 @@ namespace cmcpp
     void export_func(wasm_exec_env_t exec_env, uint64_t *args)
     {
         using result_t = typename ValTrait<func_t<F>>::result_t;
-        using lower_result_t = typename WasmValTypeTrait<ValTrait<result_t>::flat_types[0]>::type;
-        native_raw_return_type(lower_result_t, args);
+        uint64_t *orig_raw_ret = args;
         std::function<F> *func = (std::function<F> *)wasm_runtime_get_function_attachment(exec_env);
 
         using params_t_outer = typename ValTrait<func_t<F>>::params_t;
@@ -251,11 +251,23 @@ namespace cmcpp
         LiftLowerContext liftLowerContext(trap, convert, opts);
         auto params = lift_flat_values<params_t>(liftLowerContext, MAX_FLAT_PARAMS, lower_params);
 
-        result_t result = std::apply(*func, params);
-        std::cout << "result: (ValType=" << static_cast<int>(ValTrait<result_t>::type) << "): " << result << std::endl;
-        auto lower_results = lower_flat_values<result_t>(liftLowerContext, MAX_FLAT_RESULTS, std::forward<result_t>(result));
-
-        auto lower_result = std::get<typename WasmValTypeTrait<ValTrait<result_t>::flat_types[0]>::type>(lower_results[0]);
-        native_raw_set_return(lower_result);
+        if constexpr (ValTrait<result_t>::flat_types.size() > 0)
+        {
+            using lower_result_t = typename WasmValTypeTrait<ValTrait<result_t>::flat_types[0]>::type;
+            native_raw_return_type(lower_result_t, orig_raw_ret);
+            result_t result = std::apply(*func, params);
+            std::cout << "result: (ValType=" << static_cast<int>(ValTrait<result_t>::type) << "): " << result << std::endl;
+            native_raw_get_arg(int32_t, out_param, args);
+            auto lower_results = lower_flat_values<result_t>(liftLowerContext, MAX_FLAT_RESULTS, &out_param, std::forward<result_t>(result));
+            if (lower_results.size() > 0)
+            {
+                auto lower_result = std::get<lower_result_t>(lower_results[0]);
+                native_raw_set_return(lower_result);
+            }
+        }
+        else
+        {
+            std::apply(*func, params);
+        }
     }
 }
