@@ -53,11 +53,11 @@ namespace cmcpp
     inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v);
 
     template <Field... Ts>
-    inline WasmValVector lower_heap_values(LiftLowerContext &cx, int32_t *out_param, Ts &&...vs)
+    inline WasmValVector lower_heap_values(LiftLowerContext &cx, uint32_t *out_param, Ts &&...vs)
     {
         using tuple_type = tuple_t<Ts...>;
         tuple_type tuple_value = {std::forward<Ts>(vs)...};
-        int32_t ptr;
+        uint32_t ptr;
         WasmValVector flat_vals = {};
         if (out_param == nullptr)
         {
@@ -76,7 +76,7 @@ namespace cmcpp
     }
 
     template <Field... Ts>
-    inline WasmValVector lower_flat_values(LiftLowerContext &cx, uint max_flat, int32_t *out_param, Ts &&...vs)
+    inline WasmValVector lower_flat_values(LiftLowerContext &cx, uint max_flat, uint32_t *out_param, Ts &&...vs)
     {
         WasmValVector retVal = {};
         // cx.inst.may_leave=false;

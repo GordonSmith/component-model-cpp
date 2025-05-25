@@ -29,25 +29,13 @@ void exports_example_sample_variants_variant_func(exports_example_sample_variant
 
 void exports_example_sample_strings_reverse(sample_string_t *a, sample_string_t *ret)
 {
-    sample_string_t log;
-    sample_string_set(&log, "a.ptr: ");
-    example_sample_logging_log_u32((uint32_t)a->ptr, &log);
-    sample_string_set(&log, "a.len: ");
-    example_sample_logging_log_u32((uint32_t)a->len, &log);
-
     sample_string_t buff;
     example_sample_strings_reverse(a, &buff);
-
-    sample_string_set(&log, "buff.ptr: ");
-    example_sample_logging_log_u32((uint32_t)buff.ptr, &log);
-    sample_string_set(&log, "buff.len: ");
-    example_sample_logging_log_u32(buff.len, &log);
-
-    ret->ptr = (uint8_t *)malloc(a->len);
-    ret->len = a->len;
-    for (size_t i = 0; i < a->len; ++i)
+    ret->ptr = (uint8_t *)malloc(buff.len);
+    ret->len = buff.len;
+    for (size_t i = 0; i < buff.len; ++i)
     {
-        ret->ptr[i] = a->ptr[a->len - i - 1];
+        ret->ptr[i] = buff.ptr[buff.len - i - 1];
     }
 }
 

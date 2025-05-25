@@ -143,6 +143,12 @@ int main()
 
     LiftLowerContext liftLowerContext(trap, convert, opts);
 
+    auto call_reverse = guest_function<string_t(string_t)>(module_inst, exec_env, liftLowerContext,
+                                                           "example:sample/strings#reverse");
+    auto call_reverse_result = call_reverse("Hello World!");
+    std::cout << "call_reverse(\"Hello World!\"): " << call_reverse_result << std::endl;
+    std::cout << "call_reverse(call_reverse(\"Hello World!\")): " << call_reverse(call_reverse_result) << std::endl;
+
     auto variant_func = guest_function<variant_t<bool_t, uint32_t>(variant_t<bool_t, uint32_t>)>(module_inst, exec_env, liftLowerContext, "example:sample/variants#variant-func");
     std::cout << "variant_func((uint32_t)40)" << std::get<1>(variant_func((uint32_t)40)) << std::endl;
     std::cout << "variant_func((bool_t)true)" << std::get<0>(variant_func((bool_t) true)) << std::endl;
@@ -177,12 +183,6 @@ int main()
     std::cout << "call_add(1.5, 2.5): " << call_add(1.5, 2.5) << std::endl;
     std::cout << "call_add(DBL_MAX, 0.0): " << call_add(DBL_MAX / 2, 0.0) << std::endl;
     std::cout << "call_add(DBL_MAX / 2, DBL_MAX / 2): " << call_add(DBL_MAX / 2, DBL_MAX / 2) << std::endl;
-
-    auto call_reverse = guest_function<string_t(string_t)>(module_inst, exec_env, liftLowerContext,
-                                                           "example:sample/strings#reverse");
-    auto call_reverse_result = call_reverse("Hello World!");
-    std::cout << "call_reverse(\"Hello World!\"): " << call_reverse_result << std::endl;
-    std::cout << "call_reverse(call_reverse(\"Hello World!\")): " << call_reverse(call_reverse_result) << std::endl;
 
     auto call_lots = guest_function<uint32_t(string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t)>(
         module_inst, exec_env, liftLowerContext,

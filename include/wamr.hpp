@@ -182,7 +182,7 @@ namespace cmcpp
     }
 
     template <Field T>
-    WasmValVector rawWamrArg2Wasm(wasm_exec_env_t exec_env, uint64_t *args)
+    WasmValVector rawWamrArg2Wasm(wasm_exec_env_t exec_env, uint64_t *&args)
     {
         WasmValVector retVal;
         for (int i = 0; i < ValTrait<T>::flat_types.size(); i++)
@@ -197,7 +197,6 @@ namespace cmcpp
             }
             case WasmValType::i64:
             {
-
                 native_raw_get_arg(int64_t, p, args);
                 retVal.push_back(p);
                 break;
@@ -257,7 +256,7 @@ namespace cmcpp
             native_raw_return_type(lower_result_t, orig_raw_ret);
             result_t result = std::apply(*func, params);
             std::cout << "result: (ValType=" << static_cast<int>(ValTrait<result_t>::type) << "): " << result << std::endl;
-            native_raw_get_arg(int32_t, out_param, args);
+            native_raw_get_arg(uint32_t, out_param, args);
             auto lower_results = lower_flat_values<result_t>(liftLowerContext, MAX_FLAT_RESULTS, &out_param, std::forward<result_t>(result));
             if (lower_results.size() > 0)
             {
