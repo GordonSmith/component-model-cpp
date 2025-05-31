@@ -58,11 +58,11 @@ jobs:
 
       - name: configure
         run: |
-          cmake --preset linux-ninja-Debug
+          cmake --preset macos-ninja-Debug
 
       - name: build
         run: |
-          cmake --build --preset linux-ninja-Debug
+          cmake --build --preset macos-ninja-Debug
 
       - name: test
         working-directory: build

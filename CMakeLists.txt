@@ -15,7 +15,17 @@ target_include_directories(cmcpp INTERFACE
 target_compile_features(cmcpp INTERFACE cxx_std_20)
 
 if (BUILD_SAMPLES AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/samples/CMakeLists.txt")
-    set(WASI_SDK_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/vcpkg_installed/x64-linux/wasi-sdk)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+        set(WASI_SDK_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/vcpkg_installed/x64-windows/wasi-sdk)
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+        if(CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64")
+            set(WASI_SDK_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/vcpkg_installed/arm64-osx/wasi-sdk)
+        else()
+            set(WASI_SDK_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/vcpkg_installed/x64-osx/wasi-sdk)
+        endif()
+    else()
+        set(WASI_SDK_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/vcpkg_installed/x64-linux/wasi-sdk)
+    endif()
     add_subdirectory(samples)
 endif()
 

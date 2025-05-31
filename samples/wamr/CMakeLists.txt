@@ -26,16 +26,24 @@ include_directories(
 add_executable(wamr
     main.cpp
 )
-target_compile_options(wamr PRIVATE -Wno-error=maybe-uninitialized)
-target_compile_options(wamr PRIVATE -Wno-error=jump-misses-init)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(wamr PRIVATE -Wno-error=maybe-uninitialized)
+    target_compile_options(wamr PRIVATE -Wno-error=jump-misses-init)
+endif()
 
 target_include_directories(wamr 
     PRIVATE ${WAMR_INCLUDE_DIRS}
 )
 message("VMLIB_LIB: ${VMLIB_LIB}")
 message("IWASM_LIB: ${IWASM_LIB}")
-target_link_libraries(wamr
-    # PRIVATE ${IWASM_LIB}
-    PRIVATE ${VMLIB_LIB}
-    PRIVATE m
-)
+if (WIN32)
+    target_link_libraries(wamr
+        PRIVATE ${WAMR_LIB}
+    )
+else()
+    target_link_libraries(wamr
+        # PRIVATE ${IWASM_LIB}
+        PRIVATE ${VMLIB_LIB}
+        PRIVATE m
+    )
+endif()

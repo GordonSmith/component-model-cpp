@@ -66,6 +66,11 @@
             "hidden": true
         },
         {
+            "name": "macos",
+            "cacheVariables": {},
+            "hidden": true
+        },
+        {
             "name": "ninja",
             "generator": "Ninja",
             "hidden": true
@@ -143,6 +148,24 @@
                 "vcpkg",
                 "VS-17"
             ]
+        },
+        {
+            "name": "macos-ninja-Debug",
+            "inherits": [
+                "macos",
+                "ninja",
+                "vcpkg",
+                "Debug"
+            ]
+        },
+        {
+            "name": "macos-ninja-Release",
+            "inherits": [
+                "macos",
+                "ninja",
+                "vcpkg",
+                "Release"
+            ]
         }
     ],
     "buildPresets": [
@@ -194,6 +217,14 @@
             "nativeToolOptions": [
                 "-m"
             ]
+        },
+        {
+            "name": "macos-ninja-Debug",
+            "configurePreset": "macos-ninja-Debug"
+        },
+        {
+            "name": "macos-ninja-Release",
+            "configurePreset": "macos-ninja-Release"
         }
     ],
     "testPresets": []
