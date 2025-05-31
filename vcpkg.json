@@ -10,6 +10,7 @@
         {
             "name": "wasm-micro-runtime",
             "platform": "linux"
-        }
+        },
+        "wasmtime-c-api"
     ]
 }

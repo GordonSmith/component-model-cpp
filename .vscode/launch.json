@@ -32,7 +32,7 @@
             "program": "${workspaceFolder}/build/samples/wasmtime/wasmtime",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/build/samples/wasmtime",
             "environment": [],
             "externalConsole": false,
             "preLaunchTask": "CMake: build"

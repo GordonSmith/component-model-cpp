@@ -14,5 +14,7 @@ ExternalProject_Add(wasm
 )
 
 add_subdirectory(wamr)
+add_subdirectory(wasmtime)
 
 add_dependencies(wamr wasm)
+add_dependencies(wasmtime wasm)
