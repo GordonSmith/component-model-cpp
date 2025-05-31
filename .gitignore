@@ -4,6 +4,7 @@
 /vcpkg_installed
 /test/wasm/build*
 .DS_Store
+__pycache__/
 
 
 # Added by cargo
