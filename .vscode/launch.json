@@ -20,7 +20,7 @@
             "program": "${workspaceFolder}/build/samples/wamr/wamr",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/build/samples/wamr",
             "environment": [],
             "externalConsole": false,
             "preLaunchTask": "CMake: build"
