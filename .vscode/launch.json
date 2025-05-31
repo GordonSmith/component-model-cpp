@@ -20,6 +20,18 @@
             "program": "${workspaceFolder}/build/samples/wamr/wamr",
             "args": [],
             "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build/samples/wamr",
+            "environment": [],
+            "externalConsole": false,
+            "preLaunchTask": "CMake: build"
+        },
+        {
+            "name": "(gdb) wasmtime-sample",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/samples/wasmtime/wasmtime",
+            "args": [],
+            "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": false,

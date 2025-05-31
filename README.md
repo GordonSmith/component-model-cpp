@@ -59,6 +59,112 @@ This repository contains a C++ ABI implementation of the WebAssembly Component M
 - [x] Wamr
 - [ ] WasmEdge
 
+## Build Instructions
+
+### Prerequisites
+
+- **CMake** 3.5 or higher (3.22+ recommended for presets)
+- **C++20 compatible compiler**
+- **vcpkg** for dependency management
+- **Rust toolchain** with `cargo` (for additional tools)
+
+#### Platform-specific requirements
+
+**Ubuntu/Linux:**
+```bash
+sudo apt-get install -y autoconf autoconf-archive automake build-essential ninja-build
+```
+
+**macOS:**
+```bash
+brew install pkg-config autoconf autoconf-archive automake coreutils libtool cmake ninja
+```
+
+**Windows:**
+- Visual Studio 2019 or 2022 with C++ support
+
+#### Rust tools (required for samples and tests)
+```bash
+cargo install wasm-tools wit-bindgen-cli
+```
+
+### Basic Build (Header-only)
+
+For header-only usage without tests or samples:
+
+```bash
+git clone https://github.com/LexisNexis-GHCPE/component-model-cpp.git
+cd component-model-cpp
+git submodule update --init --recursive
+
+mkdir build && cd build
+cmake .. -DBUILD_TESTING=OFF -DBUILD_SAMPLES=OFF
+cmake --build .
+```
+
+### Build with Dependencies (Tests & Samples)
+
+Using CMake presets with vcpkg:
+
+#### Linux
+```bash
+git clone https://github.com/LexisNexis-GHCPE/component-model-cpp.git
+cd component-model-cpp
+git submodule update --init --recursive
+
+# Configure and build
+cmake --preset linux-ninja-Debug
+cmake --build --preset linux-ninja-Debug
+
+# Run tests
+cd build && ctest -VV
+```
+
+#### Windows
+```bash
+git clone https://github.com/LexisNexis-GHCPE/component-model-cpp.git
+cd component-model-cpp
+git submodule update --init --recursive
+
+# Configure and build
+cmake --preset vcpkg-VS-17
+cmake --build --preset VS-17-Debug
+
+# Run tests
+cd build && ctest -C Debug -VV
+```
+
+#### macOS
+```bash
+git clone https://github.com/LexisNexis-GHCPE/component-model-cpp.git
+cd component-model-cpp
+git submodule update --init --recursive
+
+# Configure and build
+cmake --preset linux-ninja-Debug
+cmake --build --preset linux-ninja-Debug
+
+# Run tests
+cd build && ctest -VV
+```
+
+### Manual Build without Presets
+
+If you prefer not to use CMake presets:
+
+```bash
+mkdir build && cd build
+cmake .. -DCMAKE_TOOLCHAIN_FILE=../vcpkg/scripts/buildsystems/vcpkg.cmake
+cmake --build .
+ctest -VV  # Run tests
+```
+
+### Build Options
+
+- `-DBUILD_TESTING=ON/OFF` - Enable/disable building tests (requires doctest, ICU)
+- `-DBUILD_SAMPLES=ON/OFF` - Enable/disable building samples (requires wasi-sdk)
+- `-DCMAKE_BUILD_TYPE=Debug/Release/RelWithDebInfo/MinSizeRel` - Build configuration
+
 ## Usage
 
 This library is a header only library. To use it in your project, you can:

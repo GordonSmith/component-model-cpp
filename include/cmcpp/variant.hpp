@@ -173,11 +173,13 @@ namespace cmcpp
         using V = variant_t<bool_t, typename ValTrait<T>::inner_type>;
         if (v.has_value())
         {
-            variant::store<V>(cx, v.value(), ptr);
+            V variant_val = V(std::in_place_index<1>, v.value());
+            variant::store<V>(cx, variant_val, ptr);
         }
         else
         {
-            variant::store<V>(cx, false, ptr);
+            V variant_val = V(std::in_place_index<0>, bool_t{false});
+            variant::store<V>(cx, variant_val, ptr);
         }
     }
 
@@ -187,13 +189,13 @@ namespace cmcpp
         using V = typename ValTrait<T>::variant_type;
         if (v.has_value())
         {
-            auto v3 = v.value();
-            V v2 = v.value();
-            return variant::lower_flat<V>(cx, v2);
+            V variant_val = V(std::in_place_index<1>, v.value());
+            return variant::lower_flat<V>(cx, variant_val);
         }
         else
         {
-            return variant::lower_flat<V>(cx, false);
+            V variant_val = V(std::in_place_index<0>, bool_t{false});
+            return variant::lower_flat<V>(cx, variant_val);
         }
     }
 

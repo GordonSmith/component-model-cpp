@@ -9,6 +9,7 @@ on:
     branches:
       - trunk
       - main
+  workflow_dispatch:
 
 env:
   CTEST_OUTPUT_ON_FAILURE: 1
