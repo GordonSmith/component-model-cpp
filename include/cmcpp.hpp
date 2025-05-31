@@ -8,8 +8,8 @@
 #include <cmcpp/list.hpp>
 #include <cmcpp/tuple.hpp>
 #include <cmcpp/variant.hpp>
+#include <cmcpp/func.hpp>
 #include <cmcpp/lower.hpp>
 #include <cmcpp/lift.hpp>
-#include <cmcpp/func.hpp>
 
 #endif // CMCPP_HPP

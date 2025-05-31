@@ -34,10 +34,10 @@ namespace cmcpp
     template <String T>
     inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v);
 
-    template <List T>
+    template <Flags T>
     inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v);
 
-    template <Flags T>
+    template <List T>
     inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v);
 
     template <Tuple T>

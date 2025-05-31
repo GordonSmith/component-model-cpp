@@ -35,7 +35,7 @@ namespace cmcpp
         {
             using WasmValType = WasmValTypeTrait<ValTrait<T>::flat_types[0]>::type;
             auto retVal = std::get<WasmValType>(vi.next(ValTrait<T>::flat_types[0]));
-            assert(ValTrait<WasmValType>::LOW_VALUE <= retVal && retVal < ValTrait<WasmValType>::HIGH_VALUE);
+            assert(ValTrait<WasmValType>::LOW_VALUE <= retVal && retVal <= ValTrait<WasmValType>::HIGH_VALUE);
             return retVal;
         }
 
