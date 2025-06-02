@@ -1,3 +1,5 @@
+#pragma once
+
 #include "wasm_export.h"
 #include "cmcpp.hpp"
 
@@ -6,7 +8,7 @@ namespace cmcpp
 
     void trap(const char *msg)
     {
-        throw new std::runtime_error(msg);
+        throw std::runtime_error(msg);
     }
 
     std::vector<wasm_val_t> wasmVal2wam_val_t(const WasmValVector &values)
@@ -137,7 +139,7 @@ namespace cmcpp
     }
 
     template <Field T>
-    WasmValVector rawWamrArg2Wasm(wasm_exec_env_t exec_env, uint64_t *&args)
+    WasmValVector rawWamrArg2Wasm(uint64_t *&args)
     {
         WasmValVector retVal;
         for (int i = 0; i < ValTrait<T>::flat_types.size(); i++)
@@ -182,7 +184,7 @@ namespace cmcpp
 
         using params_t_outer = typename ValTrait<func_t<F>>::params_t;
         using params_t = typename ValTrait<params_t_outer>::inner_type;
-        auto lower_params = rawWamrArg2Wasm<params_t>(exec_env, args);
+        auto lower_params = rawWamrArg2Wasm<params_t>(args);
 
         wasm_module_inst_t module_inst = wasm_runtime_get_module_inst(exec_env);
         wasm_memory_inst_t memory = wasm_runtime_lookup_memory(module_inst, "memory");

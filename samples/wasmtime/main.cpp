@@ -67,28 +67,6 @@ using Module = WasmtimeHandle<wasmtime_module_t, wasmtime_module_delete>;
 using Linker = WasmtimeHandle<wasmtime_linker_t, wasmtime_linker_delete>;
 using Error = WasmtimeHandle<wasmtime_error_t, wasmtime_error_delete>;
 
-// Error handling utility
-void handle_error(const char *message, wasmtime_error_t *error = nullptr, wasm_trap_t *trap = nullptr)
-{
-    std::cerr << "Error: " << message << std::endl;
-
-    if (error)
-    {
-        wasm_byte_vec_t error_message;
-        wasmtime_error_message(error, &error_message);
-        std::cerr << "Error details: " << std::string(error_message.data, error_message.size) << std::endl;
-        wasm_byte_vec_delete(&error_message);
-    }
-
-    if (trap)
-    {
-        wasm_byte_vec_t trap_message;
-        wasm_trap_message(trap, &trap_message);
-        std::cerr << "Trap details: " << std::string(trap_message.data, trap_message.size) << std::endl;
-        wasm_byte_vec_delete(&trap_message);
-    }
-}
-
 // File reading utility
 std::vector<uint8_t> read_wasm_file(const char *filename)
 {
