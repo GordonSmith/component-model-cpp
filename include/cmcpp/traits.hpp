@@ -8,6 +8,7 @@
 #include <optional>
 #include <variant>
 #include <limits>
+#include <functional>
 
 #include "boost/pfr.hpp"
 
@@ -381,6 +382,158 @@ namespace cmcpp
 
     template <typename T>
     concept DoubleWord = ValTrait<T>::type == ValType::U64 || ValTrait<T>::type == ValType::S64 || ValTrait<T>::type == ValType::F64;
+
+    //  Forward declarations for resource types
+    template <typename T>
+    class ResourceType;
+    template <typename T>
+    class own_t;
+    template <typename T>
+    class borrow_t;
+
+    //  Resource handle for managing resource instances
+    template <typename T>
+    class ResourceHandle
+    {
+    public:
+        using resource_type = T;
+        using rep_type = typename T::rep_type;
+
+        rep_type rep;
+        bool own;
+        // Note: borrow_scope would be managed by the runtime context
+        uint32_t num_lends;
+
+        ResourceHandle(rep_type representation, bool owned = true)
+            : rep(representation), own(owned), num_lends(0) {}
+    };
+
+    //  Resource Types --------------------------------------------------------------------
+
+    //  Base ResourceType class that defines the resource implementation
+    template <typename T>
+    class ResourceType
+    {
+    public:
+        using rep_type = T;
+
+        // Component instance that implements this resource (would be set by runtime)
+        void *impl_instance = nullptr;
+
+        // Resource destructor function pointer (optional)
+        std::function<void(T)> dtor = nullptr;
+
+        // Whether destructor is synchronous
+        bool dtor_sync = true;
+
+        // Callback for destructor (optional)
+        std::function<void()> dtor_callback = nullptr;
+
+        ResourceType() = default;
+        ResourceType(std::function<void(T)> destructor, bool sync = true)
+            : dtor(destructor), dtor_sync(sync) {}
+    };
+
+    //  Own resource type - represents owned resource handles
+    template <typename T>
+    class own_t
+    {
+    public:
+        using resource_type = ResourceType<T>;
+        using rep_type = T;
+
+        ResourceType<T> *rt;
+        T rep;
+
+        own_t() : rt(nullptr) {}
+        own_t(ResourceType<T> *resource_type, T representation)
+            : rt(resource_type), rep(representation) {}
+
+        // Move constructor
+        own_t(own_t &&other) noexcept : rt(other.rt), rep(std::move(other.rep))
+        {
+            other.rt = nullptr;
+        }
+
+        // Move assignment
+        own_t &operator=(own_t &&other) noexcept
+        {
+            if (this != &other)
+            {
+                rt = other.rt;
+                rep = std::move(other.rep);
+                other.rt = nullptr;
+            }
+            return *this;
+        }
+
+        // Delete copy constructor and assignment (owned resources can't be copied)
+        own_t(const own_t &) = delete;
+        own_t &operator=(const own_t &) = delete;
+
+        T &get() { return rep; }
+        const T &get() const { return rep; }
+
+        // Release ownership and return the representation
+        T release()
+        {
+            rt = nullptr;
+            return std::move(rep);
+        }
+
+        bool valid() const { return rt != nullptr; }
+    };
+
+    template <typename T>
+    struct ValTrait<own_t<T>>
+    {
+        static constexpr ValType type = ValType::Own;
+        using inner_type = T;
+        static constexpr uint32_t size = 4;
+        static constexpr uint32_t alignment = 4;
+        static constexpr std::array<WasmValType, 1> flat_types = {WasmValType::i32};
+    };
+
+    //  Borrow resource type - represents borrowed resource handles
+    template <typename T>
+    class borrow_t
+    {
+    public:
+        using resource_type = ResourceType<T>;
+        using rep_type = T;
+
+        ResourceType<T> *rt;
+        T rep;
+        // Note: borrow_scope would be managed by the runtime context
+
+        borrow_t() : rt(nullptr) {}
+        borrow_t(ResourceType<T> *resource_type, T representation)
+            : rt(resource_type), rep(representation) {}
+
+        T &get() { return rep; }
+        const T &get() const { return rep; }
+
+        bool valid() const { return rt != nullptr; }
+    };
+
+    template <typename T>
+    struct ValTrait<borrow_t<T>>
+    {
+        static constexpr ValType type = ValType::Borrow;
+        using inner_type = T;
+        static constexpr uint32_t size = 4;
+        static constexpr uint32_t alignment = 4;
+        static constexpr std::array<WasmValType, 1> flat_types = {WasmValType::i32};
+    };
+
+    template <typename T>
+    concept Own = ValTrait<T>::type == ValType::Own;
+
+    template <typename T>
+    concept Borrow = ValTrait<T>::type == ValType::Borrow;
+
+    template <typename T>
+    concept Resource = Own<T> || Borrow<T>;
 
     //  Strings --------------------------------------------------------------------
     enum class Encoding

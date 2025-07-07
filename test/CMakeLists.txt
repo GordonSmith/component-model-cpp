@@ -26,6 +26,24 @@ add_executable(${PROJECT_NAME}
   host-util.cpp
 )
 
+# Add resource-specific tests as a separate executable
+add_executable(resource-tests
+  resource_tests.cpp
+  host-util.hpp
+  host-util.cpp
+)
+
+target_link_libraries(resource-tests
+  PRIVATE doctest::doctest
+  PRIVATE cmcpp
+  PRIVATE ${ICU_LIBRARIES}
+)
+
+add_test(
+  NAME resource-tests
+  COMMAND $<TARGET_FILE:resource-tests>
+)
+
 target_link_libraries(${PROJECT_NAME} 
   PRIVATE doctest::doctest
   PRIVATE cmcpp

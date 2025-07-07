@@ -54,35 +54,6 @@ namespace cmcpp
     };
 
     // Runtime State ---
-    struct ResourceHandle
-    {
-    };
-
-    struct Waitable
-    {
-    };
-
-    struct WaitableSet
-    {
-    };
-
-    struct ErrorContext
-    {
-    };
-
-    struct ComponentInstance
-    {
-        std::vector<ResourceHandle> resources;
-        std::vector<Waitable> waitables;
-        std::vector<WaitableSet> waitable_sets;
-        std::vector<ErrorContext> error_contexts;
-        bool may_leave = true;
-        bool backpressure = false;
-        bool calling_sync_export = false;
-        bool calling_sync_import = false;
-        // std::vector<std::tuple<Task<R, Args...>, Future>> pending_tasks;
-        bool starting_pending_tasks = false;
-    };
 
     class ContextLocalStorage
     {
@@ -108,7 +79,6 @@ namespace cmcpp
     {
     public:
         CanonicalOptions opts;
-        ComponentInstance inst;
         func_t<R, Args...> ft;
         std::optional<Task> supertask;
         std::optional<std::function<void()>> on_return;
@@ -116,16 +86,8 @@ namespace cmcpp
         int num_borrows = 0;
         ContextLocalStorage context();
 
-        Task(CanonicalOptions &opts, ComponentInstance &inst, func_t<R, Args...> &ft, std::optional<Task> &supertask = std::nullopt, std::optional<std::function<void()>> &on_return = std::nullopt, std::function<std::future<void>(std::future<void>)> &on_block = std::nullopt)
-            : opts(opts), inst(inst), ft(ft), supertask(supertask), on_return(on_return), on_block(on_block) {}
-    };
-
-    struct Subtask : Waitable
-    {
-    };
-
-    struct Future
-    {
+        Task(CanonicalOptions &opts, func_t<R, Args...> &ft, std::optional<Task> &supertask = std::nullopt, std::optional<std::function<void()>> &on_return = std::nullopt, std::function<std::future<void>(std::future<void>)> &on_block = std::nullopt)
+            : opts(opts), ft(ft), supertask(supertask), on_return(on_return), on_block(on_block) {}
     };
 
     //  Lifting and Lowering Context  ---

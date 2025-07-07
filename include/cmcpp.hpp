@@ -9,6 +9,7 @@
 #include <cmcpp/tuple.hpp>
 #include <cmcpp/variant.hpp>
 #include <cmcpp/func.hpp>
+#include <cmcpp/resource.hpp>
 #include <cmcpp/lower.hpp>
 #include <cmcpp/lift.hpp>
 

@@ -55,3 +55,4 @@ When working with this library:
 - [WebAssembly Component Model Specification](https://github.com/WebAssembly/component-model)
 - [Component Model Canonical ABI](https://github.com/WebAssembly/component-model/blob/main/design/mvp/CanonicalABI.md)
 - [WIT (WebAssembly Interface Types)](https://github.com/WebAssembly/component-model/blob/main/design/mvp/WIT.md)
+- [Referenvce Implementation (Python)](./ref/component-model/design/mvp/canonical-abi/definitions.py)

@@ -1304,8 +1304,8 @@ TEST_CASE("Error Handling - Memory and Edge Cases")
     try
     {
         list_t<uint8_t> large_byte_array(50000, 0xFF);
-        auto v = lower_flat(*cx2, large_byte_array);
-        auto result = lift_flat<list_t<uint8_t>>(*cx2, v);
+        auto v = lower_flat(*cx, large_byte_array);
+        auto result = lift_flat<list_t<uint8_t>>(*cx, v);
         CHECK(result.size() == 50000);
         CHECK(result[0] == 0xFF);
         CHECK(result[49999] == 0xFF);
@@ -1377,4 +1377,125 @@ TEST_CASE("Complex Nested Structures - Boundary Cases")
     CHECK(tuple_list[0] == 100);
     CHECK(tuple_list[1] == 200);
     CHECK(tuple_list[2] == 300);
+}
+
+TEST_CASE("Resources - Own and Borrow Types")
+{
+    SUBCASE("Own Resource Type Traits")
+    {
+        // Test that own_t has correct ValTrait properties
+        CHECK(ValTrait<own_t<int>>::type == ValType::Own);
+        CHECK(ValTrait<own_t<int>>::size == 4);
+        CHECK(ValTrait<own_t<int>>::alignment == 4);
+        CHECK(ValTrait<own_t<int>>::flat_types.size() == 1);
+        CHECK(ValTrait<own_t<int>>::flat_types[0] == WasmValType::i32);
+    }
+
+    SUBCASE("Borrow Resource Type Traits")
+    {
+        // Test that borrow_t has correct ValTrait properties
+        CHECK(ValTrait<borrow_t<int>>::type == ValType::Borrow);
+        CHECK(ValTrait<borrow_t<int>>::size == 4);
+        CHECK(ValTrait<borrow_t<int>>::alignment == 4);
+        CHECK(ValTrait<borrow_t<int>>::flat_types.size() == 1);
+        CHECK(ValTrait<borrow_t<int>>::flat_types[0] == WasmValType::i32);
+    }
+
+    SUBCASE("Resource Concepts")
+    {
+        // Test resource concepts
+        static_assert(Own<own_t<int>>);
+        static_assert(Borrow<borrow_t<int>>);
+        static_assert(Resource<own_t<int>>);
+        static_assert(Resource<borrow_t<int>>);
+
+        // Test that non-resources don't match
+        static_assert(!Own<int>);
+        static_assert(!Borrow<int>);
+        static_assert(!Resource<int>);
+    }
+
+    SUBCASE("ResourceType Basic Usage")
+    {
+        // Test ResourceType creation
+        ResourceType<int> rt;
+        CHECK(rt.impl_instance == nullptr);
+        CHECK(rt.dtor == nullptr);
+        CHECK(rt.dtor_sync == true);
+
+        // Test ResourceType with destructor
+        bool destroyed = false;
+        auto dtor = [&destroyed](int value)
+        { destroyed = true; };
+        ResourceType<int> rt_with_dtor(dtor, true);
+        CHECK(rt_with_dtor.dtor != nullptr);
+        CHECK(rt_with_dtor.dtor_sync == true);
+
+        // Test destructor call
+        if (rt_with_dtor.dtor)
+        {
+            rt_with_dtor.dtor(42);
+            CHECK(destroyed == true);
+        }
+    }
+
+    SUBCASE("Own Resource Basic Usage")
+    {
+        ResourceType<int> rt;
+        own_t<int> owned(&rt, 42);
+
+        CHECK(owned.valid() == true);
+        CHECK(owned.get() == 42);
+        CHECK(owned.rt == &rt);
+
+        // Test move semantics
+        own_t<int> moved = std::move(owned);
+        CHECK(moved.valid() == true);
+        CHECK(moved.get() == 42);
+        CHECK(owned.valid() == false); // moved-from object should be invalid
+
+        // Test release
+        int value = moved.release();
+        CHECK(value == 42);
+        CHECK(moved.valid() == false);
+    }
+
+    SUBCASE("Borrow Resource Basic Usage")
+    {
+        ResourceType<int> rt;
+        borrow_t<int> borrowed(&rt, 42);
+
+        CHECK(borrowed.valid() == true);
+        CHECK(borrowed.get() == 42);
+        CHECK(borrowed.rt == &rt);
+
+        // Borrow resources should be copyable
+        borrow_t<int> copied = borrowed;
+        CHECK(copied.valid() == true);
+        CHECK(copied.get() == 42);
+        CHECK(borrowed.valid() == true);
+    }
+
+    SUBCASE("Resource Type Different Inner Types")
+    {
+        // Test with different inner types
+        ResourceType<std::string> string_rt;
+        own_t<std::string> string_owned(&string_rt, "Hello, World!");
+        CHECK(string_owned.get() == "Hello, World!");
+
+        ResourceType<float> float_rt;
+        borrow_t<float> float_borrowed(&float_rt, 3.14159f);
+        CHECK(std::abs(float_borrowed.get() - 3.14159f) < 0.0001f);
+
+        // Custom struct type
+        struct CustomType
+        {
+            int x;
+            float y;
+        };
+        ResourceType<CustomType> custom_rt;
+        own_t<CustomType> custom_owned(&custom_rt, {42, 2.71828f});
+        CHECK(custom_owned.get().x == 42);
+        CHECK(std::abs(custom_owned.get().y - 2.71828f) < 0.0001f);
+    }
 }
