@@ -43,3 +43,6 @@ target_link_libraries(wamr
     PRIVATE ${VMLIB_LIB}
     PRIVATE m
 )
+
+# Add resource examples subdirectory
+add_subdirectory(resources)
