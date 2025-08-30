@@ -109,14 +109,14 @@ namespace cmcpp
     public:
         CanonicalOptions opts;
         ComponentInstance inst;
-        func_t<R, Args...> ft;
+        func_t<R(Args...)> ft;
         std::optional<Task> supertask;
         std::optional<std::function<void()>> on_return;
         std::function<std::future<void>(std::future<void>)> on_block;
         int num_borrows = 0;
         ContextLocalStorage context();
 
-        Task(CanonicalOptions &opts, ComponentInstance &inst, func_t<R, Args...> &ft, std::optional<Task> &supertask = std::nullopt, std::optional<std::function<void()>> &on_return = std::nullopt, std::function<std::future<void>(std::future<void>)> &on_block = std::nullopt)
+        Task(CanonicalOptions &opts, ComponentInstance &inst, func_t<R(Args...)> &ft, std::optional<Task> &supertask = std::nullopt, std::optional<std::function<void()>> &on_return = std::nullopt, std::function<std::future<void>(std::future<void>)> &on_block = std::nullopt)
             : opts(opts), inst(inst), ft(ft), supertask(supertask), on_return(on_return), on_block(on_block) {}
     };
 

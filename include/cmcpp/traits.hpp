@@ -23,6 +23,14 @@ namespace cmcpp
     using bytes = uint32_t;
     using size = uint32_t;
 
+    static constexpr int ceil_log2(std::size_t n) {
+        return (n <= 1) ? 0 : 1 + ceil_log2((n + 1) / 2);
+    }
+
+    static constexpr int ceil_div8(int bits) {
+        return (bits + 7) / 8;
+    }
+
     enum class WasmValType : uint8_t
     {
         UNKNOWN,
@@ -666,7 +674,7 @@ namespace cmcpp
         static constexpr ValType type = ValType::Variant;
         using inner_type = typename std::variant<Ts...>;
 
-        static constexpr int match = static_cast<int>(std::ceil(std::log2(std::variant_size_v<inner_type>) / 8.0));
+        static constexpr int match = ceil_div8(ceil_log2(std::variant_size_v<inner_type>));
         using discriminant_type = std::conditional_t<match == 0, uint8_t, std::conditional_t<match == 1, uint8_t, std::conditional_t<match == 2, uint16_t, std::conditional_t<match == 3, uint32_t, void>>>>;
         static constexpr uint32_t max_case_alignment = []() constexpr
         {
@@ -696,18 +704,26 @@ namespace cmcpp
             ((i = std::max(i, ValTrait<Ts>::flat_types.size())), ...);
             return i + 1;
         }();
+        template<size_t StartIndex, typename First, typename... Rest>
+        static constexpr void process_types(std::array<WasmValType, flat_types_len>& flat)
+        {
+            for (auto& ft : ValTrait<First>::flat_types) {
+                if (StartIndex < flat_types_len) {
+                    flat[StartIndex] = join(flat[StartIndex], ft);
+                    process_types<StartIndex + 1, Rest...>(flat);
+                }
+            }
+        }
+        template<size_t StartIndex>
+        static constexpr void process_types(std::array<WasmValType, flat_types_len>& flat)
+        {
+        }
         static constexpr std::array<WasmValType, flat_types_len> flat_types = []() constexpr
         {
             std::array<WasmValType, flat_types_len> flat;
             flat.fill(WasmValType::i32);
             flat[0] = ValTrait<discriminant_type>::flat_types[0];
-            ([&]()
-             {
-                size_t i = 1;
-                for (auto &ft : ValTrait<Ts>::flat_types) {
-                    flat[i] = join(flat[i], ft);
-                    ++i;
-                } }(), ...);
+            process_types<1, Ts...>(flat);
             return flat;
         }();
     };
@@ -739,8 +755,8 @@ namespace cmcpp
     using enum_t = uint32_t;
 
     //  Func  --------------------------------------------------------------------
-    constexpr uint MAX_FLAT_PARAMS = 16;
-    constexpr uint MAX_FLAT_RESULTS = 1;
+    constexpr uint32_t MAX_FLAT_PARAMS = 16;
+    constexpr uint32_t MAX_FLAT_RESULTS = 1;
 
     template <typename>
     struct func_t_impl;
