@@ -2,7 +2,12 @@ cmake_minimum_required(VERSION 3.5)
 
 project(cmcpp LANGUAGES CXX)
 
-option(BUILD_SAMPLES "Build samples" ON)
+# Determine default for BUILD_SAMPLES: OFF on Windows, ON elsewhere
+set(_BUILD_SAMPLES_DEFAULT ON)
+if (WIN32)
+    set(_BUILD_SAMPLES_DEFAULT OFF)
+endif()
+option(BUILD_SAMPLES "Build samples" ${_BUILD_SAMPLES_DEFAULT})
 option(BUILD_TESTING "Build tests" ON)
 
 add_library(cmcpp INTERFACE)
