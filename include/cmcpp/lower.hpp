@@ -76,7 +76,7 @@ namespace cmcpp
     }
 
     template <Field... Ts>
-    inline WasmValVector lower_flat_values(LiftLowerContext &cx, uint max_flat, uint32_t *out_param, Ts &&...vs)
+    inline WasmValVector lower_flat_values(LiftLowerContext &cx, uint32_t max_flat, uint32_t *out_param, Ts &&...vs)
     {
         WasmValVector retVal = {};
         // cx.inst.may_leave=false;

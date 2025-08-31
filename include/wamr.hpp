@@ -94,7 +94,7 @@ namespace cmcpp
             std::vector<wasm_val_t> inputs = wasmVal2wam_val_t(lowered_args);
 
             constexpr size_t output_size = std::is_same<result_t, void>::value ? 0 : 1;
-            wasm_val_t outputs[output_size];
+            wasm_val_t outputs[output_size == 0 ? 1 : output_size];
 
             bool success = wasm_runtime_call_wasm_a(exec_env, guest_func,
                                                     output_size, outputs,
