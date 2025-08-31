@@ -1,15 +1,18 @@
+#ifndef CMCPP_WAMR_HPP
+#define CMCPP_WAMR_HPP
+
 #include "wasm_export.h"
 #include "cmcpp.hpp"
 
 namespace cmcpp
 {
 
-    void trap(const char *msg)
+    inline void trap(const char *msg)
     {
         throw new std::runtime_error(msg);
     }
 
-    std::vector<wasm_val_t> wasmVal2wam_val_t(const WasmValVector &values)
+    inline std::vector<wasm_val_t> wasmVal2wam_val_t(const WasmValVector &values)
     {
         std::vector<wasm_val_t> result;
         result.reserve(values.size());
@@ -41,7 +44,7 @@ namespace cmcpp
         return result;
     }
 
-    WasmValVector wam_val_t2wasmVal(size_t count, const wasm_val_t *values)
+    inline WasmValVector wam_val_t2wasmVal(size_t count, const wasm_val_t *values)
     {
         WasmValVector result;
         result.reserve(count);
@@ -121,7 +124,7 @@ namespace cmcpp
         };
     }
 
-    std::pair<void *, size_t> convert(void *dest, uint32_t dest_byte_len, const void *src, uint32_t src_byte_len, Encoding from_encoding, Encoding to_encoding)
+    inline std::pair<void *, size_t> convert(void *dest, uint32_t dest_byte_len, const void *src, uint32_t src_byte_len, Encoding from_encoding, Encoding to_encoding)
     {
         if (from_encoding == to_encoding)
         {
@@ -236,9 +239,11 @@ namespace cmcpp
         return symbol;
     }
 
-    bool host_module(const char *module_name, NativeSymbol *native_symbols, uint32_t n_native_symbols)
+    inline bool host_module(const char *module_name, NativeSymbol *native_symbols, uint32_t n_native_symbols)
     {
         return wasm_runtime_register_natives_raw(module_name, native_symbols, n_native_symbols);
     }
 
 }
+
+#endif
