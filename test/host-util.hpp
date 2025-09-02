@@ -36,7 +36,7 @@ public:
         if (last_alloc > memory.size())
         {
             std::cout << "oom: have " << memory.size() << " need " << last_alloc << std::endl;
-            trap("oom");
+            ::trap("oom");
         }
         std::memcpy(&memory[ret], &memory[original_ptr], original_size);
         return ret;
@@ -45,10 +45,11 @@ public:
 
 inline std::unique_ptr<LiftLowerContext> createLiftLowerContext(Heap *heap, Encoding encoding)
 {
-    std::unique_ptr<cmcpp::InstanceContext> instanceContext = std::make_unique<cmcpp::InstanceContext>(trap, convert,
-                                                                                                       [heap](int original_ptr, int original_size, int alignment, int new_size) -> int
-                                                                                                       {
-                                                                                                           return heap->realloc(original_ptr, original_size, alignment, new_size);
-                                                                                                       });
+    auto instanceContext = cmcpp::createInstanceContext(
+        ::trap,
+        ::convert,
+        [heap](int original_ptr, int original_size, int alignment, int new_size) -> int {
+            return heap->realloc(original_ptr, original_size, alignment, new_size);
+        });
     return instanceContext->createLiftLowerContext(heap->memory, encoding);
 }

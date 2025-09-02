@@ -76,121 +76,196 @@ namespace cmcpp
         std::vector<uint32_t> free_;
     };
 
-    // Simple resource handle for now - can be expanded later
-    template <typename T>
-    struct SimpleResourceHandle
+    // Internal stored handle representation for a resource type
+    template <typename Rep>
+    struct StoredHandle
     {
-        uint32_t rep;
-        bool own;
-        ResourceType<T> *rt;
-
-        SimpleResourceHandle(uint32_t rep, bool own, ResourceType<T> *rt)
-            : rep(rep), own(own), rt(rt) {}
+        ResourceType<Rep> *rt;
+        Rep rep;
+        bool own; // true if owned, false if borrowed
     };
+
+    // Per-type resource table accessor
+    template <typename Rep>
+    inline ResourceTable &resource_table()
+    {
+        static ResourceTable tbl;
+        return tbl;
+    }
 
     namespace resource
     {
+        // Helper to create a new handle in the per-type table
+        template <typename Rep>
+        inline uint32_t make_handle(ResourceType<Rep> *rt, const Rep &rep, bool own)
+        {
+            StoredHandle<Rep> sh{rt, rep, own};
+            return resource_table<Rep>().add(sh);
+        }
+
+        // Helper to get a stored handle by index (if present)
+        template <typename Rep>
+        inline std::optional<StoredHandle<Rep>> get_handle(uint32_t i)
+        {
+            return resource_table<Rep>().template get<StoredHandle<Rep>>(i);
+        }
+
+        // Helper to remove a handle from the table
+        template <typename Rep>
+        inline void remove_handle(uint32_t i)
+        {
+            resource_table<Rep>().remove(i);
+        }
+
         template <typename T>
             requires cmcpp::Own<T>
         inline void store(LiftLowerContext &cx, const T &v, uint32_t ptr)
         {
-            // For owned resources, store the representation as i32
-            // In this simplified implementation, we use a hash or address
+#ifdef CMCPP_EXPERIMENTAL_RESOURCES
+            using Rep = typename T::rep_type;
+            int32_t handle = static_cast<int32_t>(make_handle<Rep>(v.rt, v.rep, /*own*/ true));
+            integer::store(cx, handle, ptr, 4);
+#else
+            // For owned resources, store the representation as i32 (stub: address-based)
             uintptr_t addr = reinterpret_cast<uintptr_t>(&v.rep);
             integer::store(cx, static_cast<int32_t>(addr & 0xFFFFFFFF), ptr, 4);
+#endif
         }
 
         template <typename T>
             requires cmcpp::Borrow<T>
         inline void store(LiftLowerContext &cx, const T &v, uint32_t ptr)
         {
-            // For borrowed resources, store the representation as i32
+#ifdef CMCPP_EXPERIMENTAL_RESOURCES
+            using Rep = typename T::rep_type;
+            int32_t handle = static_cast<int32_t>(make_handle<Rep>(v.rt, v.rep, /*own*/ false));
+            integer::store(cx, handle, ptr, 4);
+#else
+            // For borrowed resources, store the representation as i32 (stub: address-based)
             uintptr_t addr = reinterpret_cast<uintptr_t>(&v.rep);
             integer::store(cx, static_cast<int32_t>(addr & 0xFFFFFFFF), ptr, 4);
+#endif
         }
 
         template <typename T>
             requires cmcpp::Own<T>
         inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
         {
-            // For owned resources, create a handle representing ownership transfer
-            // In a full implementation, this would create a handle in the guest's resource table
-            // For now, we use a simple hash/address approach
+#ifdef CMCPP_EXPERIMENTAL_RESOURCES
+            using Rep = typename T::rep_type;
+            int32_t handle = static_cast<int32_t>(make_handle<Rep>(v.rt, v.rep, /*own*/ true));
+            return {handle};
+#else
+            // For owned resources, create a handle representing ownership transfer (stub: address-based)
             uintptr_t addr = reinterpret_cast<uintptr_t>(&v.rep);
             return {static_cast<int32_t>(addr & 0xFFFFFFFF)};
+#endif
         }
 
         template <typename T>
             requires cmcpp::Borrow<T>
         inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
         {
-            // For borrowed resources, create a handle representing a borrow
-            // In a full implementation, this would create a borrow handle with lifetime tracking
+#ifdef CMCPP_EXPERIMENTAL_RESOURCES
+            using Rep = typename T::rep_type;
+            int32_t handle = static_cast<int32_t>(make_handle<Rep>(v.rt, v.rep, /*own*/ false));
+            return {handle};
+#else
+            // For borrowed resources, create a handle representing a borrow (stub: address-based)
             uintptr_t addr = reinterpret_cast<uintptr_t>(&v.rep);
             return {static_cast<int32_t>(addr & 0xFFFFFFFF)};
+#endif
         }
 
         template <typename T>
             requires cmcpp::Own<T>
         inline T load(const LiftLowerContext &cx, uint32_t ptr)
         {
+#ifdef CMCPP_EXPERIMENTAL_RESOURCES
+            using Rep = typename T::rep_type;
             auto handle = integer::load<int32_t>(cx, ptr, 4);
-            // In a full implementation, this would look up the resource in tables
-            // and transfer ownership from guest to host
-            // For now, create a default-constructed resource with the handle as representation
+            auto sh = get_handle<Rep>(handle);
+            if (sh)
+                return T(sh->rt, sh->rep);
+            return T(nullptr, Rep{});
+#else
+            auto handle = integer::load<int32_t>(cx, ptr, 4);
+            // Stub: return default resource
             return T(nullptr, typename T::rep_type{});
+#endif
         }
 
         template <typename T>
             requires cmcpp::Borrow<T>
         inline T load(const LiftLowerContext &cx, uint32_t ptr)
         {
+#ifdef CMCPP_EXPERIMENTAL_RESOURCES
+            using Rep = typename T::rep_type;
             auto handle = integer::load<int32_t>(cx, ptr, 4);
-            // In a full implementation, this would look up the resource in tables
-            // and create a borrow reference
+            auto sh = get_handle<Rep>(handle);
+            if (sh)
+                return T(sh->rt, sh->rep);
+            return T(nullptr, Rep{});
+#else
+            auto handle = integer::load<int32_t>(cx, ptr, 4);
+            // Stub: return default resource
             return T(nullptr, typename T::rep_type{});
+#endif
         }
 
         template <typename T>
             requires cmcpp::Own<T>
         inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
         {
+#ifdef CMCPP_EXPERIMENTAL_RESOURCES
+            using Rep = typename T::rep_type;
             auto handle = vi.next<int32_t>();
-            // In a full implementation, this would:
-            // 1. Look up the handle in the guest resource table
-            // 2. Transfer ownership from guest to host
-            // 3. Remove the handle from guest table
+            auto sh = get_handle<Rep>(handle);
+            if (sh)
+            {
+                remove_handle<Rep>(handle); // transfer
+                return T(sh->rt, sh->rep);
+            }
+            return T(nullptr, Rep{});
+#else
+            auto handle = vi.next<int32_t>();
+            // Stub: return default resource
             return T(nullptr, typename T::rep_type{});
+#endif
         }
 
         template <typename T>
             requires cmcpp::Borrow<T>
         inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
         {
+#ifdef CMCPP_EXPERIMENTAL_RESOURCES
+            using Rep = typename T::rep_type;
             auto handle = vi.next<int32_t>();
-            // In a full implementation, this would:
-            // 1. Look up the handle in the guest resource table
-            // 2. Create a borrow reference (no ownership transfer)
-            // 3. Track the borrow for lifetime management
+            auto sh = get_handle<Rep>(handle);
+            if (sh)
+                return T(sh->rt, sh->rep);
+            return T(nullptr, Rep{});
+#else
+            auto handle = vi.next<int32_t>();
+            // Stub: return default resource
             return T(nullptr, typename T::rep_type{});
+#endif
         }
 
         // Canonical ABI resource functions (stubs for now)
         template <typename T>
         inline uint32_t canon_resource_new(ResourceType<T> *rt, uint32_t rep)
         {
-            // In a full implementation, this would create a new resource handle
-            // and add it to the appropriate resource table
-            return rep; // Simplified for now
+            // Stub: just echo the representation as the handle
+            (void)rt;
+            return rep;
         }
 
         template <typename T>
         inline void canon_resource_drop(ResourceType<T> *rt, uint32_t handle, bool sync = true)
         {
-            // In a full implementation, this would:
-            // 1. Remove the handle from the resource table
-            // 2. If owned, call the destructor if present
-            // 3. Handle cross-instance cleanup
+            // Stub: call destructor with the handle cast to rep type
+            (void)sync;
             if (rt && rt->dtor)
             {
                 rt->dtor(static_cast<T>(handle));
@@ -200,9 +275,9 @@ namespace cmcpp
         template <typename T>
         inline uint32_t canon_resource_rep(ResourceType<T> *rt, uint32_t handle)
         {
-            // In a full implementation, this would look up the handle
-            // and return its representation
-            return handle; // Simplified for now
+            // Stub: return the handle as representation
+            (void)rt;
+            return handle;
         }
     }
 

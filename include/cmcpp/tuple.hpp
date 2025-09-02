@@ -21,7 +21,9 @@ namespace cmcpp
             {
                 using field_type = std::remove_const_t<std::remove_reference_t<decltype(field)>>;
                 ptr = align_to(ptr, ValTrait<field_type>::alignment);
-                cmcpp::store(cx, field, ptr);
+                // Use ADL for element-wise store (resources), but qualify recursion to avoid ambiguity
+                using ::cmcpp::store;
+                store(cx, field, ptr);
                 ptr += ValTrait<field_type>::size;
             };
 
@@ -35,7 +37,9 @@ namespace cmcpp
             WasmValVector retVal = {};
             auto process_field = [&](auto &&field)
             {
-                auto flat = cmcpp::lower_flat(cx, field);
+                // Use ADL for element-wise lower_flat; qualify recursion to avoid ambiguity
+                using ::cmcpp::lower_flat;
+                auto flat = lower_flat(cx, field);
                 retVal.insert(retVal.end(), flat.begin(), flat.end());
             };
 
@@ -51,7 +55,9 @@ namespace cmcpp
             auto process_field = [&](auto &&field)
             {
                 ptr = align_to(ptr, ValTrait<std::remove_reference_t<decltype(field)>>::alignment);
-                field = cmcpp::load<std::remove_reference_t<decltype(field)>>(cx, ptr);
+                // Use ADL for element-wise load; qualify recursion to avoid ambiguity
+                using ::cmcpp::load;
+                field = load<std::remove_reference_t<decltype(field)>>(cx, ptr);
                 ptr += ValTrait<std::remove_reference_t<decltype(field)>>::size;
             };
 
@@ -66,7 +72,9 @@ namespace cmcpp
             T result;
             auto process_field = [&](auto &&field)
             {
-                field = cmcpp::lift_flat<std::remove_reference_t<decltype(field)>>(cx, vi);
+                // Use ADL for element-wise lift_flat; qualify recursion to avoid ambiguity
+                using ::cmcpp::lift_flat;
+                field = lift_flat<std::remove_reference_t<decltype(field)>>(cx, vi);
             };
 
             std::apply([&](auto &&...fields)

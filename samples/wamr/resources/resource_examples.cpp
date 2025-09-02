@@ -1,4 +1,5 @@
 #include <cmcpp.hpp>
+#include <wamr.hpp>
 #include "../../../test/host-util.hpp"
 #include <iostream>
 #include <memory>
@@ -17,6 +18,8 @@ class FileHandle
 public:
     std::string filename;
     bool is_open;
+
+    FileHandle() : filename(""), is_open(false) {}
 
     FileHandle(const std::string &name) : filename(name), is_open(true)
     {
@@ -61,6 +64,8 @@ class DatabaseConnection
 public:
     std::string connection_string;
     uint32_t connection_id;
+
+    DatabaseConnection() : connection_string(""), connection_id(0) {}
 
     DatabaseConnection(const std::string &conn_str, uint32_t id)
         : connection_string(conn_str), connection_id(id)
@@ -205,12 +210,12 @@ result_t<string_t, string_t> process_file_with_db(
 
     if (!file.valid())
     {
-        return result_t<string_t, string_t>::err("Invalid file handle");
+        return result_t<string_t, string_t>(std::in_place_index<1>, string_t("Invalid file handle"));
     }
 
     if (!db.valid())
     {
-        return result_t<string_t, string_t>::err("Invalid database connection");
+        return result_t<string_t, string_t>(std::in_place_index<1>, string_t("Invalid database connection"));
     }
 
     // Read file content
@@ -224,7 +229,7 @@ result_t<string_t, string_t> process_file_with_db(
                           std::to_string(results.size()) + " results";
 
     std::cout << "Processing complete: " << summary << std::endl;
-    return result_t<string_t, string_t>::ok(summary);
+    return result_t<string_t, string_t>(std::in_place_index<0>, summary);
 }
 
 // Native symbol tables for WAMR
@@ -261,7 +266,7 @@ void test_resource_operations()
         auto file = create_file("test_config.txt");
 
         // Create a borrow from the owned resource
-        borrow_t<FileHandle> file_borrow(&file.rt, file.get());
+    borrow_t<FileHandle> file_borrow(file.rt, file.get());
         auto content = read_file_content(file_borrow);
         std::cout << "Read content: " << content << std::endl;
 
@@ -275,7 +280,7 @@ void test_resource_operations()
         auto db = connect_database("postgresql://localhost:5432/testdb");
 
         // Create a borrow for querying
-        borrow_t<DatabaseConnection> db_borrow(&db.rt, db.get());
+    borrow_t<DatabaseConnection> db_borrow(db.rt, db.get());
         auto results = query_database(db_borrow, "SELECT * FROM users");
 
         std::cout << "Query results:\n";
@@ -295,18 +300,18 @@ void test_resource_operations()
         std::cout << "\nTest 4: Complex Processing with Borrowed Resources\n";
         std::cout << std::string(30, '-') << std::endl;
 
-        borrow_t<FileHandle> file_borrow2(&session_file.rt, session_file.get());
-        borrow_t<DatabaseConnection> db_borrow2(&session_db.rt, session_db.get());
+    borrow_t<FileHandle> file_borrow2(session_file.rt, session_file.get());
+    borrow_t<DatabaseConnection> db_borrow2(session_db.rt, session_db.get());
 
         auto process_result = process_file_with_db(file_borrow2, db_borrow2);
 
-        if (process_result.is_ok())
+        if (process_result.index() == 0)
         {
-            std::cout << "Processing succeeded: " << process_result.unwrap() << std::endl;
+            std::cout << "Processing succeeded: " << std::get<0>(process_result) << std::endl;
         }
         else
         {
-            std::cout << "Processing failed: " << process_result.unwrap_err() << std::endl;
+            std::cout << "Processing failed: " << std::get<1>(process_result) << std::endl;
         }
 
         std::cout << "\nAll tests completed successfully!\n";

@@ -209,7 +209,7 @@ namespace cmcpp
         {
             using lower_result_t = typename WasmValTypeTrait<ValTrait<result_t>::flat_types[0]>::type;
             native_raw_return_type(lower_result_t, orig_raw_ret);
-            result_t result = std::apply(*func, params);
+            result_t result = std::apply(*func, std::move(params));
             native_raw_get_arg(uint32_t, out_param, args);
             auto lower_results = lower_flat_values<result_t>(liftLowerContext, MAX_FLAT_RESULTS, &out_param, std::forward<result_t>(result));
             if (lower_results.size() > 0)
@@ -220,7 +220,7 @@ namespace cmcpp
         }
         else
         {
-            std::apply(*func, params);
+            std::apply(*func, std::move(params));
         }
     }
 
