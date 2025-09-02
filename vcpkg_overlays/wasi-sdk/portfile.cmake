@@ -17,7 +17,7 @@ elseif(WIN32)
 vcpkg_download_distfile(ARCHIVE
     URLS "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/wasi-sdk-${VERSION}-x86_64-windows.tar.gz"
     FILENAME "wasi-sdk-${VERSION}-x86_64-windows.tar.gz"
-    SHA512 e8bdae827dbbb967bf9815603aeff76ac40344c79cf6a1c388e63931c77cdc5560860c6f2ec74f3c7895fab08b93940f60e9e26365b6f4ba354ca3a921803be7
+    SHA512 ee91880d1be2a9d2f3bd90c1893448c8861130a0726811de0f55f90394260aa4693f7efbee81de5bd599c4395fe26809642741033e8e062894c9c4dea249bae4
 )
 endif()
 
