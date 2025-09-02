@@ -6,7 +6,7 @@
 	url = https://github.com/WebAssembly/component-model.git
 [submodule "ref/vscode-wasm"]
 	path = ref/vscode-wasm
-	url = https://github.com/microsoft/vscode-wasm.git
+	url = git@github.com:microsoft/vscode-wasm.git
 [submodule "ref/wasm-micro-runtime"]
 	path = ref/wasm-micro-runtime
-	url = https://github.com/bytecodealliance/wasm-micro-runtime.git
+	url = git@github.com:bytecodealliance/wasm-micro-runtime.git
