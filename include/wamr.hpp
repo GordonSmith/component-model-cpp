@@ -1,5 +1,6 @@
 #include "wasm_export.h"
 #include "cmcpp.hpp"
+#include <array>
 
 namespace cmcpp
 {
@@ -94,10 +95,11 @@ namespace cmcpp
             std::vector<wasm_val_t> inputs = wasmVal2wam_val_t(lowered_args);
 
             constexpr size_t output_size = std::is_same<result_t, void>::value ? 0 : 1;
-            wasm_val_t outputs[output_size];
+            std::array<wasm_val_t, output_size> outputs{};
+            wasm_val_t *output_ptr = output_size > 0 ? outputs.data() : nullptr;
 
             bool success = wasm_runtime_call_wasm_a(exec_env, guest_func,
-                                                    output_size, outputs,
+                                                    output_size, output_ptr,
                                                     inputs.size(), inputs.data());
 
             if (!success)
@@ -109,11 +111,11 @@ namespace cmcpp
 
             if constexpr (output_size > 0)
             {
-                auto output = lift_flat_values<result_t>(liftLowerContext, MAX_FLAT_RESULTS, wam_val_t2wasmVal(output_size, outputs));
+                auto output = lift_flat_values<result_t>(liftLowerContext, MAX_FLAT_RESULTS, wam_val_t2wasmVal(output_size, output_ptr));
 
                 if (guest_cleanup_func)
                 {
-                    wasm_runtime_call_wasm_a(exec_env, guest_cleanup_func, 0, nullptr, output_size, outputs);
+                    wasm_runtime_call_wasm_a(exec_env, guest_cleanup_func, 0, nullptr, output_size, output_ptr);
                 }
 
                 return output;

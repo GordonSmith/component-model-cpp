@@ -1,7 +1,11 @@
 #include "wamr.hpp"
 #include <algorithm>
 #include <cfloat>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <limits>
+#include <system_error>
 #include <tuple>
 
 using namespace cmcpp;
@@ -9,31 +13,64 @@ using namespace cmcpp;
 // Configuration constants
 constexpr uint32_t DEFAULT_STACK_SIZE = 8192;
 constexpr uint32_t DEFAULT_HEAP_SIZE = 8192;
-constexpr const char *WASM_FILE_PATH = "../bin/sample.wasm";
+const std::filesystem::path WASM_RELATIVE_PATH = std::filesystem::path("bin") / "sample.wasm";
 
-char *read_wasm_binary_to_buffer(const char *filename, uint32_t *size)
+std::filesystem::path resolve_wasm_path(const std::filesystem::path &start_dir)
 {
-    FILE *file = fopen(filename, "rb");
+    constexpr int MAX_ASCENT = 6;
+    auto dir = start_dir;
+    for (int depth = 0; depth < MAX_ASCENT && !dir.empty(); ++depth)
+    {
+        const auto candidate = dir / WASM_RELATIVE_PATH;
+        if (std::filesystem::exists(candidate))
+        {
+            std::error_code ec;
+            const auto normalized = std::filesystem::weakly_canonical(candidate, ec);
+            return ec ? candidate : normalized;
+        }
+        if (!dir.has_parent_path())
+        {
+            break;
+        }
+        dir = dir.parent_path();
+    }
+
+    return {};
+}
+
+char *read_wasm_binary_to_buffer(const std::filesystem::path &filename, uint32_t *size)
+{
+    std::ifstream file(filename, std::ios::binary | std::ios::ate);
     if (!file)
     {
         std::cerr << "Failed to open file: " << filename << std::endl;
         return nullptr;
     }
 
-    fseek(file, 0, SEEK_END);
-    *size = ftell(file);
-    fseek(file, 0, SEEK_SET);
-
-    char *buffer = new char[*size];
-    if (fread(buffer, 1, *size, file) != *size)
+    const auto file_size = file.tellg();
+    if (file_size < 0)
     {
-        std::cerr << "Failed to read file: " << filename << std::endl;
-        delete[] buffer;
-        fclose(file);
+        std::cerr << "Failed to determine file size: " << filename << std::endl;
         return nullptr;
     }
 
-    fclose(file);
+    if (file_size > static_cast<std::streamoff>(std::numeric_limits<uint32_t>::max()))
+    {
+        std::cerr << "File too large to load: " << filename << std::endl;
+        return nullptr;
+    }
+
+    *size = static_cast<uint32_t>(file_size);
+    file.seekg(0, std::ios::beg);
+
+    char *buffer = new char[*size];
+    if (!file.read(buffer, static_cast<std::streamsize>(*size)))
+    {
+        std::cerr << "Failed to read file: " << filename << std::endl;
+        delete[] buffer;
+        return nullptr;
+    }
+
     return buffer;
 }
 
@@ -84,11 +121,37 @@ NativeSymbol logging_symbol[] = {
     host_function("log-u32", log_u32),
 };
 
-int main()
+int main(int argc, char **argv)
 {
+    static_cast<void>(argc);
+
     std::cout << "WAMR Component Model C++ Sample" << std::endl;
     std::cout << "===============================" << std::endl;
     std::cout << "Starting WAMR runtime initialization..." << std::endl;
+
+    std::filesystem::path exe_dir = std::filesystem::current_path();
+    if (argv && argv[0])
+    {
+        const std::filesystem::path candidate = std::filesystem::absolute(argv[0]);
+        if (std::filesystem::exists(candidate))
+        {
+            exe_dir = candidate.parent_path();
+        }
+    }
+
+    std::filesystem::path wasm_path = resolve_wasm_path(exe_dir);
+    if (wasm_path.empty())
+    {
+        wasm_path = resolve_wasm_path(std::filesystem::current_path());
+    }
+
+    if (wasm_path.empty())
+    {
+        std::cerr << "Unable to locate sample.wasm relative to " << exe_dir << std::endl;
+        return 1;
+    }
+
+    std::cout << "Using WASM file: " << wasm_path << std::endl;
 
     char *buffer, error_buf[128];
     wasm_module_t module;
@@ -102,7 +165,7 @@ int main()
     std::cout << "WAMR runtime initialized successfully" << std::endl;
 
     /* read WASM file into a memory buffer */
-    buffer = read_wasm_binary_to_buffer(WASM_FILE_PATH, &size);
+    buffer = read_wasm_binary_to_buffer(wasm_path, &size);
     if (!buffer)
     {
         std::cerr << "Failed to read WASM file" << std::endl;

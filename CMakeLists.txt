@@ -5,7 +5,7 @@ project(cmcpp LANGUAGES CXX)
 # Determine default for BUILD_SAMPLES: OFF on Windows, ON elsewhere
 set(_BUILD_SAMPLES_DEFAULT ON)
 if (WIN32)
-    set(_BUILD_SAMPLES_DEFAULT OFF)
+    set(_BUILD_SAMPLES_DEFAULT ON)
 endif()
 option(BUILD_SAMPLES "Build samples" ${_BUILD_SAMPLES_DEFAULT})
 option(BUILD_TESTING "Build tests" ON)
