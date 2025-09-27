@@ -1,6 +1,8 @@
 #include "wamr.hpp"
+#include <algorithm>
 #include <cfloat>
 #include <iostream>
+#include <tuple>
 
 using namespace cmcpp;
 

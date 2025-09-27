@@ -14,6 +14,17 @@
             "preLaunchTask": "CMake: build"
         },
         {
+            "name": "(win) component-model-tests",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/test/Debug/component-model-test.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build/test/Debug",
+            "environment": [],
+            "preLaunchTask": "CMake: build"
+        },
+        {
             "name": "(gdb) wamr-sample",
             "type": "cppdbg",
             "request": "launch",
@@ -23,6 +34,17 @@
             "cwd": "${workspaceFolder}/build/samples/wamr",
             "environment": [],
             "externalConsole": false,
+            "preLaunchTask": "CMake: build"
+        },
+        {
+            "name": "(win) wamr-sample",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/samples/wamr/Debug/wamr.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build/samples/wamr/Debug",
+            "environment": [],
             "preLaunchTask": "CMake: build"
         },
         {
@@ -37,5 +59,17 @@
             "externalConsole": false,
             "preLaunchTask": "CMake: build"
         },
+        {
+            "name": "(win) wasmtime-sample",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/samples/wasmtime/Debug/wasmtime.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build/samples/wasmtime/Debug",
+            "environment": [],
+            "externalConsole": false,
+            "preLaunchTask": "CMake: build"
+        }
     ]
 }

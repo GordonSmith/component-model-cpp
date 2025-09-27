@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.10)
 
 project(cmcpp LANGUAGES CXX)
 
@@ -20,7 +20,23 @@ target_include_directories(cmcpp INTERFACE
 target_compile_features(cmcpp INTERFACE cxx_std_20)
 
 if (BUILD_SAMPLES AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/samples/CMakeLists.txt")
-    set(WASI_SDK_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/vcpkg_installed/x64-linux/wasi-sdk)
+    if (NOT DEFINED WASI_SDK_PREFIX OR WASI_SDK_PREFIX STREQUAL "")
+        set(_wasi_sdk_candidates)
+        if (DEFINED VCPKG_TARGET_TRIPLET)
+            list(APPEND _wasi_sdk_candidates "${CMAKE_CURRENT_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/wasi-sdk")
+        endif()
+        file(GLOB _wasi_sdk_glob "${CMAKE_CURRENT_BINARY_DIR}/vcpkg_installed/*/wasi-sdk")
+        list(APPEND _wasi_sdk_candidates ${_wasi_sdk_glob})
+        list(FILTER _wasi_sdk_candidates EXCLUDE REGEX "^$")
+        list(REMOVE_DUPLICATES _wasi_sdk_candidates)
+        if (_wasi_sdk_candidates)
+            list(GET _wasi_sdk_candidates 0 _wasi_sdk_default)
+            set(WASI_SDK_PREFIX "${_wasi_sdk_default}" CACHE PATH "Path to the WASI SDK used by the samples" FORCE)
+        else()
+            set(WASI_SDK_PREFIX "" CACHE PATH "Path to the WASI SDK used by the samples" FORCE)
+        endif()
+    endif()
+    message ("WASI_SDK_PREFIX: ${WASI_SDK_PREFIX}")
     add_subdirectory(samples)
 endif()
 

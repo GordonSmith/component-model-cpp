@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 3.10)
+
 function(wit2code witFile)
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${witFile}/${witFile}.c ${CMAKE_CURRENT_BINARY_DIR}/${witFile}/${witFile}.h ${CMAKE_CURRENT_BINARY_DIR}/${witFile}/${witFile}_component_type.o
