@@ -1,13 +1,23 @@
 #ifndef CMCPP_TRAITS_HPP
 #define CMCPP_TRAITS_HPP
 
-#include <cassert>
-#include <cstring>
-#include <cmath>
+#include <algorithm>
+#include <array>
 #include <bitset>
-#include <optional>
-#include <variant>
+#include <cassert>
+#include <cmath>
+#include <cstdint>
+#include <cstring>
+#include <functional>
 #include <limits>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <variant>
+#include <vector>
 
 #include "boost/pfr.hpp"
 
@@ -36,11 +46,14 @@ namespace cmcpp
     using WasmVal = std::variant<int32_t, int64_t, float32_t, float64_t>;
     using WasmValVector = std::vector<WasmVal>;
 
+    template <typename>
+    inline constexpr bool dependent_false_v = false;
+
     template <typename T>
     struct WasmValTrait
     {
         static constexpr WasmValType type = WasmValType::UNKNOWN;
-        static_assert(WasmValTrait<T>::type != WasmValType::UNKNOWN, "T must be valid WasmValType.");
+        static_assert(!dependent_false_v<T>, "T must be valid WasmValType.");
     };
 
     template <>
@@ -170,7 +183,7 @@ namespace cmcpp
     template <typename T>
     struct ValTrait
     {
-        static_assert(false, "T is not a valid type for ValTrait. Type: ");
+        static_assert(!dependent_false_v<T>, "T is not a valid type for ValTrait.");
         static constexpr ValType type = ValType::UNKNOWN;
         using inner_type = std::monostate;
         static constexpr uint32_t size = 0;
@@ -246,8 +259,8 @@ namespace cmcpp
         static constexpr uint32_t alignment = 1;
         static constexpr std::array<WasmValType, 1> flat_types = {WasmValType::i32};
 
-        static constexpr int8_t LOW_VALUE = std::numeric_limits<uint8_t>::lowest();
-        static constexpr int8_t HIGH_VALUE = std::numeric_limits<uint8_t>::max();
+        static constexpr uint8_t LOW_VALUE = std::numeric_limits<uint8_t>::lowest();
+        static constexpr uint8_t HIGH_VALUE = std::numeric_limits<uint8_t>::max();
     };
 
     template <>
@@ -428,13 +441,42 @@ namespace cmcpp
         string_t str;
         u16string_t u16str;
 
+        // Maintain both buffers in sync when we carry dual encodings so callers can
+        // materialize either representation without tracking extra state.
         inline void resize(size_t new_size)
         {
-            encoding == Encoding::Latin1 ? str.resize(new_size) : u16str.resize(new_size);
+            switch (encoding)
+            {
+            case Encoding::Latin1:
+            case Encoding::Utf8:
+                str.resize(new_size);
+                break;
+            case Encoding::Utf16:
+                u16str.resize(new_size);
+                break;
+            case Encoding::Latin1_Utf16:
+                str.resize(new_size);
+                u16str.resize(new_size);
+                break;
+            }
         }
-        inline void *data() const
+
+        inline void *data()
         {
-            return encoding == Encoding::Latin1 ? (void *)str.data() : (void *)u16str.data();
+            if (encoding == Encoding::Latin1 || encoding == Encoding::Latin1_Utf16)
+            {
+                return static_cast<void *>(str.data());
+            }
+            return static_cast<void *>(u16str.data());
+        }
+
+        inline const void *data() const
+        {
+            if (encoding == Encoding::Latin1 || encoding == Encoding::Latin1_Utf16)
+            {
+                return static_cast<const void *>(str.data());
+            }
+            return static_cast<const void *>(u16str.data());
         }
     };
     template <>
@@ -739,8 +781,8 @@ namespace cmcpp
     using enum_t = uint32_t;
 
     //  Func  --------------------------------------------------------------------
-    constexpr uint MAX_FLAT_PARAMS = 16;
-    constexpr uint MAX_FLAT_RESULTS = 1;
+    constexpr std::uint32_t MAX_FLAT_PARAMS = 16;
+    constexpr std::uint32_t MAX_FLAT_RESULTS = 1;
 
     template <typename>
     struct func_t_impl;
