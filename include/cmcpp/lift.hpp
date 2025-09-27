@@ -53,7 +53,7 @@ namespace cmcpp
     }
 
     template <Field T>
-    inline T lift_flat_values(const LiftLowerContext &cx, uint max_flat, const CoreValueIter &vi)
+    inline T lift_flat_values(const LiftLowerContext &cx, uint32_t max_flat, const CoreValueIter &vi)
     {
         auto flat_types = ValTrait<T>::flat_types;
         if (flat_types.size() > max_flat)

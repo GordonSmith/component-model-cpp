@@ -1,13 +1,24 @@
 #ifndef CMCPP_TRAITS_HPP
 #define CMCPP_TRAITS_HPP
 
-#include <cassert>
-#include <cstring>
-#include <cmath>
+#include <algorithm>
+#include <array>
+#include <bit>
 #include <bitset>
-#include <optional>
-#include <variant>
+#include <cassert>
+#include <cmath>
+#include <cstdint>
+#include <cstring>
+#include <functional>
 #include <limits>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <variant>
+#include <vector>
 
 #include "boost/pfr.hpp"
 
@@ -36,11 +47,14 @@ namespace cmcpp
     using WasmVal = std::variant<int32_t, int64_t, float32_t, float64_t>;
     using WasmValVector = std::vector<WasmVal>;
 
+    template <typename>
+    inline constexpr bool dependent_false_v = false;
+
     template <typename T>
     struct WasmValTrait
     {
         static constexpr WasmValType type = WasmValType::UNKNOWN;
-        static_assert(WasmValTrait<T>::type != WasmValType::UNKNOWN, "T must be valid WasmValType.");
+        static_assert(!dependent_false_v<T>, "T must be valid WasmValType.");
     };
 
     template <>
@@ -170,7 +184,7 @@ namespace cmcpp
     template <typename T>
     struct ValTrait
     {
-        static_assert(false, "T is not a valid type for ValTrait. Type: ");
+        static_assert(!dependent_false_v<T>, "T is not a valid type for ValTrait.");
         static constexpr ValType type = ValType::UNKNOWN;
         using inner_type = std::monostate;
         static constexpr uint32_t size = 0;
@@ -246,8 +260,8 @@ namespace cmcpp
         static constexpr uint32_t alignment = 1;
         static constexpr std::array<WasmValType, 1> flat_types = {WasmValType::i32};
 
-        static constexpr int8_t LOW_VALUE = std::numeric_limits<uint8_t>::lowest();
-        static constexpr int8_t HIGH_VALUE = std::numeric_limits<uint8_t>::max();
+        static constexpr uint8_t LOW_VALUE = std::numeric_limits<uint8_t>::lowest();
+        static constexpr uint8_t HIGH_VALUE = std::numeric_limits<uint8_t>::max();
     };
 
     template <>
@@ -428,13 +442,42 @@ namespace cmcpp
         string_t str;
         u16string_t u16str;
 
+        // Maintain both buffers in sync when we carry dual encodings so callers can
+        // materialize either representation without tracking extra state.
         inline void resize(size_t new_size)
         {
-            encoding == Encoding::Latin1 ? str.resize(new_size) : u16str.resize(new_size);
+            switch (encoding)
+            {
+            case Encoding::Latin1:
+            case Encoding::Utf8:
+                str.resize(new_size);
+                break;
+            case Encoding::Utf16:
+                u16str.resize(new_size);
+                break;
+            case Encoding::Latin1_Utf16:
+                str.resize(new_size);
+                u16str.resize(new_size);
+                break;
+            }
         }
-        inline void *data() const
+
+        inline void *data()
         {
-            return encoding == Encoding::Latin1 ? (void *)str.data() : (void *)u16str.data();
+            if (encoding == Encoding::Latin1 || encoding == Encoding::Latin1_Utf16)
+            {
+                return static_cast<void *>(str.data());
+            }
+            return static_cast<void *>(u16str.data());
+        }
+
+        inline const void *data() const
+        {
+            if (encoding == Encoding::Latin1 || encoding == Encoding::Latin1_Utf16)
+            {
+                return static_cast<const void *>(str.data());
+            }
+            return static_cast<const void *>(u16str.data());
         }
     };
     template <>
@@ -626,8 +669,10 @@ namespace cmcpp
         static constexpr ValType type = ValType::Record;
         using inner_type = R;
         using tuple_type = decltype(boost::pfr::structure_to_tuple(std::declval<R>()));
+        static constexpr uint32_t alignment = ValTrait<tuple_type>::alignment;
+        static constexpr uint32_t size = ValTrait<tuple_type>::size;
         static constexpr size_t flat_types_len = ValTrait<tuple_type>::flat_types_len;
-        static constexpr std::array<WasmValType, flat_types_len> flat_types = ValTrait<tuple_type>::flat_types;
+        static constexpr auto flat_types = ValTrait<tuple_type>::flat_types;
     };
     template <typename T>
     concept Record = ValTrait<T>::type == ValType::Record;
@@ -666,8 +711,21 @@ namespace cmcpp
         static constexpr ValType type = ValType::Variant;
         using inner_type = typename std::variant<Ts...>;
 
-        static constexpr int match = static_cast<int>(std::ceil(std::log2(std::variant_size_v<inner_type>) / 8.0));
-        using discriminant_type = std::conditional_t<match == 0, uint8_t, std::conditional_t<match == 1, uint8_t, std::conditional_t<match == 2, uint16_t, std::conditional_t<match == 3, uint32_t, void>>>>;
+        static constexpr std::size_t case_count = std::variant_size_v<inner_type>;
+        static_assert(case_count > 0, "variant must have at least one case");
+
+        static constexpr std::size_t discriminant_bits = (case_count <= 1)
+                                                             ? 1
+                                                             : std::bit_width(static_cast<unsigned>(case_count - 1));
+        static constexpr std::size_t discriminant_bytes = (discriminant_bits + 7) / 8;
+        static_assert(discriminant_bytes <= 4, "variant discriminant exceeds 32 bits");
+        using discriminant_type = std::conditional_t<
+            discriminant_bytes <= 1,
+            uint8_t,
+            std::conditional_t<
+                discriminant_bytes <= 2,
+                uint16_t,
+                uint32_t>>;
         static constexpr uint32_t max_case_alignment = []() constexpr
         {
             uint32_t a = 1;
@@ -696,20 +754,30 @@ namespace cmcpp
             ((i = std::max(i, ValTrait<Ts>::flat_types.size())), ...);
             return i + 1;
         }();
-        static constexpr std::array<WasmValType, flat_types_len> flat_types = []() constexpr
+        template <typename Case>
+        static constexpr void merge_case_types(std::array<WasmValType, flat_types_len> &flat)
         {
-            std::array<WasmValType, flat_types_len> flat;
+            std::size_t index = 1;
+            for (auto ft : ValTrait<Case>::flat_types)
+            {
+                flat[index] = join(flat[index], ft);
+                ++index;
+            }
+        }
+
+        static constexpr std::array<WasmValType, flat_types_len> compute_flat_types()
+        {
+            std::array<WasmValType, flat_types_len> flat{};
             flat.fill(WasmValType::i32);
-            flat[0] = ValTrait<discriminant_type>::flat_types[0];
-            ([&]()
-             {
-                size_t i = 1;
-                for (auto &ft : ValTrait<Ts>::flat_types) {
-                    flat[i] = join(flat[i], ft);
-                    ++i;
-                } }(), ...);
+            if constexpr (flat_types_len > 0)
+            {
+                flat[0] = ValTrait<discriminant_type>::flat_types[0];
+            }
+            (merge_case_types<Ts>(flat), ...);
             return flat;
-        }();
+        }
+
+        static constexpr std::array<WasmValType, flat_types_len> flat_types = compute_flat_types();
     };
     template <typename T>
     concept Variant = ValTrait<T>::type == ValType::Variant;
@@ -739,8 +807,8 @@ namespace cmcpp
     using enum_t = uint32_t;
 
     //  Func  --------------------------------------------------------------------
-    constexpr uint MAX_FLAT_PARAMS = 16;
-    constexpr uint MAX_FLAT_RESULTS = 1;
+    constexpr uint32_t MAX_FLAT_PARAMS = 16;
+    constexpr uint32_t MAX_FLAT_RESULTS = 1;
 
     template <typename>
     struct func_t_impl;

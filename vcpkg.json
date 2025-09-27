@@ -8,8 +8,7 @@
         },
         "wasi-sdk",
         {
-            "name": "wasm-micro-runtime",
-            "platform": "linux"
+            "name": "wasm-micro-runtime"
         }
     ]
 }

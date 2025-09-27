@@ -187,6 +187,16 @@ void test_overflow_behavior(const std::unique_ptr<LiftLowerContext> &cx, T input
     CHECK(result == expected_output);
 }
 
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wconstant-conversion"
+#pragma clang diagnostic ignored "-Wimplicit-int-conversion"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Woverflow"
+#pragma GCC diagnostic ignored "-Wconversion"
+#endif
+
 TEST_CASE("Numeric Boundary Cases - Overflow Behavior")
 {
     Heap heap(1024 * 1024);
@@ -246,6 +256,12 @@ TEST_CASE("Numeric Boundary Cases - Overflow Behavior")
     test_overflow_behavior<int64_t>(cx, 1ULL << 63, INT64_MIN);                                // 2^63 becomes -2^63
     test_overflow_behavior<int64_t>(cx, UINT64_MAX, -1);
 }
+
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 TEST_CASE("Float Special Values - Enhanced")
 {
