@@ -59,6 +59,8 @@ This repository contains a C++ ABI implementation of the WebAssembly Component M
 - [x] Wamr
 - [ ] WasmEdge
 
+When expanding the canonical ABI surface, cross-check the Python reference tests in `ref/component-model/design/mvp/canonical-abi/run_tests.py`; new host features should mirror the behaviors exercised there.
+
 ## Build Instructions
 
 ### Prerequisites
@@ -170,6 +172,46 @@ ctest -VV  # Run tests
 This library is a header only library. To use it in your project, you can:
 - [x] Copy the contents of the `include` directory to your project.
 - [ ] Use `vcpkg` to install the library and its dependencies.
+
+### Async runtime helpers
+
+The canonical Component Model runtime is cooperative: hosts must drive pending work by scheduling tasks explicitly. `cmcpp` now provides a minimal async harness in `cmcpp/runtime.hpp`:
+
+- `Store` owns the pending task queue and exposes `invoke` plus `tick()`.
+- `FuncInst` is the callable signature hosts use to wrap guest functions.
+- `Thread::create` builds a pending task with user-supplied readiness/resume callbacks.
+- `Call::from_thread` returns a cancellation-capable handle to the caller.
+
+Typical usage:
+
+```cpp
+cmcpp::Store store;
+cmcpp::FuncInst func = [](cmcpp::Store &store,
+              cmcpp::SupertaskPtr,
+              cmcpp::OnStart on_start,
+              cmcpp::OnResolve on_resolve) {
+  auto args = std::make_shared<std::vector<std::any>>(on_start());
+  auto gate = std::make_shared<std::atomic<bool>>(false);
+
+  auto thread = cmcpp::Thread::create(
+    store,
+    [gate]() { return gate->load(); },
+    [args, on_resolve](bool cancelled) {
+      on_resolve(cancelled ? std::nullopt : std::optional{*args});
+      return false; // finished
+    },
+    true,
+    [gate]() { gate->store(true); });
+
+  return cmcpp::Call::from_thread(thread);
+};
+
+auto call = store.invoke(func, nullptr, [] { return std::vector<std::any>{}; }, [](auto) {});
+// Drive progress
+store.tick();
+```
+
+Call `tick()` in your host loop until all pending work completes. Cancellation is cooperative: calling `Call::request_cancellation()` marks the associated thread as cancelled before the next `tick()`.
 
  
 ## Related projects

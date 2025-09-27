@@ -11,5 +11,6 @@
 #include <cmcpp/func.hpp>
 #include <cmcpp/lower.hpp>
 #include <cmcpp/lift.hpp>
+#include <cmcpp/runtime.hpp>
 
 #endif // CMCPP_HPP

@@ -9,6 +9,8 @@ using namespace cmcpp;
 #include <vector>
 #include <utility>
 #include <cassert>
+#include <any>
+#include <atomic>
 #include <limits>
 #include <cmath>
 #include <cstdint>
@@ -16,6 +18,191 @@ using namespace cmcpp;
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
+
+TEST_CASE("Async runtime schedules threads")
+{
+    Store store;
+
+    std::optional<std::vector<std::any>> resolved_payload;
+    bool resolved = false;
+    bool cancelled = false;
+    std::shared_ptr<std::atomic<bool>> gate;
+
+    FuncInst async_func = [&](Store &store, SupertaskPtr, OnStart on_start, OnResolve on_resolve)
+    {
+        auto args = std::make_shared<std::vector<std::any>>(on_start());
+        gate = std::make_shared<std::atomic<bool>>(false);
+
+        auto thread = Thread::create(
+            store,
+            [gate]()
+            {
+                return gate->load();
+            },
+            [args, on_resolve](bool was_cancelled)
+            {
+                if (was_cancelled)
+                {
+                    on_resolve(std::nullopt);
+                }
+                else
+                {
+                    on_resolve(*args);
+                }
+                return false;
+            },
+            true,
+            [gate]()
+            {
+                gate->store(true);
+            });
+
+        return Call::from_thread(thread);
+    };
+
+    auto call = store.invoke(
+        async_func,
+        nullptr,
+        []()
+        {
+            return std::vector<std::any>{int32_t(1), std::string("world")};
+        },
+        [&](std::optional<std::vector<std::any>> values)
+        {
+            resolved_payload = std::move(values);
+            resolved = true;
+            cancelled = !resolved_payload.has_value();
+        });
+
+    CHECK(gate);
+    CHECK(store.pending_size() == 1);
+    CHECK_FALSE(resolved);
+
+    store.tick();
+    CHECK_FALSE(resolved);
+
+    gate->store(true);
+    store.tick();
+
+    CHECK(resolved);
+    REQUIRE(resolved_payload.has_value());
+    REQUIRE(resolved_payload->size() == 2);
+    CHECK(std::any_cast<int32_t>((*resolved_payload)[0]) == 1);
+    CHECK(std::any_cast<std::string>((*resolved_payload)[1]) == "world");
+    CHECK_FALSE(cancelled);
+
+    // Cancellation path
+    resolved = false;
+    resolved_payload.reset();
+    cancelled = false;
+
+    auto call2 = store.invoke(
+        async_func,
+        nullptr,
+        []()
+        {
+            return std::vector<std::any>{int32_t(2)};
+        },
+        [&](std::optional<std::vector<std::any>> values)
+        {
+            resolved_payload = std::move(values);
+            resolved = true;
+            cancelled = !resolved_payload.has_value();
+        });
+
+    CHECK(store.pending_size() == 1);
+    store.tick();
+    CHECK(store.pending_size() == 1);
+
+    call2.request_cancellation();
+    store.tick();
+
+    CHECK(resolved);
+    CHECK(cancelled);
+    CHECK_FALSE(resolved_payload.has_value());
+}
+
+TEST_CASE("Async runtime requeues until completion")
+{
+    Store store;
+
+    auto counter = std::make_shared<int>(0);
+
+    auto thread = Thread::create(
+        store,
+        []()
+        {
+            return true;
+        },
+        [counter](bool cancelled)
+        {
+            REQUIRE_FALSE(cancelled);
+            ++(*counter);
+            return *counter < 3;
+        });
+
+    CHECK(store.pending_size() == 1);
+
+    store.tick();
+    CHECK(*counter == 1);
+    CHECK(store.pending_size() == 1);
+
+    store.tick();
+    CHECK(*counter == 2);
+    CHECK(store.pending_size() == 1);
+
+    store.tick();
+    CHECK(*counter == 3);
+    CHECK(store.pending_size() == 0);
+    CHECK(thread->completed());
+}
+
+TEST_CASE("Async runtime propagates cancellation")
+{
+    Store store;
+
+    auto ready_gate = std::make_shared<std::atomic<bool>>(false);
+    bool on_cancel_called = false;
+    bool resume_called = false;
+    bool was_cancelled = false;
+
+    auto thread = Thread::create(
+        store,
+        [ready_gate]()
+        {
+            return ready_gate->load();
+        },
+        [&on_cancel_called, &resume_called, &was_cancelled](bool cancelled)
+        {
+            resume_called = true;
+            was_cancelled = cancelled;
+            CHECK(on_cancel_called);
+            return false;
+        },
+        true,
+        [ready_gate, &on_cancel_called]()
+        {
+            on_cancel_called = true;
+            ready_gate->store(true);
+        });
+
+    auto call = Call::from_thread(thread);
+
+    CHECK(store.pending_size() == 1);
+    CHECK_FALSE(on_cancel_called);
+    CHECK_FALSE(resume_called);
+
+    call.request_cancellation();
+    CHECK(on_cancel_called);
+    CHECK(store.pending_size() == 1);
+
+    store.tick();
+
+    CHECK(resume_called);
+    CHECK(was_cancelled);
+    CHECK(store.pending_size() == 0);
+    CHECK(thread->completed());
+}
 
 TEST_CASE("Boolean")
 {
