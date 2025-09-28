@@ -5,6 +5,7 @@
 #include <cmcpp/integer.hpp>
 #include <cmcpp/float.hpp>
 #include <cmcpp/string.hpp>
+#include <cmcpp/error_context.hpp>
 #include <cmcpp/flags.hpp>
 #include <cmcpp/list.hpp>
 #include <cmcpp/tuple.hpp>
