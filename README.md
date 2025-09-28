@@ -162,9 +162,34 @@ ctest -VV  # Run tests
 
 ### Build Options
 
-- `-DBUILD_TESTING=ON/OFF` - Enable/disable building tests (requires doctest, ICU)
-- `-DBUILD_SAMPLES=ON/OFF` - Enable/disable building samples (requires wasi-sdk)
-- `-DCMAKE_BUILD_TYPE=Debug/Release/RelWithDebInfo/MinSizeRel` - Build configuration
+
+### Coverage
+
+The presets build tests with GCC/Clang coverage instrumentation enabled, so generating a report is mostly a matter of running the suite and capturing the counters. On Ubuntu the full workflow looks like:
+
+```bash
+# 1. Install tooling (once per machine)
+sudo apt-get update
+sudo apt-get install -y lcov
+
+# 2. Rebuild and rerun tests to refresh .gcda files
+cmake --build --preset linux-ninja-Debug
+cd build
+ctest --output-on-failure
+
+# 3. Capture raw coverage data
+lcov --capture --directory . --output-file coverage.info
+
+# 4. Filter out system headers, vcpkg packages, and tests (optional but recommended)
+lcov --remove coverage.info '/usr/include/*' '*/vcpkg/*' '*/test/*' \
+  --output-file coverage.filtered.info --ignore-errors unused
+
+# 5. Inspect the summary or render HTML
+lcov --list coverage.filtered.info
+genhtml coverage.filtered.info --output-directory coverage-html  # optional
+```
+
+Generated artifacts live in the `build/` directory (`coverage.info`, `coverage.filtered.info`, and optionally `coverage-html/`). The same commands work on other platforms once the equivalent of `lcov` (or LLVM's `llvm-cov`) is installed.
 
 ## Usage
 
@@ -172,51 +197,114 @@ This library is a header only library. To use it in your project, you can:
 - [x] Copy the contents of the `include` directory to your project.
 - [ ] Use `vcpkg` to install the library and its dependencies.
 
-### Async runtime helpers
+### Configuring `InstanceContext` and canonical options
 
-The canonical Component Model runtime is cooperative: hosts must drive pending work by scheduling tasks explicitly. `cmcpp` now provides a minimal async harness in `cmcpp/runtime.hpp`:
+Most host interactions begin by materialising an `InstanceContext`. This container wires together the host trap callback, string conversion routine, and the guest `realloc` export. Use `createInstanceContext` to capture those dependencies once:
 
-- `Store` owns the pending task queue and exposes `invoke` plus `tick()`.
+```cpp
+cmcpp::HostTrap trap = [](const char *msg) {
+  throw std::runtime_error(msg ? msg : "trap");
+};
+cmcpp::HostUnicodeConversion convert = {}; // see test/host-util.cpp for an ICU-backed example
+cmcpp::GuestRealloc realloc = [&](int ptr, int old_size, int align, int new_size) {
+  return guest_realloc(ptr, old_size, align, new_size);
+};
+
+auto icx = cmcpp::createInstanceContext(trap, convert, realloc);
+```
+
+When preparing to lift or lower values, create a `LiftLowerContext` from the instance. Pass the guest memory span and any canonical options you need:
+
+```cpp
+cmcpp::Heap heap(4096);
+cmcpp::CanonicalOptions options;
+options.memory = cmcpp::GuestMemory(heap.memory.data(), heap.memory.size());
+options.string_encoding = cmcpp::Encoding::Utf8;
+options.realloc = icx->realloc;
+options.post_return = [] { /* guest cleanup */ };
+options.callback = [](cmcpp::EventCode code, uint32_t index, uint32_t payload) {
+  std::printf("async event %u for handle %u (0x%x)\n",
+              static_cast<unsigned>(code), index, payload);
+};
+options.sync = false; // allow async continuations
+
+auto cx = icx->createLiftLowerContext(std::move(options));
+cx->inst = &component_instance;
+```
+
+The canonical options determine whether async continuations are allowed (`sync`), which hook to run after a successful lowering (`post_return`), and how async notifications surface back to the embedder (`callback`). Every guest call that moves data across the ABI should use the same context until `LiftLowerContext::exit_call()` is invoked.
+
+### Driving async flows with the runtime harness
+
+The Component Model runtime is cooperative: hosts advance work by draining a pending queue. `cmcpp/runtime.hpp` provides the same primitives as the canonical Python reference:
+
+- `Store` owns the queue of `Thread` objects and exposes `invoke` plus `tick()`.
 - `FuncInst` is the callable signature hosts use to wrap guest functions.
-- `Thread::create` builds a pending task with user-supplied readiness/resume callbacks.
-- `Call::from_thread` returns a cancellation-capable handle to the caller.
-- `Task` coordinates canonical backpressure, `canon_task.{return,cancel}`, and `canon_yield` helpers exposed through `context.hpp`.
-- `canon_backpressure_{set,inc,dec}` update in-flight counters; most canonical entry points now guard `ComponentInstance::may_leave` before touching guest state.
+- `Thread::create` builds resumable work with readiness and resume callbacks.
+- `Call::from_thread` returns a handle that supports cancellation and completion queries.
+- `Task` bridges canonical backpressure (`canon_task.{return,cancel}`) and ensures `ComponentInstance::may_leave` rules are enforced.
 
-Typical usage:
+A minimal async call looks like this:
 
 ```cpp
 cmcpp::Store store;
-cmcpp::FuncInst func = [](cmcpp::Store &store,
-              cmcpp::SupertaskPtr,
-              cmcpp::OnStart on_start,
-              cmcpp::OnResolve on_resolve) {
+
+cmcpp::FuncInst guest = [](cmcpp::Store &store,
+                            cmcpp::SupertaskPtr,
+                            cmcpp::OnStart on_start,
+                            cmcpp::OnResolve on_resolve) {
   auto args = std::make_shared<std::vector<std::any>>(on_start());
-  auto gate = std::make_shared<std::atomic<bool>>(false);
+  auto ready = std::make_shared<std::atomic<bool>>(false);
 
   auto thread = cmcpp::Thread::create(
-    store,
-    [gate]() { return gate->load(); },
-    [args, on_resolve](bool cancelled) {
-      on_resolve(cancelled ? std::nullopt : std::optional{*args});
-      return false; // finished
-    },
-    true,
-    [gate]() { gate->store(true); });
+      store,
+      [ready] { return ready->load(); },
+      [args, on_resolve](bool cancelled) {
+        on_resolve(cancelled ? std::nullopt : std::optional{*args});
+        return false; // one-shot
+      },
+      /*notify_on_cancel=*/true,
+      [ready] { ready->store(true); });
 
   return cmcpp::Call::from_thread(thread);
 };
 
-auto call = store.invoke(func, nullptr, [] { return std::vector<std::any>{}; }, [](auto) {});
-// Drive progress
-store.tick();
+auto call = store.invoke(
+    guest,
+    nullptr,
+    [] { return std::vector<std::any>{int32_t{7}}; },
+    [](std::optional<std::vector<std::any>> values) {
+      if (!values) { std::puts("cancelled"); return; }
+      std::printf("resolved with %d\n", std::any_cast<int32_t>((*values)[0]));
+    });
+
+while (!call.completed()) {
+  store.tick();
+}
 ```
 
-### Waitables, streams, and futures
+`Call::request_cancellation()` cooperatively aborts work before the next `tick()`, mirroring the canonical `cancel` semantics.
 
-The canonical async ABI surfaces are implemented via `canon_waitable_*`, `canon_stream_*`, and `canon_future_*` helpers on `ComponentInstance`. Waitable sets can be joined to readable/writable stream ends or futures, and `canon_waitable_set_poll` reports readiness using the same event payload layout defined by the spec. See the doctests in `test/main.cpp` for end-to-end examples.
+### Waitables, streams, futures, and other resources
 
-Call `tick()` in your host loop until all pending work completes. Cancellation is cooperative: calling `Call::request_cancellation()` marks the associated thread as cancelled before the next `tick()`.
+`ComponentInstance` manages resource tables that back the canonical `canon_waitable_*`, `canon_stream_*`, and `canon_future_*` entry points. Hosts typically:
+
+1. Instantiate a descriptor (`make_stream_descriptor<T>()`, `make_future_descriptor<T>()`, etc.).
+2. Create handles via `canon_stream_new`/`canon_future_new`, which return packed readable/writable indices.
+3. Join readable ends to a waitable set with `canon_waitable_join`.
+4. Poll readiness using `canon_waitable_set_poll`, decoding the `EventCode` and payload stored in guest memory.
+5. Drop resources with the corresponding `canon_*_drop_*` helpers once the guest is finished.
+
+Streams and futures honour the canonical copy result payload layout, so the values copied into guest memory exactly match the spec. Cancellation helpers (`canon_stream_cancel_*`, `canon_future_cancel_*`) post events when the embedder requests termination, and the async callback registered in `CanonicalOptions` receives the same event triplet that the waitable set reports.
+
+For a complete walkthrough, see the doctest suites in `test/main.cpp`:
+
+- "Async runtime schedules threads" demonstrates `Store`, `Thread`, `Call`, and cancellation.
+- "Waitable set surfaces stream readiness" polls a waitable set tied to a stream.
+- "Future lifecycle completes" verifies readable/writable futures.
+- "Task yield, cancel, and return" exercises backpressure and async task APIs.
+
+Those tests are ICU-enabled and run automatically via `ctest`.
 
  
 ## Related projects
