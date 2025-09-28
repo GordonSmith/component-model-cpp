@@ -34,10 +34,7 @@ This repository contains a C++ ABI implementation of the WebAssembly Component M
 - [x] F32
 - [x] F64
 - [x] Char
-- [x] String
-- [x] utf8 String
-- [x] utf16 String
-- [x] latin1+utf16 String
+- [x] Strings (UTF-8, UTF-16, Latin-1+UTF-16)
 - [x] List
 - [x] Record
 - [x] Tuple
@@ -46,6 +43,8 @@ This repository contains a C++ ABI implementation of the WebAssembly Component M
 - [x] Option
 - [x] Result
 - [x] Flags
+- [x] Streams (readable/writable)
+- [x] Futures (readable/writable)
 - [ ] Own
 - [ ] Borrow
 
@@ -181,6 +180,8 @@ The canonical Component Model runtime is cooperative: hosts must drive pending w
 - `FuncInst` is the callable signature hosts use to wrap guest functions.
 - `Thread::create` builds a pending task with user-supplied readiness/resume callbacks.
 - `Call::from_thread` returns a cancellation-capable handle to the caller.
+- `Task` coordinates canonical backpressure, `canon_task.{return,cancel}`, and `canon_yield` helpers exposed through `context.hpp`.
+- `canon_backpressure_{set,inc,dec}` update in-flight counters; most canonical entry points now guard `ComponentInstance::may_leave` before touching guest state.
 
 Typical usage:
 
