@@ -2,109 +2,127 @@
 #define CMCPP_FUNC_HPP
 
 #include "context.hpp"
+#include "flags.hpp"
 
 namespace cmcpp
 {
     namespace func
     {
-        //     template <Flags T>
-        //     int32_t pack_flags_into_int(const T &v)
-        //     {
-        //         return v.to_ulong();
-        //     }
+        enum class ContextType
+        {
+            Lift,
+            Lower
+        };
 
-        //     template <Flags T>
-        //     void store(LiftLowerContext &cx, const T &v, offset ptr)
-        //     {
-        //         auto i = pack_flags_into_int(v);
-        //         std::memcpy(&cx.opts.memory[ptr], i, ValTrait<T>::size);
-        //     }
+        template <Flags T>
+        inline int32_t pack_flags_into_int(const T &v)
+        {
+            return flags::pack_flags_into_int(v);
+        }
 
-        //     template <Flags T>
-        //     WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
-        //     {
-        //         return {pack_flags_into_int(v)};
-        //     }
+        template <Flags T>
+        inline void store(LiftLowerContext &cx, const T &v, offset ptr)
+        {
+            flags::store(cx, v, ptr);
+        }
 
-        //     template <Flags T>
-        //     T unpack_flags_from_int(const uint32_t &buff)
-        //     {
-        //         return {buff};
-        //     }
+        template <Flags T>
+        inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
+        {
+            return flags::lower_flat(cx, v);
+        }
 
-        //     template <Flags T>
-        //     T load(const LiftLowerContext &cx, uint32_t ptr)
-        //     {
-        //         uint8_t buff[ValTrait<T>::size];
-        //         std::memcpy(&buff, &cx.opts.memory[ptr], ValTrait<T>::size);
-        //         return unpack_flags_from_int<T>(buff);
-        //     }
+        template <Flags T>
+        inline T unpack_flags_from_int(uint32_t value)
+        {
+            return flags::unpack_flags_from_int<T>(value);
+        }
 
-        //     template <Flags T>
-        //     T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
-        //     {
-        //         auto i = vi.next<int32_t>();
-        //         uint8_t buff[ValTrait<T>::size];
-        //         std::memcpy(&buff, &i, ValTrait<T>::size);
-        //         return unpack_flags_from_int<T>(i);
-        //     }
+        template <Flags T>
+        inline T load(const LiftLowerContext &cx, uint32_t ptr)
+        {
+            return flags::load<T>(cx, ptr);
+        }
 
-        // enum class ContextType
-        // {
-        //     Lift,
-        //     Lower
-        // };
+        template <Flags T>
+        inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
+        {
+            return flags::lift_flat<T>(cx, vi);
+        }
 
-        // template <Func T>
-        // inline core_func_t flatten(LiftLowerContext &cx, ContextType context)
-        // {
-        //     std::vector<WasmValType> flat_params(ValTrait<T>::flat_params_types.begin(), ValTrait<T>::flat_params_types.end());
-        //     std::vector<WasmValType> flat_results(ValTrait<T>::flat_result_types.begin(), ValTrait<T>::flat_result_types.end());
-        //     // if (cx.opts.sync == true)
-        //     {
-        //         if (flat_params.size() > MAX_FLAT_PARAMS)
-        //         {
-        //             flat_params = {WasmValType::i32};
-        //         }
-        //         if (flat_results.size() > MAX_FLAT_RESULTS)
-        //         {
-        //             switch (context)
-        //             {
-        //             case ContextType::Lift:
-        //                 flat_results = {WasmValType::i32};
-        //                 break;
-        //             case ContextType::Lower:
-        //                 flat_params.push_back(WasmValType::i32);
-        //                 flat_results = {};
-        //             }
-        //         }
-        //     }
-        //     return {flat_params, flat_results};
-        // }
+        template <Func T>
+        inline core_func_t flatten(const CanonicalOptions &opts, ContextType context)
+        {
+            using params_trait = ValTrait<typename ValTrait<T>::params_t>;
+            using result_trait = ValTrait<typename ValTrait<T>::result_t>;
 
-        // template <Flags T>
-        // inline void store(LiftLowerContext &cx, const T &v, uint32_t ptr)
-        // {
-        //     flags::store(cx, v, ptr);
-        // }
+            WasmValTypeVector flat_params(params_trait::flat_types.begin(), params_trait::flat_types.end());
+            WasmValTypeVector flat_results(result_trait::flat_types.begin(), result_trait::flat_types.end());
 
-        // template <Flags T>
-        // inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)
-        // {
-        //     return flags::lower_flat(cx, v);
-        // }
+            const size_t raw_param_count = flat_params.size();
+            const size_t raw_result_count = flat_results.size();
 
-        // template <Flags T>
-        // inline T load(const LiftLowerContext &cx, uint32_t ptr)
-        // {
-        //     return flags::load<T>(cx, ptr);
-        // }
+            auto pointer_type = []() -> WasmValTypeVector
+            {
+                return {WasmValType::i32};
+            };
 
-        // template <Flags T>
-        // inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
-        // {
-        //     return flags::lift_flat<T>(cx, vi);
-        // }
+            if (opts.sync)
+            {
+                if (raw_param_count > MAX_FLAT_PARAMS)
+                {
+                    flat_params = pointer_type();
+                }
+
+                if (raw_result_count > MAX_FLAT_RESULTS)
+                {
+                    if (context == ContextType::Lift)
+                    {
+                        flat_results = pointer_type();
+                    }
+                    else
+                    {
+                        flat_params.push_back(WasmValType::i32);
+                        flat_results.clear();
+                    }
+                }
+            }
+            else
+            {
+                if (context == ContextType::Lift)
+                {
+                    if (raw_param_count > MAX_FLAT_PARAMS)
+                    {
+                        flat_params = pointer_type();
+                    }
+
+                    if (opts.callback.has_value())
+                    {
+                        flat_results = pointer_type();
+                    }
+                    else
+                    {
+                        flat_results.clear();
+                    }
+                }
+                else
+                {
+                    if (raw_param_count > MAX_FLAT_ASYNC_PARAMS)
+                    {
+                        flat_params = pointer_type();
+                    }
+
+                    if (raw_result_count > 0)
+                    {
+                        flat_params.push_back(WasmValType::i32);
+                    }
+
+                    flat_results = pointer_type();
+                }
+            }
+
+            return {std::move(flat_params), std::move(flat_results)};
+        }
     }
 }
 #endif

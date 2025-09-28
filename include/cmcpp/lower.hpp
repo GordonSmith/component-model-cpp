@@ -62,7 +62,7 @@ namespace cmcpp
         if (out_param == nullptr)
         {
             ptr = cx.opts.realloc(0, 0, ValTrait<tuple_type>::alignment, ValTrait<tuple_type>::size);
-            flat_vals = {ptr};
+            flat_vals = {static_cast<int32_t>(ptr)};
         }
         else
         {
