@@ -5,6 +5,7 @@
 using namespace cmcpp;
 
 #include <iostream>
+#include <algorithm>
 #include <string>
 #include <vector>
 #include <utility>
@@ -230,6 +231,81 @@ TEST_CASE("Backpressure counters and may_leave guards")
     CHECK_THROWS(canon_waitable_set_new(inst, trap));
     inst.may_leave = true;
     CHECK_NOTHROW(canon_waitable_set_new(inst, trap));
+}
+
+TEST_CASE("Context locals provide per-task storage")
+{
+    ComponentInstance inst;
+    HostTrap trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    Task task(inst);
+
+    CHECK(ContextLocalStorage::LENGTH == 1);
+    CHECK(canon_context_get(task, 0, trap) == 0);
+
+    canon_context_set(task, 0, 42, trap);
+    CHECK(canon_context_get(task, 0, trap) == 42);
+
+    CHECK_THROWS(canon_context_get(task, ContextLocalStorage::LENGTH, trap));
+    CHECK_THROWS(canon_context_set(task, ContextLocalStorage::LENGTH, 99, trap));
+
+    inst.may_leave = false;
+    CHECK_THROWS(canon_context_get(task, 0, trap));
+    inst.may_leave = true;
+}
+
+TEST_CASE("Error context APIs manage debug messages")
+{
+    Store store;
+    ComponentInstance inst;
+    inst.store = &store;
+
+    HostTrap trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    Task task(inst);
+
+    Heap heap(1024);
+    auto cx = createLiftLowerContext(&heap, Encoding::Utf8);
+    cx->inst = &inst;
+
+    const std::string guest_message = "component failure";
+    const uint32_t guest_ptr = 32;
+    std::copy(guest_message.begin(), guest_message.end(), heap.memory.begin() + guest_ptr);
+    uint32_t tagged_code_units = static_cast<uint32_t>(guest_message.size());
+
+    uint32_t err_index = canon_error_context_new(task, cx.get(), guest_ptr, tagged_code_units, trap);
+    CHECK(err_index != 0);
+
+    const uint32_t record_ptr = 128;
+    canon_error_context_debug_message(task, *cx, err_index, record_ptr, trap);
+
+    uint32_t stored_ptr = integer::load<uint32_t>(*cx, record_ptr);
+    uint32_t stored_len = integer::load<uint32_t>(*cx, record_ptr + 4);
+    auto roundtrip = string::load_from_range<string_t>(*cx, stored_ptr, stored_len);
+    CHECK(roundtrip == guest_message);
+
+    inst.may_leave = false;
+    CHECK_THROWS(canon_error_context_debug_message(task, *cx, err_index, record_ptr + 16, trap));
+    inst.may_leave = true;
+
+    canon_error_context_drop(task, err_index, trap);
+    CHECK_THROWS(canon_error_context_drop(task, err_index, trap));
+
+    uint32_t empty_index = canon_error_context_new(task, nullptr, 0, 0, trap);
+    CHECK(empty_index != 0);
+
+    const uint32_t empty_record = 192;
+    canon_error_context_debug_message(task, *cx, empty_index, empty_record, trap);
+    uint32_t empty_len = integer::load<uint32_t>(*cx, empty_record + 4);
+    CHECK(empty_len == 0);
+
+    canon_error_context_drop(task, empty_index, trap);
 }
 
 TEST_CASE("Task yield, cancel, and return")

@@ -5,6 +5,7 @@
 #include "runtime.hpp"
 
 #include <algorithm>
+#include <array>
 #include <deque>
 #include <future>
 #include <memory>
@@ -969,10 +970,6 @@ namespace cmcpp
         std::unordered_map<const ResourceType *, HandleTable> tables_;
     };
 
-    struct ErrorContext
-    {
-    };
-
     struct ComponentInstance
     {
         Store *store = nullptr;
@@ -1009,6 +1006,27 @@ namespace cmcpp
         trap_if(trap_cx, inst.backpressure == 0, "backpressure underflow");
         inst.backpressure -= 1;
     }
+
+    class ContextLocalStorage
+    {
+    public:
+        static constexpr uint32_t LENGTH = 1;
+
+        ContextLocalStorage() = default;
+
+        void set(uint32_t index, int32_t value)
+        {
+            storage_[index] = value;
+        }
+
+        int32_t get(uint32_t index) const
+        {
+            return storage_[index];
+        }
+
+    private:
+        std::array<int32_t, LENGTH> storage_{};
+    };
 
     class Task : public std::enable_shared_from_this<Task>
     {
@@ -1184,6 +1202,16 @@ namespace cmcpp
             return state_;
         }
 
+        ContextLocalStorage &context()
+        {
+            return context_;
+        }
+
+        const ContextLocalStorage &context() const
+        {
+            return context_;
+        }
+
         ComponentInstance *component_instance() const
         {
             return inst_;
@@ -1236,6 +1264,7 @@ namespace cmcpp
         uint32_t num_borrows_ = 0;
         std::shared_ptr<Thread> thread_;
         State state_ = State::Initial;
+        ContextLocalStorage context_{};
     };
 
     inline void canon_task_return(Task &task, std::vector<std::any> result, const HostTrap &trap)
@@ -1275,25 +1304,6 @@ namespace cmcpp
                                       cancellable);
         return event.code == EventCode::TASK_CANCELLED ? 1u : 0u;
     }
-
-    class ContextLocalStorage
-    {
-    public:
-        static constexpr int LENGTH = 2;
-        int array[LENGTH] = {0, 0};
-
-        ContextLocalStorage() = default;
-
-        void set(int i, int v)
-        {
-            array[i] = v;
-        }
-
-        int get(int i)
-        {
-            return array[i];
-        }
-    };
 
     struct Subtask : Waitable
     {
@@ -1357,6 +1367,28 @@ namespace cmcpp
     {
         const HandleElement &element = inst.handles.get(rt, index, trap);
         return element.rep;
+    }
+
+    inline int32_t canon_context_get(Task &task, uint32_t index, const HostTrap &trap)
+    {
+        if (auto *inst = task.component_instance())
+        {
+            ensure_may_leave(*inst, trap);
+        }
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, index >= ContextLocalStorage::LENGTH, "context index out of bounds");
+        return task.context().get(index);
+    }
+
+    inline void canon_context_set(Task &task, uint32_t index, int32_t value, const HostTrap &trap)
+    {
+        if (auto *inst = task.component_instance())
+        {
+            ensure_may_leave(*inst, trap);
+        }
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, index >= ContextLocalStorage::LENGTH, "context index out of bounds");
+        task.context().set(index, value);
     }
 
     inline uint32_t canon_waitable_set_new(ComponentInstance &inst, const HostTrap &trap)
