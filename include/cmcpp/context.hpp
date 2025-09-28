@@ -26,11 +26,13 @@
 
 namespace cmcpp
 {
+    enum class EventCode : uint8_t;
+
     using HostTrap = std::function<void(const char *msg) noexcept(false)>;
     using GuestRealloc = std::function<int(int ptr, int old_size, int align, int new_size)>;
     using GuestMemory = std::span<uint8_t>;
     using GuestPostReturn = std::function<void()>;
-    using GuestCallback = std::function<void()>;
+    using GuestCallback = std::function<void(EventCode, uint32_t, uint32_t)>;
     using HostUnicodeConversion = std::function<std::pair<void *, size_t>(void *dest, uint32_t dest_byte_len, const void *src, uint32_t src_byte_len, Encoding from_encoding, Encoding to_encoding)>;
 
     // Canonical ABI Options ---
@@ -83,8 +85,18 @@ namespace cmcpp
         LiftLowerContext(const HostTrap &host_trap, const HostUnicodeConversion &conversion, const LiftLowerOptions &options, ComponentInstance *instance = nullptr)
             : trap(host_trap), convert(conversion), opts(options), inst(instance) {}
 
+        void set_canonical_options(CanonicalOptions options);
+        CanonicalOptions *canonical_options();
+        const CanonicalOptions *canonical_options() const;
+        bool is_sync() const;
+        void invoke_post_return() const;
+        void notify_async_event(EventCode code, uint32_t index, uint32_t payload) const;
+
         void track_owning_lend(HandleElement &lending_handle);
         void exit_call();
+
+    private:
+        std::optional<CanonicalOptions> canonical_opts_;
     };
 
     inline void trap_if(const LiftLowerContext &cx, bool condition, const char *message = nullptr) noexcept(false)
@@ -101,6 +113,54 @@ namespace cmcpp
             return;
         }
         throw std::runtime_error(msg);
+    }
+
+    inline void LiftLowerContext::set_canonical_options(CanonicalOptions options)
+    {
+        canonical_opts_ = std::move(options);
+        opts = *canonical_opts_;
+    }
+
+    inline CanonicalOptions *LiftLowerContext::canonical_options()
+    {
+        return canonical_opts_ ? &*canonical_opts_ : nullptr;
+    }
+
+    inline const CanonicalOptions *LiftLowerContext::canonical_options() const
+    {
+        return canonical_opts_ ? &*canonical_opts_ : nullptr;
+    }
+
+    inline bool LiftLowerContext::is_sync() const
+    {
+        if (auto *canon = canonical_options())
+        {
+            return canon->sync;
+        }
+        return true;
+    }
+
+    inline void LiftLowerContext::invoke_post_return() const
+    {
+        if (auto *canon = canonical_options())
+        {
+            if (canon->post_return)
+            {
+                (*canon->post_return)();
+            }
+        }
+    }
+
+    inline void LiftLowerContext::notify_async_event(EventCode code, uint32_t index, uint32_t payload) const
+    {
+        if (auto *canon = canonical_options())
+        {
+            trap_if(*this, canon->sync, "async continuation requires async canonical options");
+            if (canon->callback)
+            {
+                (*canon->callback)(code, index, payload);
+            }
+        }
     }
 
     inline LiftLowerContext make_trap_context(const HostTrap &trap)
@@ -518,7 +578,7 @@ namespace cmcpp
         uint32_t read(const std::shared_ptr<LiftLowerContext> &cx, uint32_t handle_index, uint32_t ptr, uint32_t n, bool sync, const HostTrap &trap);
         uint32_t cancel(bool sync, const HostTrap &trap);
         void drop(const HostTrap &trap);
-        void complete_async(uint32_t handle_index, CopyResult result, uint32_t progress, const HostTrap &trap);
+        void complete_async(const std::shared_ptr<LiftLowerContext> &cx, uint32_t handle_index, CopyResult result, uint32_t progress, const HostTrap &trap);
 
     private:
         std::shared_ptr<SharedStreamState> shared_;
@@ -582,13 +642,18 @@ namespace cmcpp
 
         auto pending = std::move(*shared_->pending_read);
         shared_->pending_read.reset();
-        set_pending_event({EventCode::STREAM_READ, pending.handle_index, pack_copy_result(CopyResult::Cancelled, pending.progress)});
+        auto payload = pack_copy_result(CopyResult::Cancelled, pending.progress);
+        set_pending_event({EventCode::STREAM_READ, pending.handle_index, payload});
         state_ = CopyState::Done;
 
         if (sync)
         {
             auto event = get_pending_event(trap);
             return event.payload;
+        }
+        if (pending.cx)
+        {
+            pending.cx->notify_async_event(EventCode::STREAM_READ, pending.handle_index, payload);
         }
         return BLOCKED;
     }
@@ -606,10 +671,15 @@ namespace cmcpp
         Waitable::drop(trap);
     }
 
-    inline void ReadableStreamEnd::complete_async(uint32_t handle_index, CopyResult result, uint32_t progress, const HostTrap &trap)
+    inline void ReadableStreamEnd::complete_async(const std::shared_ptr<LiftLowerContext> &cx, uint32_t handle_index, CopyResult result, uint32_t progress, const HostTrap &trap)
     {
-        set_pending_event({EventCode::STREAM_READ, handle_index, pack_copy_result(result, progress)});
+        auto payload = pack_copy_result(result, progress);
+        set_pending_event({EventCode::STREAM_READ, handle_index, payload});
         state_ = (result == CopyResult::Completed) ? CopyState::Idle : CopyState::Done;
+        if (cx)
+        {
+            cx->notify_async_event(EventCode::STREAM_READ, handle_index, payload);
+        }
     }
 
     inline void satisfy_pending_read(SharedStreamState &state, const HostTrap &trap)
@@ -624,7 +694,7 @@ namespace cmcpp
         pending.progress += consumed;
         if (pending.progress >= pending.requested)
         {
-            pending.endpoint->complete_async(pending.handle_index, CopyResult::Completed, pending.progress, trap);
+            pending.endpoint->complete_async(pending.cx, pending.handle_index, CopyResult::Completed, pending.progress, trap);
             state.pending_read.reset();
         }
     }
@@ -662,7 +732,7 @@ namespace cmcpp
             {
                 auto pending = std::move(*shared_->pending_read);
                 shared_->pending_read.reset();
-                pending.endpoint->complete_async(pending.handle_index, CopyResult::Dropped, pending.progress, trap);
+                pending.endpoint->complete_async(pending.cx, pending.handle_index, CopyResult::Dropped, pending.progress, trap);
             }
             shared_->writable_dropped = true;
         }
@@ -707,7 +777,7 @@ namespace cmcpp
         uint32_t read(const std::shared_ptr<LiftLowerContext> &cx, uint32_t handle_index, uint32_t ptr, bool sync, const HostTrap &trap);
         uint32_t cancel(bool sync, const HostTrap &trap);
         void drop(const HostTrap &trap);
-        void complete_async(uint32_t handle_index, CopyResult result, uint32_t progress, const HostTrap &trap);
+        void complete_async(const std::shared_ptr<LiftLowerContext> &cx, uint32_t handle_index, CopyResult result, uint32_t progress, const HostTrap &trap);
 
     private:
         std::shared_ptr<SharedFutureState> shared_;
@@ -772,13 +842,18 @@ namespace cmcpp
 
         auto pending = std::move(*shared_->pending_read);
         shared_->pending_read.reset();
-        set_pending_event({EventCode::FUTURE_READ, pending.handle_index, pack_copy_result(CopyResult::Cancelled, 0)});
+        auto payload = pack_copy_result(CopyResult::Cancelled, 0);
+        set_pending_event({EventCode::FUTURE_READ, pending.handle_index, payload});
         state_ = CopyState::Done;
 
         if (sync)
         {
             auto event = get_pending_event(trap);
             return event.payload;
+        }
+        if (pending.cx)
+        {
+            pending.cx->notify_async_event(EventCode::FUTURE_READ, pending.handle_index, payload);
         }
         return BLOCKED;
     }
@@ -796,10 +871,15 @@ namespace cmcpp
         Waitable::drop(trap);
     }
 
-    inline void ReadableFutureEnd::complete_async(uint32_t handle_index, CopyResult result, uint32_t progress, const HostTrap &trap)
+    inline void ReadableFutureEnd::complete_async(const std::shared_ptr<LiftLowerContext> &cx, uint32_t handle_index, CopyResult result, uint32_t progress, const HostTrap &trap)
     {
-        set_pending_event({EventCode::FUTURE_READ, handle_index, pack_copy_result(result, progress)});
+        auto payload = pack_copy_result(result, progress);
+        set_pending_event({EventCode::FUTURE_READ, handle_index, payload});
         state_ = (result == CopyResult::Completed) ? CopyState::Idle : CopyState::Done;
+        if (cx)
+        {
+            cx->notify_async_event(EventCode::FUTURE_READ, handle_index, payload);
+        }
     }
 
     inline uint32_t WritableFutureEnd::write(const std::shared_ptr<LiftLowerContext> &cx, uint32_t handle_index, uint32_t ptr, const HostTrap &trap)
@@ -819,7 +899,7 @@ namespace cmcpp
             shared_->pending_read.reset();
             ensure_memory_range(*pending.cx, pending.ptr, 1, shared_->descriptor.alignment, shared_->descriptor.element_size);
             std::memcpy(pending.cx->opts.memory.data() + pending.ptr, shared_->value.data(), shared_->descriptor.element_size);
-            pending.endpoint->complete_async(pending.handle_index, CopyResult::Completed, 1, trap);
+            pending.endpoint->complete_async(pending.cx, pending.handle_index, CopyResult::Completed, 1, trap);
         }
 
         set_pending_event({EventCode::FUTURE_WRITE, handle_index, pack_copy_result(CopyResult::Completed, 1)});
@@ -843,7 +923,7 @@ namespace cmcpp
             {
                 auto pending = std::move(*shared_->pending_read);
                 shared_->pending_read.reset();
-                pending.endpoint->complete_async(pending.handle_index, CopyResult::Dropped, 0, trap);
+                pending.endpoint->complete_async(pending.cx, pending.handle_index, CopyResult::Dropped, 0, trap);
             }
             shared_->writable_dropped = true;
         }
@@ -1603,10 +1683,31 @@ namespace cmcpp
         HostUnicodeConversion convert;
         GuestRealloc realloc;
 
-        std::unique_ptr<LiftLowerContext> createLiftLowerContext(const GuestMemory &memory, const Encoding &string_encoding = Encoding::Utf8, const std::optional<GuestPostReturn> &post_return = std::nullopt)
+        std::unique_ptr<LiftLowerContext> createLiftLowerContext(const GuestMemory &memory,
+                                                                 const Encoding &string_encoding = Encoding::Utf8,
+                                                                 const std::optional<GuestPostReturn> &post_return = std::nullopt,
+                                                                 bool sync = true,
+                                                                 const std::optional<GuestCallback> &callback = std::nullopt)
         {
-            LiftLowerOptions opts(string_encoding, memory, realloc);
+            CanonicalOptions options;
+            options.string_encoding = string_encoding;
+            options.memory = memory;
+            options.realloc = realloc;
+            options.post_return = post_return;
+            options.sync = sync;
+            options.callback = callback;
+            return createLiftLowerContext(std::move(options));
+        }
+
+        std::unique_ptr<LiftLowerContext> createLiftLowerContext(CanonicalOptions options)
+        {
+            if (!options.realloc)
+            {
+                options.realloc = realloc;
+            }
+            LiftLowerOptions opts(options.string_encoding, options.memory, options.realloc);
             auto retVal = std::make_unique<LiftLowerContext>(trap, convert, opts);
+            retVal->set_canonical_options(std::move(options));
             return retVal;
         }
     };

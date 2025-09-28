@@ -399,6 +399,103 @@ TEST_CASE("Task yield, cancel, and return")
     CHECK(store.pending_size() == 0);
 }
 
+TEST_CASE("Canonical options control lift/lower callbacks")
+{
+    SUBCASE("post_return runs once for heap spill")
+    {
+        Heap heap(1024);
+        int post_return_calls = 0;
+
+        CanonicalOptions options;
+        options.post_return = GuestPostReturn([&]()
+                                              { ++post_return_calls; });
+
+        auto cx = createLiftLowerContext(&heap, std::move(options));
+        using ResultTuple = tuple_t<string_t, string_t>;
+        ResultTuple value{"alpha", "beta"};
+
+        auto lowered = lower_flat_values<ResultTuple>(*cx, MAX_FLAT_RESULTS, nullptr, std::move(value));
+        CHECK(lowered.size() == 1);
+        CHECK(post_return_calls == 1);
+    }
+
+    SUBCASE("post_return runs once when using provided out pointer")
+    {
+        Heap heap(1024);
+        int post_return_calls = 0;
+
+        CanonicalOptions options;
+        options.post_return = GuestPostReturn([&]()
+                                              { ++post_return_calls; });
+
+        auto cx = createLiftLowerContext(&heap, std::move(options));
+        using ResultTuple = tuple_t<string_t, string_t>;
+        ResultTuple value{"gamma", "delta"};
+
+        uint32_t out_ptr = align_to(32u, ValTrait<ResultTuple>::alignment);
+        auto lowered = lower_flat_values<ResultTuple>(*cx, MAX_FLAT_RESULTS, &out_ptr, std::move(value));
+        CHECK(lowered.empty());
+        CHECK(post_return_calls == 1);
+    }
+
+    SUBCASE("sync context traps on async lowering")
+    {
+        Heap heap(1024);
+        CanonicalOptions options;
+        auto cx = createLiftLowerContext(&heap, std::move(options));
+        using ResultTuple = tuple_t<string_t, string_t>;
+        CHECK_THROWS(lower_flat_values<ResultTuple>(*cx, 0, nullptr, ResultTuple{"omega", "sigma"}));
+    }
+
+    SUBCASE("async callback fires for stream completion")
+    {
+        Heap heap(1024);
+        bool callback_called = false;
+        EventCode observed_code = EventCode::NONE;
+        uint32_t observed_index = 0;
+        uint32_t observed_payload = 0;
+
+        CanonicalOptions options;
+        options.sync = false;
+        options.callback = GuestCallback([&](EventCode code, uint32_t index, uint32_t payload)
+                                         {
+                                             callback_called = true;
+                                             observed_code = code;
+                                             observed_index = index;
+                                             observed_payload = payload; });
+
+        auto cx_unique = createLiftLowerContext(&heap, options);
+        std::shared_ptr<LiftLowerContext> cx(cx_unique.release(), [](LiftLowerContext *ptr)
+                                             { delete ptr; });
+
+        HostTrap trap = [](const char *msg)
+        {
+            throw std::runtime_error(msg ? msg : "trap");
+        };
+
+        auto descriptor = make_stream_descriptor<uint8_t>();
+        auto shared_state = std::make_shared<SharedStreamState>(descriptor);
+        ReadableStreamEnd readable(shared_state);
+        WritableStreamEnd writable(shared_state);
+
+        uint32_t read_ptr = 0;
+        uint32_t write_ptr = 64;
+        heap.memory[write_ptr] = 0x42;
+
+        auto blocked = readable.read(cx, 1, read_ptr, 1, false, trap);
+        CHECK(blocked == BLOCKED);
+        CHECK_FALSE(callback_called);
+
+        writable.write(cx, 2, write_ptr, 1, trap);
+
+        CHECK(callback_called);
+        CHECK(observed_code == EventCode::STREAM_READ);
+        CHECK(observed_index == 1);
+        CHECK(observed_payload == pack_copy_result(CopyResult::Completed, 1));
+        CHECK(heap.memory[read_ptr] == heap.memory[write_ptr]);
+    }
+}
+
 TEST_CASE("Resource handle lifecycle mirrors canonical definitions")
 {
     ComponentInstance resource_impl;
@@ -830,7 +927,9 @@ TEST_CASE("Waitable set surfaces stream readiness")
     canon_waitable_join(inst, readable, waitable_set, host_trap);
 
     Heap heap(256);
-    auto cx = std::shared_ptr<LiftLowerContext>(createLiftLowerContext(&heap, Encoding::Utf8).release(), [](LiftLowerContext *ptr)
+    CanonicalOptions options;
+    options.sync = false;
+    auto cx = std::shared_ptr<LiftLowerContext>(createLiftLowerContext(&heap, options).release(), [](LiftLowerContext *ptr)
                                                 { delete ptr; });
 
     uint32_t read_ptr = 0;
@@ -890,7 +989,9 @@ TEST_CASE("Stream cancellation posts events")
     canon_waitable_join(inst, readable, waitable_set, host_trap);
 
     Heap heap(128);
-    auto cx = std::shared_ptr<LiftLowerContext>(createLiftLowerContext(&heap, Encoding::Utf8).release(), [](LiftLowerContext *ptr)
+    CanonicalOptions options;
+    options.sync = false;
+    auto cx = std::shared_ptr<LiftLowerContext>(createLiftLowerContext(&heap, options).release(), [](LiftLowerContext *ptr)
                                                 { delete ptr; });
 
     uint32_t read_ptr = 0;
@@ -933,7 +1034,9 @@ TEST_CASE("Future lifecycle completes")
     canon_waitable_join(inst, readable, waitable_set, host_trap);
 
     Heap heap(256);
-    auto cx = std::shared_ptr<LiftLowerContext>(createLiftLowerContext(&heap, Encoding::Utf8).release(), [](LiftLowerContext *ptr)
+    CanonicalOptions options;
+    options.sync = false;
+    auto cx = std::shared_ptr<LiftLowerContext>(createLiftLowerContext(&heap, options).release(), [](LiftLowerContext *ptr)
                                                 { delete ptr; });
 
     uint32_t read_ptr = 0;
@@ -1616,7 +1719,7 @@ TEST_CASE("Async function flattening matches canonical ABI")
 
     CanonicalOptions lift_with_callback;
     lift_with_callback.sync = false;
-    lift_with_callback.callback = GuestCallback([]() {});
+    lift_with_callback.callback = GuestCallback([](EventCode, uint32_t, uint32_t) {});
 
     auto lift_callback = func::flatten<AsyncLiftFn>(lift_with_callback, func::ContextType::Lift);
     CHECK(lift_callback.results.size() == 1);

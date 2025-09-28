@@ -78,6 +78,10 @@ namespace cmcpp
     template <Field... Ts>
     inline WasmValVector lower_flat_values(LiftLowerContext &cx, uint32_t max_flat, uint32_t *out_param, Ts &&...vs)
     {
+        if (auto *canon = cx.canonical_options())
+        {
+            trap_if(cx, canon->sync && max_flat == 0, "async lowering requires async canonical options");
+        }
         WasmValVector retVal = {};
         // cx.inst.may_leave=false;
         constexpr auto flat_types = ValTrait<tuple_t<Ts...>>::flat_types;
@@ -93,9 +97,11 @@ namespace cmcpp
                 retVal.insert(retVal.end(), flat.begin(), flat.end());
             };
             (lower_v(vs), ...);
+            cx.invoke_post_return();
             return retVal;
         }
         // cx.inst.may_leave=true;
+        cx.invoke_post_return();
         return retVal;
     }
 
