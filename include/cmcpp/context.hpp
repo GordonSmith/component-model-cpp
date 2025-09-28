@@ -2,6 +2,7 @@
 #define CMCPP_CONTEXT_HPP
 
 #include "traits.hpp"
+#include "runtime.hpp"
 
 #include <algorithm>
 #include <deque>
@@ -974,6 +975,7 @@ namespace cmcpp
 
     struct ComponentInstance
     {
+        Store *store = nullptr;
         bool may_leave = true;
         bool may_enter = true;
         bool exclusive = false;
@@ -982,6 +984,297 @@ namespace cmcpp
         HandleTables handles;
         InstanceTable table;
     };
+
+    inline void ensure_may_leave(ComponentInstance &inst, const HostTrap &trap)
+    {
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, !inst.may_leave, "component may not leave");
+    }
+
+    inline void canon_backpressure_set(ComponentInstance &inst, bool enabled)
+    {
+        inst.backpressure = enabled ? 1u : 0u;
+    }
+
+    inline void canon_backpressure_inc(ComponentInstance &inst, const HostTrap &trap)
+    {
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, inst.backpressure >= 0x1'0000u, "backpressure overflow");
+        inst.backpressure += 1;
+    }
+
+    inline void canon_backpressure_dec(ComponentInstance &inst, const HostTrap &trap)
+    {
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, inst.backpressure == 0, "backpressure underflow");
+        inst.backpressure -= 1;
+    }
+
+    class Task : public std::enable_shared_from_this<Task>
+    {
+    public:
+        enum class State
+        {
+            Initial,
+            PendingCancel,
+            CancelDelivered,
+            Resolved
+        };
+
+        Task(ComponentInstance &instance,
+             CanonicalOptions options = {},
+             SupertaskPtr supertask = {},
+             OnResolve on_resolve = {})
+            : opts_(std::move(options)), inst_(&instance), supertask_(std::move(supertask)), on_resolve_(std::move(on_resolve))
+        {
+        }
+
+        void set_thread(const std::shared_ptr<Thread> &thread)
+        {
+            thread_ = thread;
+            if (thread_)
+            {
+                thread_->set_allow_cancellation(!opts_.sync);
+                thread_->set_in_event_loop(opts_.callback.has_value());
+                if (inst_)
+                {
+                    auto super = std::make_shared<Supertask>();
+                    super->instance = inst_;
+                    super->thread = thread_;
+                    super->parent = supertask_;
+                    supertask_ = std::move(super);
+                }
+            }
+        }
+
+        std::shared_ptr<Thread> thread() const
+        {
+            return thread_;
+        }
+
+        void set_on_resolve(OnResolve on_resolve)
+        {
+            on_resolve_ = std::move(on_resolve);
+        }
+
+        bool enter(const HostTrap &trap)
+        {
+            auto *thread_ptr = thread_.get();
+            auto *inst = inst_;
+            if (!thread_ptr || !inst)
+            {
+                return false;
+            }
+
+            auto has_backpressure = [inst, this]() -> bool
+            {
+                return inst->backpressure > 0 || (needs_exclusive() && inst->exclusive);
+            };
+
+            if (has_backpressure() || inst->num_waiting_to_enter > 0)
+            {
+                inst->num_waiting_to_enter += 1;
+                bool completed = thread_ptr->suspend_until([has_backpressure]()
+                                                           { return !has_backpressure(); },
+                                                           true);
+                inst->num_waiting_to_enter -= 1;
+                if (!completed)
+                {
+                    if (state_ == State::CancelDelivered)
+                    {
+                        cancel(trap);
+                    }
+                    return false;
+                }
+            }
+
+            if (needs_exclusive())
+            {
+                inst->exclusive = true;
+            }
+            return true;
+        }
+
+        void exit()
+        {
+            if (!inst_)
+            {
+                return;
+            }
+            if (needs_exclusive())
+            {
+                inst_->exclusive = false;
+            }
+        }
+
+        void request_cancellation()
+        {
+            if (state_ != State::Initial || !thread_)
+            {
+                return;
+            }
+
+            if (ready_for_cancellation())
+            {
+                state_ = State::CancelDelivered;
+            }
+            else
+            {
+                state_ = State::PendingCancel;
+            }
+            thread_->request_cancellation();
+        }
+
+        bool suspend_until(Thread::ReadyFn ready, bool cancellable)
+        {
+            if (cancellable && state_ == State::CancelDelivered)
+            {
+                return false;
+            }
+            if (cancellable && state_ == State::PendingCancel)
+            {
+                state_ = State::CancelDelivered;
+                return false;
+            }
+            if (!thread_)
+            {
+                return false;
+            }
+            bool completed = thread_->suspend_until(std::move(ready), cancellable);
+            if (!completed && cancellable && state_ == State::PendingCancel)
+            {
+                state_ = State::CancelDelivered;
+            }
+            return completed;
+        }
+
+        Event yield_until(Thread::ReadyFn ready, bool cancellable)
+        {
+            if (!suspend_until(std::move(ready), cancellable))
+            {
+                return {EventCode::TASK_CANCELLED, 0, 0};
+            }
+            return {EventCode::NONE, 0, 0};
+        }
+
+        void return_result(std::vector<std::any> result, const HostTrap &trap)
+        {
+            ensure_resolvable(trap);
+            if (on_resolve_)
+            {
+                on_resolve_(std::optional<std::vector<std::any>>(std::move(result)));
+            }
+            state_ = State::Resolved;
+        }
+
+        void cancel(const HostTrap &trap)
+        {
+            auto trap_cx = make_trap_context(trap);
+            trap_if(trap_cx, state_ != State::CancelDelivered, "task cancellation not delivered");
+            trap_if(trap_cx, num_borrows_ > 0, "task has outstanding borrows");
+            if (on_resolve_)
+            {
+                on_resolve_(std::nullopt);
+            }
+            state_ = State::Resolved;
+        }
+
+        State state() const
+        {
+            return state_;
+        }
+
+        ComponentInstance *component_instance() const
+        {
+            return inst_;
+        }
+
+        const CanonicalOptions &options() const
+        {
+            return opts_;
+        }
+
+        void incr_borrows()
+        {
+            num_borrows_ += 1;
+        }
+
+        void decr_borrows()
+        {
+            if (num_borrows_ > 0)
+            {
+                num_borrows_ -= 1;
+            }
+        }
+
+    private:
+        bool needs_exclusive() const
+        {
+            return opts_.sync || opts_.callback.has_value();
+        }
+
+        void ensure_resolvable(const HostTrap &trap)
+        {
+            auto trap_cx = make_trap_context(trap);
+            trap_if(trap_cx, state_ == State::Resolved, "task already resolved");
+            trap_if(trap_cx, num_borrows_ > 0, "task has outstanding borrows");
+        }
+
+        bool ready_for_cancellation() const
+        {
+            if (!thread_)
+            {
+                return false;
+            }
+            return thread_->cancellable() && !(thread_->in_event_loop() && inst_ && inst_->exclusive);
+        }
+
+        CanonicalOptions opts_;
+        ComponentInstance *inst_ = nullptr;
+        SupertaskPtr supertask_;
+        OnResolve on_resolve_;
+        uint32_t num_borrows_ = 0;
+        std::shared_ptr<Thread> thread_;
+        State state_ = State::Initial;
+    };
+
+    inline void canon_task_return(Task &task, std::vector<std::any> result, const HostTrap &trap)
+    {
+        if (auto *inst = task.component_instance())
+        {
+            ensure_may_leave(*inst, trap);
+        }
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, task.options().sync, "task.return requires async context");
+        task.return_result(std::move(result), trap);
+    }
+
+    inline void canon_task_cancel(Task &task, const HostTrap &trap)
+    {
+        if (auto *inst = task.component_instance())
+        {
+            ensure_may_leave(*inst, trap);
+        }
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, task.options().sync, "task.cancel requires async context");
+        task.cancel(trap);
+    }
+
+    inline uint32_t canon_yield(bool cancellable, Task &task, const HostTrap &trap)
+    {
+        if (auto *inst = task.component_instance())
+        {
+            ensure_may_leave(*inst, trap);
+        }
+        if (task.state() == Task::State::CancelDelivered || task.state() == Task::State::PendingCancel)
+        {
+            return 1u;
+        }
+        auto event = task.yield_until([]
+                                      { return true; },
+                                      cancellable);
+        return event.code == EventCode::TASK_CANCELLED ? 1u : 0u;
+    }
 
     class ContextLocalStorage
     {
@@ -1068,12 +1361,14 @@ namespace cmcpp
 
     inline uint32_t canon_waitable_set_new(ComponentInstance &inst, const HostTrap &trap)
     {
+        ensure_may_leave(inst, trap);
         auto wset = std::make_shared<WaitableSet>();
         return inst.table.add(wset, trap);
     }
 
     inline uint32_t canon_waitable_set_wait(bool /*cancellable*/, GuestMemory mem, ComponentInstance &inst, uint32_t set_index, uint32_t ptr, const HostTrap &trap)
     {
+        ensure_may_leave(inst, trap);
         auto wset = inst.table.get<WaitableSet>(set_index, trap);
         wset->begin_wait();
         if (!wset->has_pending_event())
@@ -1090,6 +1385,7 @@ namespace cmcpp
 
     inline uint32_t canon_waitable_set_poll(bool /*cancellable*/, GuestMemory mem, ComponentInstance &inst, uint32_t set_index, uint32_t ptr, const HostTrap &trap)
     {
+        ensure_may_leave(inst, trap);
         auto wset = inst.table.get<WaitableSet>(set_index, trap);
         if (!wset->has_pending_event())
         {
@@ -1103,12 +1399,14 @@ namespace cmcpp
 
     inline void canon_waitable_set_drop(ComponentInstance &inst, uint32_t set_index, const HostTrap &trap)
     {
+        ensure_may_leave(inst, trap);
         auto wset = inst.table.remove<WaitableSet>(set_index, trap);
         wset->drop(trap);
     }
 
     inline void canon_waitable_join(ComponentInstance &inst, uint32_t waitable_index, uint32_t set_index, const HostTrap &trap)
     {
+        ensure_may_leave(inst, trap);
         auto waitable = inst.table.get<Waitable>(waitable_index, trap);
         if (set_index == 0)
         {
@@ -1121,6 +1419,7 @@ namespace cmcpp
 
     inline uint64_t canon_stream_new(ComponentInstance &inst, const StreamDescriptor &descriptor, const HostTrap &trap)
     {
+        ensure_may_leave(inst, trap);
         auto trap_cx = make_trap_context(trap);
         trap_if(trap_cx, descriptor.element_size == 0, "stream descriptor invalid");
         auto shared = std::make_shared<SharedStreamState>(descriptor);
@@ -1140,6 +1439,7 @@ namespace cmcpp
                                       bool sync,
                                       const HostTrap &trap)
     {
+        ensure_may_leave(inst, trap);
         auto trap_cx = make_trap_context(trap);
         trap_if(trap_cx, !cx, "lift/lower context required");
         auto readable = inst.table.get<ReadableStreamEnd>(readable_index, trap);
@@ -1155,6 +1455,7 @@ namespace cmcpp
                                        uint32_t n,
                                        const HostTrap &trap)
     {
+        ensure_may_leave(inst, trap);
         auto trap_cx = make_trap_context(trap);
         trap_if(trap_cx, !cx, "lift/lower context required");
         auto writable = inst.table.get<WritableStreamEnd>(writable_index, trap);
@@ -1164,30 +1465,35 @@ namespace cmcpp
 
     inline uint32_t canon_stream_cancel_read(ComponentInstance &inst, uint32_t readable_index, bool sync, const HostTrap &trap)
     {
+        ensure_may_leave(inst, trap);
         auto readable = inst.table.get<ReadableStreamEnd>(readable_index, trap);
         return readable->cancel(sync, trap);
     }
 
     inline uint32_t canon_stream_cancel_write(ComponentInstance &inst, uint32_t writable_index, bool sync, const HostTrap &trap)
     {
+        ensure_may_leave(inst, trap);
         auto writable = inst.table.get<WritableStreamEnd>(writable_index, trap);
         return writable->cancel(sync, trap);
     }
 
     inline void canon_stream_drop_readable(ComponentInstance &inst, uint32_t readable_index, const HostTrap &trap)
     {
+        ensure_may_leave(inst, trap);
         auto readable = inst.table.remove<ReadableStreamEnd>(readable_index, trap);
         readable->drop(trap);
     }
 
     inline void canon_stream_drop_writable(ComponentInstance &inst, uint32_t writable_index, const HostTrap &trap)
     {
+        ensure_may_leave(inst, trap);
         auto writable = inst.table.remove<WritableStreamEnd>(writable_index, trap);
         writable->drop(trap);
     }
 
     inline uint64_t canon_future_new(ComponentInstance &inst, const FutureDescriptor &descriptor, const HostTrap &trap)
     {
+        ensure_may_leave(inst, trap);
         auto trap_cx = make_trap_context(trap);
         trap_if(trap_cx, descriptor.element_size == 0, "future descriptor invalid");
         auto shared = std::make_shared<SharedFutureState>(descriptor);
@@ -1206,6 +1512,7 @@ namespace cmcpp
                                       bool sync,
                                       const HostTrap &trap)
     {
+        ensure_may_leave(inst, trap);
         auto trap_cx = make_trap_context(trap);
         trap_if(trap_cx, !cx, "lift/lower context required");
         auto readable = inst.table.get<ReadableFutureEnd>(readable_index, trap);
@@ -1220,6 +1527,7 @@ namespace cmcpp
                                        uint32_t ptr,
                                        const HostTrap &trap)
     {
+        ensure_may_leave(inst, trap);
         auto trap_cx = make_trap_context(trap);
         trap_if(trap_cx, !cx, "lift/lower context required");
         auto writable = inst.table.get<WritableFutureEnd>(writable_index, trap);
@@ -1229,24 +1537,28 @@ namespace cmcpp
 
     inline uint32_t canon_future_cancel_read(ComponentInstance &inst, uint32_t readable_index, bool sync, const HostTrap &trap)
     {
+        ensure_may_leave(inst, trap);
         auto readable = inst.table.get<ReadableFutureEnd>(readable_index, trap);
         return readable->cancel(sync, trap);
     }
 
     inline uint32_t canon_future_cancel_write(ComponentInstance &inst, uint32_t writable_index, bool sync, const HostTrap &trap)
     {
+        ensure_may_leave(inst, trap);
         auto writable = inst.table.get<WritableFutureEnd>(writable_index, trap);
         return writable->cancel(sync, trap);
     }
 
     inline void canon_future_drop_readable(ComponentInstance &inst, uint32_t readable_index, const HostTrap &trap)
     {
+        ensure_may_leave(inst, trap);
         auto readable = inst.table.remove<ReadableFutureEnd>(readable_index, trap);
         readable->drop(trap);
     }
 
     inline void canon_future_drop_writable(ComponentInstance &inst, uint32_t writable_index, const HostTrap &trap)
     {
+        ensure_may_leave(inst, trap);
         auto writable = inst.table.remove<WritableFutureEnd>(writable_index, trap);
         writable->drop(trap);
     }

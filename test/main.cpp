@@ -206,6 +206,123 @@ TEST_CASE("Async runtime propagates cancellation")
     CHECK(thread->completed());
 }
 
+TEST_CASE("Backpressure counters and may_leave guards")
+{
+    ComponentInstance inst;
+    HostTrap trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    canon_backpressure_set(inst, true);
+    CHECK(inst.backpressure == 1);
+    canon_backpressure_inc(inst, trap);
+    CHECK(inst.backpressure == 2);
+    canon_backpressure_dec(inst, trap);
+    CHECK(inst.backpressure == 1);
+    canon_backpressure_set(inst, false);
+    CHECK(inst.backpressure == 0);
+    CHECK_THROWS(canon_backpressure_dec(inst, trap));
+
+    Store store;
+    inst.store = &store;
+    inst.may_leave = false;
+    CHECK_THROWS(canon_waitable_set_new(inst, trap));
+    inst.may_leave = true;
+    CHECK_NOTHROW(canon_waitable_set_new(inst, trap));
+}
+
+TEST_CASE("Task yield, cancel, and return")
+{
+    Store store;
+    ComponentInstance inst;
+    inst.store = &store;
+    HostTrap trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    CanonicalOptions async_opts;
+    async_opts.sync = false;
+
+    bool resolved_called = false;
+    std::optional<std::vector<std::any>> resolved_value;
+
+    auto cancel_task = std::make_shared<Task>(inst, async_opts, nullptr, [&](std::optional<std::vector<std::any>> values)
+                                              {
+                                                 resolved_called = true;
+                                                 resolved_value = std::move(values); });
+
+    auto cancel_gate = std::make_shared<std::atomic<bool>>(true);
+    auto cancel_thread = Thread::create(
+        store,
+        [cancel_gate]()
+        {
+            return cancel_gate->load();
+        },
+        [cancel_task, &trap](bool was_cancelled)
+        {
+            CHECK(was_cancelled);
+            REQUIRE(cancel_task->enter(trap));
+            auto event_code = canon_yield(true, *cancel_task, trap);
+            CHECK(event_code == 1);
+            canon_task_cancel(*cancel_task, trap);
+            cancel_task->exit();
+            return false;
+        },
+        true,
+        [cancel_gate]()
+        {
+            cancel_gate->store(true);
+        });
+
+    cancel_task->set_thread(cancel_thread);
+    cancel_task->request_cancellation();
+    CHECK(cancel_task->state() == Task::State::CancelDelivered);
+    store.tick();
+
+    CHECK(resolved_called);
+    CHECK_FALSE(resolved_value.has_value());
+    CHECK(store.pending_size() == 0);
+
+    resolved_called = false;
+    resolved_value.reset();
+
+    auto return_task = std::make_shared<Task>(inst, async_opts, nullptr, [&](std::optional<std::vector<std::any>> values)
+                                              {
+                                                 resolved_called = true;
+                                                 resolved_value = std::move(values); });
+
+    auto return_gate = std::make_shared<std::atomic<bool>>(true);
+    auto return_thread = Thread::create(
+        store,
+        [return_gate]()
+        {
+            return return_gate->load();
+        },
+        [return_task, &trap](bool was_cancelled)
+        {
+            CHECK_FALSE(was_cancelled);
+            REQUIRE(return_task->enter(trap));
+            auto event_code = canon_yield(false, *return_task, trap);
+            CHECK(event_code == 0);
+            std::vector<std::any> payload;
+            payload.emplace_back(int32_t(42));
+            canon_task_return(*return_task, std::move(payload), trap);
+            return_task->exit();
+            return false;
+        });
+
+    return_task->set_thread(return_thread);
+    store.tick();
+
+    CHECK(resolved_called);
+    REQUIRE(resolved_value.has_value());
+    REQUIRE(resolved_value->size() == 1);
+    CHECK(std::any_cast<int32_t>((*resolved_value)[0]) == 42);
+    CHECK(store.pending_size() == 0);
+}
+
 TEST_CASE("Resource handle lifecycle mirrors canonical definitions")
 {
     ComponentInstance resource_impl;
