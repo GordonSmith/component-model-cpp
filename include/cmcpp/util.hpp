@@ -7,14 +7,6 @@ namespace cmcpp
 {
     const bool DETERMINISTIC_PROFILE = false;
 
-    inline void trap_if(const LiftLowerContext &cx, bool condition, const char *message = nullptr) noexcept(false)
-    {
-        if (condition)
-        {
-            cx.trap(message == nullptr ? "Unknown trap" : message);
-        }
-    }
-
     inline bool_t convert_int_to_bool(uint8_t i)
     {
         return i > 0;

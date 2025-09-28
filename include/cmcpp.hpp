@@ -1,6 +1,7 @@
 #ifndef CMCPP_HPP
 #define CMCPP_HPP
 
+#include <cmcpp/context.hpp>
 #include <cmcpp/integer.hpp>
 #include <cmcpp/float.hpp>
 #include <cmcpp/string.hpp>

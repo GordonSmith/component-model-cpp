@@ -4,6 +4,10 @@
 #include "traits.hpp"
 
 #include <future>
+#include <optional>
+#include <stdexcept>
+#include <unordered_map>
+#include <vector>
 #if __has_include(<span>)
 #include <span>
 #else
@@ -53,9 +57,166 @@ namespace cmcpp
         bool allways_task_return = false;
     };
 
-    // Runtime State ---
-    struct ResourceHandle
+    struct ComponentInstance;
+    struct HandleElement;
+
+    class LiftLowerContext
     {
+    public:
+        HostTrap trap;
+        HostUnicodeConversion convert;
+
+        LiftLowerOptions opts;
+        ComponentInstance *inst = nullptr;
+        std::vector<HandleElement *> lenders;
+        uint32_t borrow_count = 0;
+
+        LiftLowerContext(const HostTrap &host_trap, const HostUnicodeConversion &conversion, const LiftLowerOptions &options, ComponentInstance *instance = nullptr)
+            : trap(host_trap), convert(conversion), opts(options), inst(instance) {}
+
+        void track_owning_lend(HandleElement &lending_handle);
+        void exit_call();
+    };
+
+    inline void trap_if(const LiftLowerContext &cx, bool condition, const char *message = nullptr) noexcept(false)
+    {
+        if (condition)
+        {
+            const char *msg = message == nullptr ? "Unknown trap" : message;
+            if (cx.trap)
+            {
+                cx.trap(msg);
+                return;
+            }
+            throw std::runtime_error(msg);
+        }
+    }
+
+    inline LiftLowerContext make_trap_context(const HostTrap &trap)
+    {
+        HostUnicodeConversion convert{};
+        LiftLowerOptions opts{};
+        return LiftLowerContext(trap, convert, opts);
+    }
+
+    struct ResourceType
+    {
+        ComponentInstance *impl = nullptr;
+        std::function<void(uint32_t)> dtor;
+
+        ResourceType() = default;
+
+        explicit ResourceType(ComponentInstance &instance, std::function<void(uint32_t)> destructor = {})
+            : impl(&instance), dtor(std::move(destructor)) {}
+    };
+
+    struct HandleElement
+    {
+        uint32_t rep = 0;
+        bool own = false;
+        LiftLowerContext *scope = nullptr;
+        uint32_t lend_count = 0;
+    };
+
+    class HandleTable
+    {
+    public:
+        static constexpr uint32_t MAX_LENGTH = 1u << 30;
+
+        HandleElement &get(uint32_t index, const HostTrap &trap)
+        {
+            auto trap_cx = make_trap_context(trap);
+            trap_if(trap_cx, index >= entries_.size(), "resource index out of bounds");
+            auto &slot = entries_[index];
+            trap_if(trap_cx, !slot.has_value(), "resource slot empty");
+            return slot.value();
+        }
+
+        const HandleElement &get(uint32_t index, const HostTrap &trap) const
+        {
+            auto trap_cx = make_trap_context(trap);
+            trap_if(trap_cx, index >= entries_.size(), "resource index out of bounds");
+            const auto &slot = entries_[index];
+            trap_if(trap_cx, !slot.has_value(), "resource slot empty");
+            return slot.value();
+        }
+
+        uint32_t add(const HandleElement &element, const HostTrap &trap)
+        {
+            auto trap_cx = make_trap_context(trap);
+            uint32_t index;
+            if (!free_.empty())
+            {
+                index = free_.back();
+                free_.pop_back();
+                entries_[index] = element;
+            }
+            else
+            {
+                trap_if(trap_cx, entries_.size() >= MAX_LENGTH, "resource table overflow");
+                entries_.push_back(element);
+                index = static_cast<uint32_t>(entries_.size() - 1);
+            }
+            return index;
+        }
+
+        HandleElement remove(uint32_t index, const HostTrap &trap)
+        {
+            HandleElement element = get(index, trap);
+            entries_[index].reset();
+            free_.push_back(index);
+            return element;
+        }
+
+        const std::vector<std::optional<HandleElement>> &entries() const
+        {
+            return entries_;
+        }
+
+        const std::vector<uint32_t> &free_list() const
+        {
+            return free_;
+        }
+
+    private:
+        std::vector<std::optional<HandleElement>> entries_{};
+        std::vector<uint32_t> free_;
+        HandleTable() { entries_.push_back(std::nullopt); }
+    };
+
+    class HandleTables
+    {
+    public:
+        HandleElement &get(ResourceType &rt, uint32_t index, const HostTrap &trap)
+        {
+            return table(rt).get(index, trap);
+        }
+
+        const HandleElement &get(const ResourceType &rt, uint32_t index, const HostTrap &trap) const
+        {
+            auto it = tables_.find(&rt);
+            auto trap_cx = make_trap_context(trap);
+            trap_if(trap_cx, it == tables_.end(), "resource table missing");
+            return it->second.get(index, trap);
+        }
+
+        uint32_t add(ResourceType &rt, const HandleElement &element, const HostTrap &trap)
+        {
+            return table(rt).add(element, trap);
+        }
+
+        HandleElement remove(ResourceType &rt, uint32_t index, const HostTrap &trap)
+        {
+            return table(rt).remove(index, trap);
+        }
+
+        HandleTable &table(ResourceType &rt)
+        {
+            return tables_[&rt];
+        }
+
+    private:
+        std::unordered_map<const ResourceType *, HandleTable> tables_;
     };
 
     struct Waitable
@@ -72,16 +233,9 @@ namespace cmcpp
 
     struct ComponentInstance
     {
-        std::vector<ResourceHandle> resources;
-        std::vector<Waitable> waitables;
-        std::vector<WaitableSet> waitable_sets;
-        std::vector<ErrorContext> error_contexts;
         bool may_leave = true;
-        bool backpressure = false;
-        bool calling_sync_export = false;
-        bool calling_sync_import = false;
-        // std::vector<std::tuple<Task<R, Args...>, Future>> pending_tasks;
-        bool starting_pending_tasks = false;
+        bool may_enter = true;
+        HandleTables handles;
     };
 
     class ContextLocalStorage
@@ -103,25 +257,6 @@ namespace cmcpp
         }
     };
 
-    template <Field R, Field... Args>
-    class Task
-    {
-    public:
-        using function_type = func_t<R(Args...)>;
-
-        CanonicalOptions opts;
-        ComponentInstance inst;
-        function_type ft;
-        std::optional<Task> supertask;
-        std::optional<std::function<void()>> on_return;
-        std::function<std::future<void>(std::future<void>)> on_block;
-        int num_borrows = 0;
-        ContextLocalStorage context();
-
-        Task(CanonicalOptions &opts, ComponentInstance &inst, function_type &ft, std::optional<Task> &supertask = std::nullopt, std::optional<std::function<void()>> &on_return = std::nullopt, std::function<std::future<void>(std::future<void>)> &on_block = std::nullopt)
-            : opts(opts), inst(inst), ft(ft), supertask(supertask), on_return(on_return), on_block(on_block) {}
-    };
-
     struct Subtask : Waitable
     {
     };
@@ -130,21 +265,61 @@ namespace cmcpp
     {
     };
 
-    //  Lifting and Lowering Context  ---
-    // template <Field R, Field... Args>
-    class LiftLowerContext
+    inline void LiftLowerContext::track_owning_lend(HandleElement &lending_handle)
     {
-    public:
-        HostTrap trap;
-        HostUnicodeConversion convert;
+        trap_if(*this, !lending_handle.own, "lender must own resource");
+        lending_handle.lend_count += 1;
+        lenders.push_back(&lending_handle);
+    }
 
-        LiftLowerOptions opts;
-        // ComponentInstance inst;
-        // std::optional<std::variant<Task<R, Args...>, Subtask>> borrow_scope;
+    inline void LiftLowerContext::exit_call()
+    {
+        trap_if(*this, borrow_count != 0, "borrow count mismatch on exit");
+        for (auto *handle : lenders)
+        {
+            if (handle && handle->lend_count > 0)
+            {
+                handle->lend_count -= 1;
+            }
+        }
+        lenders.clear();
+    }
 
-        LiftLowerContext(const HostTrap &trap, const HostUnicodeConversion &convert, const LiftLowerOptions &opts)
-            : trap(trap), convert(convert), opts(opts) {}
-    };
+    inline uint32_t canon_resource_new(ComponentInstance &inst, ResourceType &rt, uint32_t rep, const HostTrap &trap)
+    {
+        HandleElement element;
+        element.rep = rep;
+        element.own = true;
+        return inst.handles.add(rt, element, trap);
+    }
+
+    inline void canon_resource_drop(ComponentInstance &inst, ResourceType &rt, uint32_t index, const HostTrap &trap)
+    {
+        HandleElement element = inst.handles.remove(rt, index, trap);
+        auto trap_cx = make_trap_context(trap);
+        if (element.own)
+        {
+            trap_if(trap_cx, element.scope != nullptr, "own handle cannot have borrow scope");
+            trap_if(trap_cx, element.lend_count != 0, "resource has outstanding lends");
+            trap_if(trap_cx, rt.impl != nullptr && (&inst != rt.impl) && !rt.impl->may_enter, "resource impl may not enter");
+            if (rt.dtor)
+            {
+                rt.dtor(element.rep);
+            }
+        }
+        else
+        {
+            trap_if(trap_cx, element.scope == nullptr, "borrow scope missing");
+            trap_if(trap_cx, element.scope->borrow_count == 0, "borrow scope underflow");
+            element.scope->borrow_count -= 1;
+        }
+    }
+
+    inline uint32_t canon_resource_rep(ComponentInstance &inst, ResourceType &rt, uint32_t index, const HostTrap &trap)
+    {
+        const HandleElement &element = inst.handles.get(rt, index, trap);
+        return element.rep;
+    }
 
     //  ----------------------------
 
