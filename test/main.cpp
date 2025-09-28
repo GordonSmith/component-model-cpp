@@ -15,6 +15,7 @@ using namespace cmcpp;
 #include <cmath>
 #include <cstdint>
 #include <stdexcept>
+#include <cstring>
 // #include <fmt/core.h>
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
@@ -597,7 +598,6 @@ TEST_CASE("Float Special Values - Enhanced")
     auto v_zero = lower_flat(*cx, zero);
     auto result_zero = lift_flat<float32_t>(*cx, v_zero);
     CHECK(result_zero == 0.0f);
-
     float32_t neg_zero = -0.0f;
     auto v_neg_zero = lower_flat(*cx, neg_zero);
     auto result_neg_zero = lift_flat<float32_t>(*cx, v_neg_zero);
@@ -618,6 +618,163 @@ TEST_CASE("Float Special Values - Enhanced")
     auto v_max64 = lower_flat(*cx, max_val64);
     auto result_max64 = lift_flat<float64_t>(*cx, v_max64);
     CHECK(result_max64 == max_val64);
+}
+
+TEST_CASE("Waitable set surfaces stream readiness")
+{
+    ComponentInstance inst;
+    HostTrap host_trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    auto desc = make_stream_descriptor<int32_t>();
+    uint64_t handles = canon_stream_new(inst, desc, host_trap);
+    uint32_t readable = static_cast<uint32_t>(handles & 0xFFFFFFFFu);
+    uint32_t writable = static_cast<uint32_t>(handles >> 32);
+
+    uint32_t waitable_set = canon_waitable_set_new(inst, host_trap);
+    canon_waitable_join(inst, readable, waitable_set, host_trap);
+
+    Heap heap(256);
+    auto cx = std::shared_ptr<LiftLowerContext>(createLiftLowerContext(&heap, Encoding::Utf8).release(), [](LiftLowerContext *ptr)
+                                                { delete ptr; });
+
+    uint32_t read_ptr = 0;
+    uint32_t write_ptr = 32;
+    uint32_t event_ptr = 128;
+
+    int32_t to_write[2] = {42, 87};
+    std::memcpy(heap.memory.data() + write_ptr, to_write, sizeof(to_write));
+
+    auto blocked = canon_stream_read(inst, desc, readable, cx, read_ptr, 2, false, host_trap);
+    CHECK(blocked == BLOCKED);
+
+    GuestMemory mem(heap.memory.data(), heap.memory.size());
+    auto code = canon_waitable_set_poll(false, mem, inst, waitable_set, event_ptr, host_trap);
+    CHECK(code == static_cast<uint32_t>(EventCode::NONE));
+
+    auto write_payload = canon_stream_write(inst, desc, writable, cx, write_ptr, 2, host_trap);
+    CHECK((write_payload & 0xF) == static_cast<uint32_t>(CopyResult::Completed));
+    auto write_count = write_payload >> 4;
+    CHECK(write_count == 2);
+
+    code = canon_waitable_set_poll(false, mem, inst, waitable_set, event_ptr, host_trap);
+    CHECK(code == static_cast<uint32_t>(EventCode::STREAM_READ));
+
+    uint32_t reported_index = 0;
+    uint32_t payload = 0;
+    std::memcpy(&reported_index, heap.memory.data() + event_ptr, sizeof(uint32_t));
+    std::memcpy(&payload, heap.memory.data() + event_ptr + sizeof(uint32_t), sizeof(uint32_t));
+    CHECK(reported_index == readable);
+    CHECK((payload & 0xF) == static_cast<uint32_t>(CopyResult::Completed));
+    auto read_count = payload >> 4;
+    CHECK(read_count == 2);
+
+    int32_t read_values[2] = {0, 0};
+    std::memcpy(read_values, heap.memory.data() + read_ptr, sizeof(read_values));
+    CHECK(read_values[0] == 42);
+    CHECK(read_values[1] == 87);
+
+    canon_stream_drop_readable(inst, readable, host_trap);
+    canon_stream_drop_writable(inst, writable, host_trap);
+    canon_waitable_set_drop(inst, waitable_set, host_trap);
+}
+
+TEST_CASE("Stream cancellation posts events")
+{
+    ComponentInstance inst;
+    HostTrap host_trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    auto desc = make_stream_descriptor<int32_t>();
+    uint64_t handles = canon_stream_new(inst, desc, host_trap);
+    uint32_t readable = static_cast<uint32_t>(handles & 0xFFFFFFFFu);
+
+    uint32_t waitable_set = canon_waitable_set_new(inst, host_trap);
+    canon_waitable_join(inst, readable, waitable_set, host_trap);
+
+    Heap heap(128);
+    auto cx = std::shared_ptr<LiftLowerContext>(createLiftLowerContext(&heap, Encoding::Utf8).release(), [](LiftLowerContext *ptr)
+                                                { delete ptr; });
+
+    uint32_t read_ptr = 0;
+    uint32_t event_ptr = 64;
+
+    auto blocked = canon_stream_read(inst, desc, readable, cx, read_ptr, 1, false, host_trap);
+    CHECK(blocked == BLOCKED);
+
+    auto cancel_payload = canon_stream_cancel_read(inst, readable, false, host_trap);
+    CHECK(cancel_payload == BLOCKED);
+
+    GuestMemory mem(heap.memory.data(), heap.memory.size());
+    auto code = canon_waitable_set_poll(false, mem, inst, waitable_set, event_ptr, host_trap);
+    CHECK(code == static_cast<uint32_t>(EventCode::STREAM_READ));
+
+    uint32_t payload = 0;
+    std::memcpy(&payload, heap.memory.data() + event_ptr + sizeof(uint32_t), sizeof(uint32_t));
+    CHECK((payload & 0xF) == static_cast<uint32_t>(CopyResult::Cancelled));
+    auto cancel_count = payload >> 4;
+    CHECK(cancel_count == 0);
+
+    canon_stream_drop_readable(inst, readable, host_trap);
+    canon_waitable_set_drop(inst, waitable_set, host_trap);
+}
+
+TEST_CASE("Future lifecycle completes")
+{
+    ComponentInstance inst;
+    HostTrap host_trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    auto desc = make_future_descriptor<int32_t>();
+    uint64_t handles = canon_future_new(inst, desc, host_trap);
+    uint32_t readable = static_cast<uint32_t>(handles & 0xFFFFFFFFu);
+    uint32_t writable = static_cast<uint32_t>(handles >> 32);
+
+    uint32_t waitable_set = canon_waitable_set_new(inst, host_trap);
+    canon_waitable_join(inst, readable, waitable_set, host_trap);
+
+    Heap heap(256);
+    auto cx = std::shared_ptr<LiftLowerContext>(createLiftLowerContext(&heap, Encoding::Utf8).release(), [](LiftLowerContext *ptr)
+                                                { delete ptr; });
+
+    uint32_t read_ptr = 0;
+    uint32_t write_ptr = 32;
+    uint32_t event_ptr = 96;
+
+    auto read_blocked = canon_future_read(inst, desc, readable, cx, read_ptr, false, host_trap);
+    CHECK(read_blocked == BLOCKED);
+
+    int32_t value = 99;
+    std::memcpy(heap.memory.data() + write_ptr, &value, sizeof(int32_t));
+
+    auto write_payload = canon_future_write(inst, desc, writable, cx, write_ptr, host_trap);
+    CHECK((write_payload & 0xF) == static_cast<uint32_t>(CopyResult::Completed));
+    auto write_count = write_payload >> 4;
+    CHECK(write_count == 1);
+
+    GuestMemory mem(heap.memory.data(), heap.memory.size());
+    auto code = canon_waitable_set_poll(false, mem, inst, waitable_set, event_ptr, host_trap);
+    CHECK(code == static_cast<uint32_t>(EventCode::FUTURE_READ));
+
+    uint32_t payload = 0;
+    std::memcpy(&payload, heap.memory.data() + event_ptr + sizeof(uint32_t), sizeof(uint32_t));
+    CHECK((payload & 0xF) == static_cast<uint32_t>(CopyResult::Completed));
+    auto read_count = payload >> 4;
+    CHECK(read_count == 1);
+
+    int32_t observed = 0;
+    std::memcpy(&observed, heap.memory.data() + read_ptr, sizeof(int32_t));
+    CHECK(observed == value);
+
+    canon_future_drop_readable(inst, readable, host_trap);
+    canon_future_drop_writable(inst, writable, host_trap);
+    canon_waitable_set_drop(inst, waitable_set, host_trap);
 }
 
 const char *const hw = "hello World!";
