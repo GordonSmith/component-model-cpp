@@ -181,8 +181,9 @@ namespace cmcpp
         }
 
     private:
-        std::vector<std::optional<HandleElement>> entries_{std::nullopt};
+        std::vector<std::optional<HandleElement>> entries_{};
         std::vector<uint32_t> free_;
+        HandleTable() { entries_.push_back(std::nullopt); }
     };
 
     class HandleTables
