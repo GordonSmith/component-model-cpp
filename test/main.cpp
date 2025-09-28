@@ -14,6 +14,7 @@ using namespace cmcpp;
 #include <limits>
 #include <cmath>
 #include <cstdint>
+#include <stdexcept>
 // #include <fmt/core.h>
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
@@ -202,6 +203,97 @@ TEST_CASE("Async runtime propagates cancellation")
     CHECK(was_cancelled);
     CHECK(store.pending_size() == 0);
     CHECK(thread->completed());
+}
+
+TEST_CASE("Resource handle lifecycle mirrors canonical definitions")
+{
+    ComponentInstance resource_impl;
+    ComponentInstance inst;
+    std::vector<uint32_t> dtor_calls;
+
+    HostTrap host_trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    ResourceType rt(resource_impl, [&](uint32_t rep)
+                    { dtor_calls.push_back(rep); });
+
+    REQUIRE(inst.may_leave);
+    REQUIRE(inst.may_enter);
+
+    uint32_t h1 = canon_resource_new(inst, rt, 42, host_trap);
+    uint32_t h2 = canon_resource_new(inst, rt, 43, host_trap);
+
+    CHECK(h1 == 1);
+    CHECK(h2 == 2);
+
+    LiftLowerOptions borrow_opts;
+    HostUnicodeConversion noop_convert = [](void *, uint32_t, const void *, uint32_t, Encoding, Encoding)
+    {
+        return std::pair<void *, size_t>{nullptr, 0};
+    };
+    LiftLowerContext borrow_scope(host_trap, noop_convert, borrow_opts, &inst);
+    borrow_scope.borrow_count = 1;
+
+    HandleElement borrowed;
+    borrowed.rep = 44;
+    borrowed.own = false;
+    borrowed.scope = &borrow_scope;
+    uint32_t h3 = inst.handles.add(rt, borrowed, host_trap);
+    CHECK(h3 == 3);
+
+    uint32_t h4 = canon_resource_new(inst, rt, 45, host_trap);
+    CHECK(h4 == 4);
+
+    const auto &table_entries = inst.handles.table(rt).entries();
+    CHECK(table_entries.size() == 5);
+    CHECK_FALSE(table_entries[0].has_value());
+    CHECK(table_entries[1].has_value());
+    CHECK(table_entries[2].has_value());
+    CHECK(table_entries[3].has_value());
+    CHECK(table_entries[4].has_value());
+
+    CHECK(canon_resource_rep(inst, rt, h1, host_trap) == 42);
+    CHECK(canon_resource_rep(inst, rt, h2, host_trap) == 43);
+    CHECK(canon_resource_rep(inst, rt, h3, host_trap) == 44);
+    CHECK(canon_resource_rep(inst, rt, h4, host_trap) == 45);
+
+    dtor_calls.clear();
+    canon_resource_drop(inst, rt, h1, host_trap);
+    CHECK(dtor_calls == std::vector<uint32_t>{42});
+    auto &table_after_drop = inst.handles.table(rt);
+    CHECK(table_after_drop.entries()[1].has_value() == false);
+    CHECK(table_after_drop.free_list().size() == 1);
+
+    uint32_t h5 = canon_resource_new(inst, rt, 46, host_trap);
+    CHECK(h5 == 1);
+    CHECK(table_after_drop.entries().size() == 5);
+    CHECK(table_after_drop.entries()[1].has_value());
+    CHECK(dtor_calls == std::vector<uint32_t>{42});
+
+    borrow_scope.borrow_count = 1;
+    canon_resource_drop(inst, rt, h3, host_trap);
+    CHECK(dtor_calls == std::vector<uint32_t>{42});
+    CHECK(borrow_scope.borrow_count == 0);
+    CHECK(table_after_drop.entries()[3].has_value() == false);
+    CHECK(table_after_drop.free_list().size() == 1);
+
+    canon_resource_drop(inst, rt, h2, host_trap);
+    CHECK(dtor_calls == std::vector<uint32_t>{42, 43});
+
+    canon_resource_drop(inst, rt, h4, host_trap);
+    CHECK(dtor_calls == std::vector<uint32_t>{42, 43, 45});
+
+    canon_resource_drop(inst, rt, h5, host_trap);
+    CHECK(dtor_calls == std::vector<uint32_t>{42, 43, 45, 46});
+
+    auto &final_table = inst.handles.table(rt);
+    CHECK(final_table.free_list().size() == 4);
+    for (size_t i = 1; i < final_table.entries().size(); ++i)
+    {
+        CHECK_FALSE(final_table.entries()[i].has_value());
+    }
 }
 
 TEST_CASE("Boolean")
