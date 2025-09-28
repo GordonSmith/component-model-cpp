@@ -12,6 +12,10 @@
 
 This repository contains a C++ ABI implementation of the WebAssembly Component Model.
 
+## Release management
+
+Automated releases are handled by [Release Please](https://github.com/googleapis/release-please) via GitHub Actions. Conventional commit messages (`feat:`, `fix:`, etc.) keep the changelog accurate and drive version bumps; when enough changes accumulate, the workflow opens a release PR that can be merged to publish a GitHub release.
+
 ## Features
 
 ### OS

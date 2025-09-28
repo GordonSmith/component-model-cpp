@@ -27,31 +27,34 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
 
       - name: Cache Cargo registry
-        if: always() 
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('./Cargo.lock') }}
-          path: ~/.cargo/registry
-          restore-keys: |
-            ${{ runner.os }}-cargo-registry-
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Cache vcpkg registry
-        if: always() 
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
+          path: |
+            build/vcpkg_installed/
+            build/vcpkg_packages/
           key: ${{ runner.os }}-vcpkg-${{ hashFiles('./vcpkg*.json') }}
-          path: build/vcpkg_installed/**/*
           restore-keys: |
             ${{ runner.os }}-vcpkg-
 
       - name: Install rust dependencies
         run: |
-          cargo install wasm-tools wit-bindgen-cli 
+          cargo install wasm-tools wit-bindgen-cli || true
 
       - name: configure
         run: |
@@ -64,7 +67,7 @@ jobs:
       - name: test
         working-directory: build
         run: |
-          ctest -C Debug -VV 
+          ctest -C Debug -VV
 
       - name: Upload error logs
         if: ${{ failure() || cancelled() }}

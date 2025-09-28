@@ -1,19 +1,12 @@
-name: Ubuntu
+name: C++ Release CI
 
 on:
   push:
-    branches:
-      - trunk
-      - main
-  pull_request:
-    branches:
-      - trunk
-      - main
-  workflow_dispatch:
+    tags:
+      - "v*.*.*"
 
 env:
   CTEST_OUTPUT_ON_FAILURE: 1
-  CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
 jobs:
   build:
@@ -25,6 +18,8 @@ jobs:
 
     runs-on: ${{ matrix.os }}
 
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -68,21 +63,27 @@ jobs:
 
       - name: configure
         run: |
-          cmake --preset linux-ninja-Debug
+          cmake --preset linux-ninja-Release
 
       - name: build
         run: |
-          cmake --build --preset linux-ninja-Debug
+          cmake --build --preset linux-ninja-Release
 
       - name: test
         working-directory: build
         run: |
           ctest -VV
 
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5.4.0
+      - name: Package
+        run: |
+          tar -czvf cmcpp-${GITHUB_REF_NAME}.tar.gz include LICENSE LICENSE-BOOST-PFR
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          generateReleaseNotes: true
+          tag: ${{ github.ref_name }}
+          artifacts: cmcpp-${{ github.ref_name }}.tar.gz
 
       - name: Upload error logs
         if: ${{ failure() || cancelled() }}

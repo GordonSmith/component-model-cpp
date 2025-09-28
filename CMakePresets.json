@@ -151,6 +151,18 @@
             "configurePreset": "linux-ninja-Debug"
         },
         {
+            "name": "linux-ninja-Release",
+            "configurePreset": "linux-ninja-Release"
+        },
+        {
+            "name": "linux-ninja-RelWithDebInfo",
+            "configurePreset": "linux-ninja-RelWithDebInfo"
+        },
+        {
+            "name": "linux-ninja-MinSizeRel",
+            "configurePreset": "linux-ninja-MinSizeRel"
+        },
+        {
             "name": "VS-16-Debug",
             "configurePreset": "vcpkg-VS-16",
             "configuration": "Debug",
