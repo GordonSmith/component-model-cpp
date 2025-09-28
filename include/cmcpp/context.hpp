@@ -3,11 +3,18 @@
 
 #include "traits.hpp"
 
+#include <algorithm>
+#include <deque>
 #include <future>
+#include <memory>
 #include <optional>
+#include <random>
 #include <stdexcept>
+#include <typeindex>
 #include <unordered_map>
 #include <vector>
+#include <cstring>
+#include <limits>
 #if __has_include(<span>)
 #include <span>
 #else
@@ -99,6 +106,747 @@ namespace cmcpp
         HostUnicodeConversion convert{};
         LiftLowerOptions opts{};
         return LiftLowerContext(trap, convert, opts);
+    }
+
+    constexpr uint32_t BLOCKED = 0xFFFF'FFFFu;
+
+    enum class EventCode : uint8_t
+    {
+        NONE = 0,
+        SUBTASK = 1,
+        STREAM_READ = 2,
+        STREAM_WRITE = 3,
+        FUTURE_READ = 4,
+        FUTURE_WRITE = 5,
+        TASK_CANCELLED = 6
+    };
+
+    struct Event
+    {
+        EventCode code = EventCode::NONE;
+        uint32_t index = 0;
+        uint32_t payload = 0;
+    };
+
+    struct TableEntry
+    {
+        virtual ~TableEntry() = default;
+    };
+
+    class WaitableSet;
+
+    class Waitable : public TableEntry
+    {
+    public:
+        Waitable() = default;
+
+        void set_pending_event(const Event &event)
+        {
+            pending_event_ = event;
+        }
+
+        bool has_pending_event() const
+        {
+            return pending_event_.has_value();
+        }
+
+        Event get_pending_event(const HostTrap &trap)
+        {
+            auto trap_cx = make_trap_context(trap);
+            trap_if(trap_cx, !pending_event_.has_value(), "waitable pending event missing");
+            Event event = *pending_event_;
+            pending_event_.reset();
+            return event;
+        }
+
+        void clear_pending_event()
+        {
+            pending_event_.reset();
+        }
+
+        void join(WaitableSet *set, const HostTrap &trap);
+
+        WaitableSet *joined_set() const
+        {
+            return wset_;
+        }
+
+        void drop(const HostTrap &trap);
+
+    private:
+        std::optional<Event> pending_event_;
+        WaitableSet *wset_ = nullptr;
+    };
+
+    class WaitableSet : public TableEntry
+    {
+    public:
+        void add_waitable(Waitable &waitable)
+        {
+            if (std::find(waitables_.begin(), waitables_.end(), &waitable) == waitables_.end())
+            {
+                waitables_.push_back(&waitable);
+            }
+        }
+
+        void remove_waitable(Waitable &waitable)
+        {
+            auto it = std::find(waitables_.begin(), waitables_.end(), &waitable);
+            if (it != waitables_.end())
+            {
+                waitables_.erase(it);
+            }
+        }
+
+        bool has_pending_event() const
+        {
+            return std::any_of(waitables_.begin(), waitables_.end(), [](const Waitable *w)
+                               { return w && w->has_pending_event(); });
+        }
+
+        Event take_pending_event(const HostTrap &trap)
+        {
+            auto trap_cx = make_trap_context(trap);
+            trap_if(trap_cx, waitables_.empty(), "waitable set empty");
+            for (auto *w : waitables_)
+            {
+                if (w != nullptr && w->has_pending_event())
+                {
+                    return w->get_pending_event(trap);
+                }
+            }
+            trap_if(trap_cx, true, "waitable set missing event");
+            return {};
+        }
+
+        void drop(const HostTrap &trap)
+        {
+            auto trap_cx = make_trap_context(trap);
+            trap_if(trap_cx, !waitables_.empty(), "waitable set not empty");
+            trap_if(trap_cx, num_waiting_ != 0, "waitable set has waiters");
+        }
+
+        void begin_wait()
+        {
+            num_waiting_ += 1;
+        }
+
+        void end_wait()
+        {
+            if (num_waiting_ > 0)
+            {
+                num_waiting_ -= 1;
+            }
+        }
+
+        uint32_t num_waiting() const
+        {
+            return num_waiting_;
+        }
+
+    private:
+        std::vector<Waitable *> waitables_;
+        uint32_t num_waiting_ = 0;
+    };
+
+    inline void Waitable::join(WaitableSet *set, const HostTrap &)
+    {
+        if (wset_ == set)
+        {
+            return;
+        }
+        if (wset_)
+        {
+            wset_->remove_waitable(*this);
+        }
+        wset_ = set;
+        if (wset_)
+        {
+            wset_->add_waitable(*this);
+        }
+    }
+
+    inline void Waitable::drop(const HostTrap &trap)
+    {
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, has_pending_event(), "waitable drop with pending event");
+        if (wset_)
+        {
+            wset_->remove_waitable(*this);
+            wset_ = nullptr;
+        }
+    }
+
+    class InstanceTable
+    {
+    public:
+        uint32_t add(const std::shared_ptr<TableEntry> &entry, const HostTrap &trap)
+        {
+            auto trap_cx = make_trap_context(trap);
+            trap_if(trap_cx, !entry, "null table entry");
+            uint32_t index;
+            if (!free_.empty())
+            {
+                index = free_.back();
+                free_.pop_back();
+                entries_[index] = entry;
+            }
+            else
+            {
+                trap_if(trap_cx, entries_.size() >= (1u << 30), "instance table overflow");
+                entries_.push_back(entry);
+                index = static_cast<uint32_t>(entries_.size() - 1);
+            }
+            return index;
+        }
+
+        std::shared_ptr<TableEntry> get_entry(uint32_t index, const HostTrap &trap) const
+        {
+            auto trap_cx = make_trap_context(trap);
+            trap_if(trap_cx, index == 0 || index >= entries_.size(), "table index out of bounds");
+            auto entry = entries_[index];
+            trap_if(trap_cx, !entry, "table slot empty");
+            return entry;
+        }
+
+        std::shared_ptr<TableEntry> remove_entry(uint32_t index, const HostTrap &trap)
+        {
+            auto entry = get_entry(index, trap);
+            entries_[index].reset();
+            free_.push_back(index);
+            return entry;
+        }
+
+        template <typename T>
+        std::shared_ptr<T> get(uint32_t index, const HostTrap &trap) const
+        {
+            auto base = get_entry(index, trap);
+            auto derived = std::dynamic_pointer_cast<T>(base);
+            auto trap_cx = make_trap_context(trap);
+            trap_if(trap_cx, !derived, "table entry type mismatch");
+            return derived;
+        }
+
+        template <typename T>
+        std::shared_ptr<T> remove(uint32_t index, const HostTrap &trap)
+        {
+            auto base = remove_entry(index, trap);
+            auto derived = std::dynamic_pointer_cast<T>(base);
+            auto trap_cx = make_trap_context(trap);
+            trap_if(trap_cx, !derived, "table entry type mismatch");
+            return derived;
+        }
+
+    private:
+        std::vector<std::shared_ptr<TableEntry>> entries_{nullptr};
+        std::vector<uint32_t> free_;
+    };
+
+    struct StreamDescriptor
+    {
+        uint32_t element_size = 0;
+        uint32_t alignment = 1;
+        std::type_index type = typeid(void);
+    };
+
+    template <typename T>
+    StreamDescriptor make_stream_descriptor()
+    {
+        return StreamDescriptor{ValTrait<T>::size, ValTrait<T>::alignment, std::type_index(typeid(T))};
+    }
+
+    struct FutureDescriptor
+    {
+        uint32_t element_size = 0;
+        uint32_t alignment = 1;
+        std::type_index type = typeid(void);
+    };
+
+    template <typename T>
+    FutureDescriptor make_future_descriptor()
+    {
+        return FutureDescriptor{ValTrait<T>::size, ValTrait<T>::alignment, std::type_index(typeid(T))};
+    }
+
+    inline uint8_t normalize_alignment(uint32_t alignment)
+    {
+        if (alignment == 0)
+        {
+            return 1;
+        }
+        return static_cast<uint8_t>(std::min<uint32_t>(alignment, 255));
+    }
+
+    inline void ensure_memory_range(const LiftLowerContext &cx, uint32_t ptr, uint32_t count, uint32_t alignment, uint32_t elem_size)
+    {
+        auto align_value = normalize_alignment(alignment);
+        trap_if(cx, ptr != align_to(ptr, align_value), "misaligned memory access");
+        uint64_t total_bytes = static_cast<uint64_t>(count) * elem_size;
+        trap_if(cx, ptr + total_bytes > cx.opts.memory.size(), "memory overflow");
+    }
+
+    inline void write_event_fields(GuestMemory mem, uint32_t ptr, uint32_t p1, uint32_t p2, const HostTrap &trap)
+    {
+        if (ptr + 8 > mem.size())
+        {
+            auto trap_cx = make_trap_context(trap);
+            trap_if(trap_cx, true, "event write out of bounds");
+        }
+        std::memcpy(mem.data() + ptr, &p1, sizeof(uint32_t));
+        std::memcpy(mem.data() + ptr + sizeof(uint32_t), &p2, sizeof(uint32_t));
+    }
+
+    enum class CopyResult : uint32_t
+    {
+        Completed = 0,
+        Dropped = 1,
+        Cancelled = 2
+    };
+
+    enum class CopyState : uint8_t
+    {
+        Idle = 0,
+        Copying = 1,
+        Done = 2
+    };
+
+    inline uint32_t pack_copy_result(CopyResult result, uint32_t progress)
+    {
+        return static_cast<uint32_t>(result) | (progress << 4);
+    }
+
+    inline void validate_descriptor(const StreamDescriptor &expected, const StreamDescriptor &actual, const HostTrap &trap)
+    {
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, expected.element_size != actual.element_size, "stream descriptor size mismatch");
+        trap_if(trap_cx, expected.alignment != actual.alignment, "stream descriptor alignment mismatch");
+        trap_if(trap_cx, expected.type != actual.type, "stream descriptor type mismatch");
+    }
+
+    inline void validate_descriptor(const FutureDescriptor &expected, const FutureDescriptor &actual, const HostTrap &trap)
+    {
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, expected.element_size != actual.element_size, "future descriptor size mismatch");
+        trap_if(trap_cx, expected.alignment != actual.alignment, "future descriptor alignment mismatch");
+        trap_if(trap_cx, expected.type != actual.type, "future descriptor type mismatch");
+    }
+
+    class ReadableStreamEnd;
+    class WritableStreamEnd;
+
+    struct SharedStreamState
+    {
+        explicit SharedStreamState(const StreamDescriptor &desc) : descriptor(desc) {}
+
+        StreamDescriptor descriptor;
+        std::deque<std::vector<uint8_t>> queue;
+        bool readable_dropped = false;
+        bool writable_dropped = false;
+
+        struct PendingRead
+        {
+            std::shared_ptr<LiftLowerContext> cx;
+            uint32_t ptr = 0;
+            uint32_t requested = 0;
+            uint32_t progress = 0;
+            uint32_t handle_index = 0;
+            ReadableStreamEnd *endpoint = nullptr;
+        };
+
+        std::optional<PendingRead> pending_read;
+    };
+
+    inline void copy_into_queue(const std::shared_ptr<LiftLowerContext> &cx, uint32_t ptr, uint32_t count, SharedStreamState &state, const HostTrap &trap)
+    {
+        if (count == 0)
+        {
+            return;
+        }
+        ensure_memory_range(*cx, ptr, count, state.descriptor.alignment, state.descriptor.element_size);
+        auto *src = cx->opts.memory.data() + ptr;
+        for (uint32_t i = 0; i < count; ++i)
+        {
+            std::vector<uint8_t> bytes(state.descriptor.element_size);
+            std::memcpy(bytes.data(), src + i * state.descriptor.element_size, state.descriptor.element_size);
+            state.queue.push_back(std::move(bytes));
+        }
+    }
+
+    inline uint32_t copy_from_queue(const std::shared_ptr<LiftLowerContext> &cx,
+                                    uint32_t ptr,
+                                    uint32_t offset,
+                                    uint32_t max_count,
+                                    SharedStreamState &state,
+                                    const HostTrap &trap)
+    {
+        if (max_count == 0)
+        {
+            return 0;
+        }
+        uint32_t available = std::min<uint32_t>(max_count, static_cast<uint32_t>(state.queue.size()));
+        if (available == 0)
+        {
+            return 0;
+        }
+        ensure_memory_range(*cx, ptr, offset + available, state.descriptor.alignment, state.descriptor.element_size);
+        auto *dest = cx->opts.memory.data() + ptr + offset * state.descriptor.element_size;
+        auto trap_cx = make_trap_context(trap);
+        for (uint32_t i = 0; i < available; ++i)
+        {
+            const auto &bytes = state.queue.front();
+            trap_if(trap_cx, bytes.size() != state.descriptor.element_size, "stream element size mismatch");
+            std::memcpy(dest + i * state.descriptor.element_size, bytes.data(), state.descriptor.element_size);
+            state.queue.pop_front();
+        }
+        return available;
+    }
+
+    inline void satisfy_pending_read(SharedStreamState &state, const HostTrap &trap);
+
+    class ReadableStreamEnd : public Waitable
+    {
+    public:
+        explicit ReadableStreamEnd(std::shared_ptr<SharedStreamState> shared) : shared_(std::move(shared)) {}
+
+        const StreamDescriptor &descriptor() const
+        {
+            return shared_->descriptor;
+        }
+
+        uint32_t read(const std::shared_ptr<LiftLowerContext> &cx, uint32_t handle_index, uint32_t ptr, uint32_t n, bool sync, const HostTrap &trap);
+        uint32_t cancel(bool sync, const HostTrap &trap);
+        void drop(const HostTrap &trap);
+        void complete_async(uint32_t handle_index, CopyResult result, uint32_t progress, const HostTrap &trap);
+
+    private:
+        std::shared_ptr<SharedStreamState> shared_;
+        CopyState state_ = CopyState::Idle;
+    };
+
+    class WritableStreamEnd : public Waitable
+    {
+    public:
+        explicit WritableStreamEnd(std::shared_ptr<SharedStreamState> shared) : shared_(std::move(shared)) {}
+
+        const StreamDescriptor &descriptor() const
+        {
+            return shared_->descriptor;
+        }
+
+        uint32_t write(const std::shared_ptr<LiftLowerContext> &cx, uint32_t handle_index, uint32_t ptr, uint32_t n, const HostTrap &trap);
+        uint32_t cancel(bool sync, const HostTrap &trap);
+        void drop(const HostTrap &trap);
+
+    private:
+        std::shared_ptr<SharedStreamState> shared_;
+        CopyState state_ = CopyState::Idle;
+    };
+
+    inline uint32_t ReadableStreamEnd::read(const std::shared_ptr<LiftLowerContext> &cx, uint32_t handle_index, uint32_t ptr, uint32_t n, bool sync, const HostTrap &trap)
+    {
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, !shared_, "stream state missing");
+        trap_if(trap_cx, shared_->descriptor.element_size == 0, "invalid stream descriptor");
+        trap_if(trap_cx, state_ != CopyState::Idle, "stream read busy");
+
+        uint32_t consumed = copy_from_queue(cx, ptr, 0, n, *shared_, trap);
+        if (consumed > 0 || n == 0)
+        {
+            set_pending_event({EventCode::STREAM_READ, handle_index, pack_copy_result(CopyResult::Completed, consumed)});
+            auto event = get_pending_event(trap);
+            state_ = CopyState::Idle;
+            return event.payload;
+        }
+
+        if (shared_->writable_dropped)
+        {
+            set_pending_event({EventCode::STREAM_READ, handle_index, pack_copy_result(CopyResult::Dropped, 0)});
+            auto event = get_pending_event(trap);
+            state_ = CopyState::Done;
+            return event.payload;
+        }
+
+        trap_if(trap_cx, sync, "sync stream read would block");
+        shared_->pending_read = SharedStreamState::PendingRead{cx, ptr, n, 0, handle_index, this};
+        state_ = CopyState::Copying;
+        return BLOCKED;
+    }
+
+    inline uint32_t ReadableStreamEnd::cancel(bool sync, const HostTrap &trap)
+    {
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, state_ != CopyState::Copying, "no pending stream read");
+        trap_if(trap_cx, !shared_ || !shared_->pending_read, "no pending stream read");
+
+        auto pending = std::move(*shared_->pending_read);
+        shared_->pending_read.reset();
+        set_pending_event({EventCode::STREAM_READ, pending.handle_index, pack_copy_result(CopyResult::Cancelled, pending.progress)});
+        state_ = CopyState::Done;
+
+        if (sync)
+        {
+            auto event = get_pending_event(trap);
+            return event.payload;
+        }
+        return BLOCKED;
+    }
+
+    inline void ReadableStreamEnd::drop(const HostTrap &trap)
+    {
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, state_ == CopyState::Copying, "cannot drop pending stream read");
+        trap_if(trap_cx, shared_ && shared_->pending_read.has_value(), "pending read must complete before drop");
+        if (shared_)
+        {
+            shared_->readable_dropped = true;
+        }
+        state_ = CopyState::Done;
+        Waitable::drop(trap);
+    }
+
+    inline void ReadableStreamEnd::complete_async(uint32_t handle_index, CopyResult result, uint32_t progress, const HostTrap &trap)
+    {
+        set_pending_event({EventCode::STREAM_READ, handle_index, pack_copy_result(result, progress)});
+        state_ = (result == CopyResult::Completed) ? CopyState::Idle : CopyState::Done;
+    }
+
+    inline void satisfy_pending_read(SharedStreamState &state, const HostTrap &trap)
+    {
+        if (!state.pending_read)
+        {
+            return;
+        }
+        auto &pending = *state.pending_read;
+        uint32_t remaining = pending.requested - pending.progress;
+        uint32_t consumed = copy_from_queue(pending.cx, pending.ptr, pending.progress, remaining, state, trap);
+        pending.progress += consumed;
+        if (pending.progress >= pending.requested)
+        {
+            pending.endpoint->complete_async(pending.handle_index, CopyResult::Completed, pending.progress, trap);
+            state.pending_read.reset();
+        }
+    }
+
+    inline uint32_t WritableStreamEnd::write(const std::shared_ptr<LiftLowerContext> &cx, uint32_t handle_index, uint32_t ptr, uint32_t n, const HostTrap &trap)
+    {
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, !shared_, "stream state missing");
+        trap_if(trap_cx, shared_->descriptor.element_size == 0, "invalid stream descriptor");
+        trap_if(trap_cx, state_ != CopyState::Idle, "stream write busy");
+
+        copy_into_queue(cx, ptr, n, *shared_, trap);
+        satisfy_pending_read(*shared_, trap);
+
+        set_pending_event({EventCode::STREAM_WRITE, handle_index, pack_copy_result(CopyResult::Completed, n)});
+        auto event = get_pending_event(trap);
+        state_ = CopyState::Idle;
+        return event.payload;
+    }
+
+    inline uint32_t WritableStreamEnd::cancel(bool, const HostTrap &trap)
+    {
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, true, "no pending stream write");
+        return BLOCKED;
+    }
+
+    inline void WritableStreamEnd::drop(const HostTrap &trap)
+    {
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, state_ == CopyState::Copying, "cannot drop pending stream write");
+        if (shared_)
+        {
+            if (shared_->pending_read)
+            {
+                auto pending = std::move(*shared_->pending_read);
+                shared_->pending_read.reset();
+                pending.endpoint->complete_async(pending.handle_index, CopyResult::Dropped, pending.progress, trap);
+            }
+            shared_->writable_dropped = true;
+        }
+        state_ = CopyState::Done;
+        Waitable::drop(trap);
+    }
+
+    class ReadableFutureEnd;
+    class WritableFutureEnd;
+
+    struct SharedFutureState
+    {
+        explicit SharedFutureState(const FutureDescriptor &desc) : descriptor(desc), value(desc.element_size) {}
+
+        FutureDescriptor descriptor;
+        bool readable_dropped = false;
+        bool writable_dropped = false;
+        bool value_ready = false;
+        std::vector<uint8_t> value;
+
+        struct PendingRead
+        {
+            std::shared_ptr<LiftLowerContext> cx;
+            uint32_t ptr = 0;
+            uint32_t handle_index = 0;
+            ReadableFutureEnd *endpoint = nullptr;
+        };
+
+        std::optional<PendingRead> pending_read;
+    };
+
+    class ReadableFutureEnd : public Waitable
+    {
+    public:
+        explicit ReadableFutureEnd(std::shared_ptr<SharedFutureState> shared) : shared_(std::move(shared)) {}
+
+        const FutureDescriptor &descriptor() const
+        {
+            return shared_->descriptor;
+        }
+
+        uint32_t read(const std::shared_ptr<LiftLowerContext> &cx, uint32_t handle_index, uint32_t ptr, bool sync, const HostTrap &trap);
+        uint32_t cancel(bool sync, const HostTrap &trap);
+        void drop(const HostTrap &trap);
+        void complete_async(uint32_t handle_index, CopyResult result, uint32_t progress, const HostTrap &trap);
+
+    private:
+        std::shared_ptr<SharedFutureState> shared_;
+        CopyState state_ = CopyState::Idle;
+    };
+
+    class WritableFutureEnd : public Waitable
+    {
+    public:
+        explicit WritableFutureEnd(std::shared_ptr<SharedFutureState> shared) : shared_(std::move(shared)) {}
+
+        const FutureDescriptor &descriptor() const
+        {
+            return shared_->descriptor;
+        }
+
+        uint32_t write(const std::shared_ptr<LiftLowerContext> &cx, uint32_t handle_index, uint32_t ptr, const HostTrap &trap);
+        uint32_t cancel(bool sync, const HostTrap &trap);
+        void drop(const HostTrap &trap);
+
+    private:
+        std::shared_ptr<SharedFutureState> shared_;
+        CopyState state_ = CopyState::Idle;
+    };
+
+    inline uint32_t ReadableFutureEnd::read(const std::shared_ptr<LiftLowerContext> &cx, uint32_t handle_index, uint32_t ptr, bool sync, const HostTrap &trap)
+    {
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, !shared_, "future state missing");
+        trap_if(trap_cx, shared_->descriptor.element_size == 0, "invalid future descriptor");
+        trap_if(trap_cx, state_ != CopyState::Idle, "future read busy");
+
+        if (shared_->value_ready)
+        {
+            ensure_memory_range(*cx, ptr, 1, shared_->descriptor.alignment, shared_->descriptor.element_size);
+            std::memcpy(cx->opts.memory.data() + ptr, shared_->value.data(), shared_->descriptor.element_size);
+            set_pending_event({EventCode::FUTURE_READ, handle_index, pack_copy_result(CopyResult::Completed, 1)});
+            auto event = get_pending_event(trap);
+            state_ = CopyState::Idle;
+            return event.payload;
+        }
+
+        if (shared_->writable_dropped)
+        {
+            set_pending_event({EventCode::FUTURE_READ, handle_index, pack_copy_result(CopyResult::Dropped, 0)});
+            auto event = get_pending_event(trap);
+            state_ = CopyState::Done;
+            return event.payload;
+        }
+
+        trap_if(trap_cx, sync, "sync future read would block");
+        shared_->pending_read = SharedFutureState::PendingRead{cx, ptr, handle_index, this};
+        state_ = CopyState::Copying;
+        return BLOCKED;
+    }
+
+    inline uint32_t ReadableFutureEnd::cancel(bool sync, const HostTrap &trap)
+    {
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, state_ != CopyState::Copying, "no pending future read");
+        trap_if(trap_cx, !shared_ || !shared_->pending_read, "no pending future read");
+
+        auto pending = std::move(*shared_->pending_read);
+        shared_->pending_read.reset();
+        set_pending_event({EventCode::FUTURE_READ, pending.handle_index, pack_copy_result(CopyResult::Cancelled, 0)});
+        state_ = CopyState::Done;
+
+        if (sync)
+        {
+            auto event = get_pending_event(trap);
+            return event.payload;
+        }
+        return BLOCKED;
+    }
+
+    inline void ReadableFutureEnd::drop(const HostTrap &trap)
+    {
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, state_ == CopyState::Copying, "cannot drop pending future read");
+        trap_if(trap_cx, shared_ && shared_->pending_read.has_value(), "pending future read must complete before drop");
+        if (shared_)
+        {
+            shared_->readable_dropped = true;
+        }
+        state_ = CopyState::Done;
+        Waitable::drop(trap);
+    }
+
+    inline void ReadableFutureEnd::complete_async(uint32_t handle_index, CopyResult result, uint32_t progress, const HostTrap &trap)
+    {
+        set_pending_event({EventCode::FUTURE_READ, handle_index, pack_copy_result(result, progress)});
+        state_ = (result == CopyResult::Completed) ? CopyState::Idle : CopyState::Done;
+    }
+
+    inline uint32_t WritableFutureEnd::write(const std::shared_ptr<LiftLowerContext> &cx, uint32_t handle_index, uint32_t ptr, const HostTrap &trap)
+    {
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, !shared_, "future state missing");
+        trap_if(trap_cx, shared_->descriptor.element_size == 0, "invalid future descriptor");
+        trap_if(trap_cx, shared_->value_ready, "future already resolved");
+
+        ensure_memory_range(*cx, ptr, 1, shared_->descriptor.alignment, shared_->descriptor.element_size);
+        std::memcpy(shared_->value.data(), cx->opts.memory.data() + ptr, shared_->descriptor.element_size);
+        shared_->value_ready = true;
+
+        if (shared_->pending_read)
+        {
+            auto pending = std::move(*shared_->pending_read);
+            shared_->pending_read.reset();
+            ensure_memory_range(*pending.cx, pending.ptr, 1, shared_->descriptor.alignment, shared_->descriptor.element_size);
+            std::memcpy(pending.cx->opts.memory.data() + pending.ptr, shared_->value.data(), shared_->descriptor.element_size);
+            pending.endpoint->complete_async(pending.handle_index, CopyResult::Completed, 1, trap);
+        }
+
+        set_pending_event({EventCode::FUTURE_WRITE, handle_index, pack_copy_result(CopyResult::Completed, 1)});
+        auto event = get_pending_event(trap);
+        state_ = CopyState::Idle;
+        return event.payload;
+    }
+
+    inline uint32_t WritableFutureEnd::cancel(bool, const HostTrap &trap)
+    {
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, true, "no pending future write");
+        return BLOCKED;
+    }
+
+    inline void WritableFutureEnd::drop(const HostTrap &trap)
+    {
+        if (shared_ && !shared_->value_ready)
+        {
+            if (shared_->pending_read)
+            {
+                auto pending = std::move(*shared_->pending_read);
+                shared_->pending_read.reset();
+                pending.endpoint->complete_async(pending.handle_index, CopyResult::Dropped, 0, trap);
+            }
+            shared_->writable_dropped = true;
+        }
+        state_ = CopyState::Done;
+        Waitable::drop(trap);
     }
 
     struct ResourceType
@@ -220,14 +968,6 @@ namespace cmcpp
         std::unordered_map<const ResourceType *, HandleTable> tables_;
     };
 
-    struct Waitable
-    {
-    };
-
-    struct WaitableSet
-    {
-    };
-
     struct ErrorContext
     {
     };
@@ -236,7 +976,11 @@ namespace cmcpp
     {
         bool may_leave = true;
         bool may_enter = true;
+        bool exclusive = false;
+        uint32_t backpressure = 0;
+        uint32_t num_waiting_to_enter = 0;
         HandleTables handles;
+        InstanceTable table;
     };
 
     class ContextLocalStorage
@@ -320,6 +1064,191 @@ namespace cmcpp
     {
         const HandleElement &element = inst.handles.get(rt, index, trap);
         return element.rep;
+    }
+
+    inline uint32_t canon_waitable_set_new(ComponentInstance &inst, const HostTrap &trap)
+    {
+        auto wset = std::make_shared<WaitableSet>();
+        return inst.table.add(wset, trap);
+    }
+
+    inline uint32_t canon_waitable_set_wait(bool /*cancellable*/, GuestMemory mem, ComponentInstance &inst, uint32_t set_index, uint32_t ptr, const HostTrap &trap)
+    {
+        auto wset = inst.table.get<WaitableSet>(set_index, trap);
+        wset->begin_wait();
+        if (!wset->has_pending_event())
+        {
+            wset->end_wait();
+            write_event_fields(mem, ptr, 0, 0, trap);
+            return BLOCKED;
+        }
+        auto event = wset->take_pending_event(trap);
+        wset->end_wait();
+        write_event_fields(mem, ptr, event.index, event.payload, trap);
+        return static_cast<uint32_t>(event.code);
+    }
+
+    inline uint32_t canon_waitable_set_poll(bool /*cancellable*/, GuestMemory mem, ComponentInstance &inst, uint32_t set_index, uint32_t ptr, const HostTrap &trap)
+    {
+        auto wset = inst.table.get<WaitableSet>(set_index, trap);
+        if (!wset->has_pending_event())
+        {
+            write_event_fields(mem, ptr, 0, 0, trap);
+            return static_cast<uint32_t>(EventCode::NONE);
+        }
+        auto event = wset->take_pending_event(trap);
+        write_event_fields(mem, ptr, event.index, event.payload, trap);
+        return static_cast<uint32_t>(event.code);
+    }
+
+    inline void canon_waitable_set_drop(ComponentInstance &inst, uint32_t set_index, const HostTrap &trap)
+    {
+        auto wset = inst.table.remove<WaitableSet>(set_index, trap);
+        wset->drop(trap);
+    }
+
+    inline void canon_waitable_join(ComponentInstance &inst, uint32_t waitable_index, uint32_t set_index, const HostTrap &trap)
+    {
+        auto waitable = inst.table.get<Waitable>(waitable_index, trap);
+        if (set_index == 0)
+        {
+            waitable->join(nullptr, trap);
+            return;
+        }
+        auto wset = inst.table.get<WaitableSet>(set_index, trap);
+        waitable->join(wset.get(), trap);
+    }
+
+    inline uint64_t canon_stream_new(ComponentInstance &inst, const StreamDescriptor &descriptor, const HostTrap &trap)
+    {
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, descriptor.element_size == 0, "stream descriptor invalid");
+        auto shared = std::make_shared<SharedStreamState>(descriptor);
+        auto readable = std::make_shared<ReadableStreamEnd>(shared);
+        auto writable = std::make_shared<WritableStreamEnd>(shared);
+        uint32_t readable_index = inst.table.add(readable, trap);
+        uint32_t writable_index = inst.table.add(writable, trap);
+        return (static_cast<uint64_t>(writable_index) << 32) | readable_index;
+    }
+
+    inline uint32_t canon_stream_read(ComponentInstance &inst,
+                                      const StreamDescriptor &descriptor,
+                                      uint32_t readable_index,
+                                      const std::shared_ptr<LiftLowerContext> &cx,
+                                      uint32_t ptr,
+                                      uint32_t n,
+                                      bool sync,
+                                      const HostTrap &trap)
+    {
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, !cx, "lift/lower context required");
+        auto readable = inst.table.get<ReadableStreamEnd>(readable_index, trap);
+        validate_descriptor(descriptor, readable->descriptor(), trap);
+        return readable->read(cx, readable_index, ptr, n, sync, trap);
+    }
+
+    inline uint32_t canon_stream_write(ComponentInstance &inst,
+                                       const StreamDescriptor &descriptor,
+                                       uint32_t writable_index,
+                                       const std::shared_ptr<LiftLowerContext> &cx,
+                                       uint32_t ptr,
+                                       uint32_t n,
+                                       const HostTrap &trap)
+    {
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, !cx, "lift/lower context required");
+        auto writable = inst.table.get<WritableStreamEnd>(writable_index, trap);
+        validate_descriptor(descriptor, writable->descriptor(), trap);
+        return writable->write(cx, writable_index, ptr, n, trap);
+    }
+
+    inline uint32_t canon_stream_cancel_read(ComponentInstance &inst, uint32_t readable_index, bool sync, const HostTrap &trap)
+    {
+        auto readable = inst.table.get<ReadableStreamEnd>(readable_index, trap);
+        return readable->cancel(sync, trap);
+    }
+
+    inline uint32_t canon_stream_cancel_write(ComponentInstance &inst, uint32_t writable_index, bool sync, const HostTrap &trap)
+    {
+        auto writable = inst.table.get<WritableStreamEnd>(writable_index, trap);
+        return writable->cancel(sync, trap);
+    }
+
+    inline void canon_stream_drop_readable(ComponentInstance &inst, uint32_t readable_index, const HostTrap &trap)
+    {
+        auto readable = inst.table.remove<ReadableStreamEnd>(readable_index, trap);
+        readable->drop(trap);
+    }
+
+    inline void canon_stream_drop_writable(ComponentInstance &inst, uint32_t writable_index, const HostTrap &trap)
+    {
+        auto writable = inst.table.remove<WritableStreamEnd>(writable_index, trap);
+        writable->drop(trap);
+    }
+
+    inline uint64_t canon_future_new(ComponentInstance &inst, const FutureDescriptor &descriptor, const HostTrap &trap)
+    {
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, descriptor.element_size == 0, "future descriptor invalid");
+        auto shared = std::make_shared<SharedFutureState>(descriptor);
+        auto readable = std::make_shared<ReadableFutureEnd>(shared);
+        auto writable = std::make_shared<WritableFutureEnd>(shared);
+        uint32_t readable_index = inst.table.add(readable, trap);
+        uint32_t writable_index = inst.table.add(writable, trap);
+        return (static_cast<uint64_t>(writable_index) << 32) | readable_index;
+    }
+
+    inline uint32_t canon_future_read(ComponentInstance &inst,
+                                      const FutureDescriptor &descriptor,
+                                      uint32_t readable_index,
+                                      const std::shared_ptr<LiftLowerContext> &cx,
+                                      uint32_t ptr,
+                                      bool sync,
+                                      const HostTrap &trap)
+    {
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, !cx, "lift/lower context required");
+        auto readable = inst.table.get<ReadableFutureEnd>(readable_index, trap);
+        validate_descriptor(descriptor, readable->descriptor(), trap);
+        return readable->read(cx, readable_index, ptr, sync, trap);
+    }
+
+    inline uint32_t canon_future_write(ComponentInstance &inst,
+                                       const FutureDescriptor &descriptor,
+                                       uint32_t writable_index,
+                                       const std::shared_ptr<LiftLowerContext> &cx,
+                                       uint32_t ptr,
+                                       const HostTrap &trap)
+    {
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, !cx, "lift/lower context required");
+        auto writable = inst.table.get<WritableFutureEnd>(writable_index, trap);
+        validate_descriptor(descriptor, writable->descriptor(), trap);
+        return writable->write(cx, writable_index, ptr, trap);
+    }
+
+    inline uint32_t canon_future_cancel_read(ComponentInstance &inst, uint32_t readable_index, bool sync, const HostTrap &trap)
+    {
+        auto readable = inst.table.get<ReadableFutureEnd>(readable_index, trap);
+        return readable->cancel(sync, trap);
+    }
+
+    inline uint32_t canon_future_cancel_write(ComponentInstance &inst, uint32_t writable_index, bool sync, const HostTrap &trap)
+    {
+        auto writable = inst.table.get<WritableFutureEnd>(writable_index, trap);
+        return writable->cancel(sync, trap);
+    }
+
+    inline void canon_future_drop_readable(ComponentInstance &inst, uint32_t readable_index, const HostTrap &trap)
+    {
+        auto readable = inst.table.remove<ReadableFutureEnd>(readable_index, trap);
+        readable->drop(trap);
+    }
+
+    inline void canon_future_drop_writable(ComponentInstance &inst, uint32_t writable_index, const HostTrap &trap)
+    {
+        auto writable = inst.table.remove<WritableFutureEnd>(writable_index, trap);
+        writable->drop(trap);
     }
 
     //  ----------------------------

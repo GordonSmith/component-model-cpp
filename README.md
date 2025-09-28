@@ -211,6 +211,10 @@ auto call = store.invoke(func, nullptr, [] { return std::vector<std::any>{}; }, 
 store.tick();
 ```
 
+### Waitables, streams, and futures
+
+The canonical async ABI surfaces are implemented via `canon_waitable_*`, `canon_stream_*`, and `canon_future_*` helpers on `ComponentInstance`. Waitable sets can be joined to readable/writable stream ends or futures, and `canon_waitable_set_poll` reports readiness using the same event payload layout defined by the spec. See the doctests in `test/main.cpp` for end-to-end examples.
+
 Call `tick()` in your host loop until all pending work completes. Cancellation is cooperative: calling `Call::request_cancellation()` marks the associated thread as cancelled before the next `tick()`.
 
  
