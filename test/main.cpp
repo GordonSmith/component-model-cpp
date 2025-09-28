@@ -1317,6 +1317,14 @@ TEST_CASE("Flags")
     CHECK(flags.test<"ccc">() == f.test<"ccc">());
     CHECK(flags == f);
 
+    auto encoded_flags = func::pack_flags_into_int(flags);
+    auto decoded_flags = func::unpack_flags_from_int<MyFlags>(static_cast<uint32_t>(encoded_flags));
+    CHECK(decoded_flags == flags);
+
+    func::store(*cx, flags, 0);
+    auto loaded_flags = func::load<MyFlags>(*cx, 0);
+    CHECK(loaded_flags == flags);
+
     using MyFlags2 = flags_t<"one", "two", "three", "four", "five", "six", "seven", "8", "nine">;
     CHECK(ValTrait<MyFlags2>::size == 2);
     CHECK(MyFlags2::labelsSize == 9);
@@ -1487,6 +1495,7 @@ TEST_CASE("Records")
     auto v = lower_flat(*cx, p_in);
     auto p_out = lift_flat<Person>(*cx, v);
     CHECK(p_in.name == p_out.name);
+
     CHECK(p_in.age == p_out.age);
     CHECK(p_in.weight == p_out.weight);
 
@@ -1549,6 +1558,91 @@ TEST_CASE("Records")
     CHECK(pex3_in.p.weight == pex3_out.p.weight);
     CHECK(pex3_in.p.address == pex3_out.p.address);
     CHECK(pex3_in.p.phones == pex3_out.p.phones);
+}
+
+TEST_CASE("Function flattening honors canonical limits")
+{
+    CanonicalOptions opts;
+    opts.sync = true;
+
+    using HeavyParamFn = std::function<void(string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t)>;
+
+    auto lift_flat = func::flatten<HeavyParamFn>(opts, func::ContextType::Lift);
+    CHECK(lift_flat.params.size() == 1);
+    CHECK(lift_flat.params[0] == WasmValType::i32);
+    CHECK(lift_flat.results.empty());
+
+    auto lower_flat = func::flatten<HeavyParamFn>(opts, func::ContextType::Lower);
+    CHECK(lower_flat.params.size() == 1);
+    CHECK(lower_flat.params[0] == WasmValType::i32);
+    CHECK(lower_flat.results.empty());
+
+    using HeavyResultFn = std::function<tuple_t<string_t, string_t>()>;
+
+    auto lift_results = func::flatten<HeavyResultFn>(opts, func::ContextType::Lift);
+    CHECK(lift_results.params.empty());
+    CHECK(lift_results.results.size() == 1);
+    CHECK(lift_results.results[0] == WasmValType::i32);
+
+    auto lower_results = func::flatten<HeavyResultFn>(opts, func::ContextType::Lower);
+    CHECK(lower_results.params.size() == 1);
+    CHECK(lower_results.params.back() == WasmValType::i32);
+    CHECK(lower_results.results.empty());
+}
+
+TEST_CASE("Async function flattening matches canonical ABI")
+{
+    using AsyncFn = std::function<int32_t(int32_t, int32_t, int32_t, int32_t, int32_t)>;
+
+    CanonicalOptions async_opts;
+    async_opts.sync = false;
+
+    auto lower_async = func::flatten<AsyncFn>(async_opts, func::ContextType::Lower);
+    CHECK(lower_async.params.size() == 2);
+    CHECK(lower_async.params[0] == WasmValType::i32);
+    CHECK(lower_async.params[1] == WasmValType::i32);
+    CHECK(lower_async.results.size() == 1);
+    CHECK(lower_async.results[0] == WasmValType::i32);
+
+    using AsyncLiftFn = std::function<int32_t(int32_t)>;
+
+    CanonicalOptions lift_opts;
+    lift_opts.sync = false;
+
+    auto lift_no_callback = func::flatten<AsyncLiftFn>(lift_opts, func::ContextType::Lift);
+    CHECK(lift_no_callback.params.size() == 1);
+    CHECK(lift_no_callback.params[0] == WasmValType::i32);
+    CHECK(lift_no_callback.results.empty());
+
+    CanonicalOptions lift_with_callback;
+    lift_with_callback.sync = false;
+    lift_with_callback.callback = GuestCallback([]() {});
+
+    auto lift_callback = func::flatten<AsyncLiftFn>(lift_with_callback, func::ContextType::Lift);
+    CHECK(lift_callback.results.size() == 1);
+    CHECK(lift_callback.results[0] == WasmValType::i32);
+}
+
+TEST_CASE("Heap-based lowering triggers for oversized results")
+{
+    Heap heap(1024 * 1024);
+    auto cx = createLiftLowerContext(&heap, Encoding::Utf8);
+
+    using ResultTuple = tuple_t<string_t, string_t>;
+    ResultTuple value{"alpha", "beta"};
+
+    auto lowered = lower_flat_values<ResultTuple>(*cx, MAX_FLAT_RESULTS, nullptr, std::move(value));
+    REQUIRE(lowered.size() == 1);
+    auto ptr = std::get<int32_t>(lowered[0]);
+
+    auto stored = load<ResultTuple>(*cx, ptr);
+    CHECK(std::get<0>(stored) == "alpha");
+    CHECK(std::get<1>(stored) == "beta");
+
+    CoreValueIter iter(lowered);
+    auto lifted = lift_flat_values<ResultTuple>(*cx, MAX_FLAT_RESULTS, iter);
+    CHECK(std::get<0>(lifted) == "alpha");
+    CHECK(std::get<1>(lifted) == "beta");
 }
 
 TEST_CASE("Variant")

@@ -809,6 +809,7 @@ namespace cmcpp
     //  Func  --------------------------------------------------------------------
     constexpr uint32_t MAX_FLAT_PARAMS = 16;
     constexpr uint32_t MAX_FLAT_RESULTS = 1;
+    constexpr uint32_t MAX_FLAT_ASYNC_PARAMS = 4;
 
     template <typename>
     struct func_t_impl;
