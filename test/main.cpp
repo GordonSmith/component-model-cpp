@@ -207,6 +207,84 @@ TEST_CASE("Async runtime propagates cancellation")
     CHECK(thread->completed());
 }
 
+TEST_CASE("Thread suspend_until supports force yield gating")
+{
+    Store store;
+
+    auto gate = std::make_shared<std::atomic<bool>>(true);
+
+    auto thread = std::shared_ptr<Thread>(new Thread(
+        store,
+        []()
+        {
+            return true;
+        },
+        [](bool)
+        {
+            return false;
+        },
+        true,
+        {}));
+
+    bool completed = thread->suspend_until(
+        [gate]()
+        {
+            return gate->load();
+        },
+        true,
+        true);
+
+    CHECK_FALSE(completed);
+    CHECK(thread->allow_cancellation());
+    CHECK_FALSE(thread->ready());
+    CHECK(thread->ready());
+
+    gate->store(false);
+    CHECK_FALSE(thread->ready());
+
+    gate->store(true);
+    CHECK(thread->ready());
+}
+
+TEST_CASE("Store microtasks run before pending threads")
+{
+    Store store;
+    int microtask_counter = 0;
+
+    store.enqueue([&]()
+                  { microtask_counter += 1; });
+    store.enqueue([&]()
+                  { microtask_counter += 1; });
+
+    auto thread = Thread::create(
+        store,
+        []()
+        {
+            return true;
+        },
+        [&microtask_counter](bool cancelled)
+        {
+            CHECK_FALSE(cancelled);
+            microtask_counter += 10;
+            return false;
+        });
+
+    CHECK(store.pending_size() == 1);
+
+    store.tick();
+    CHECK(microtask_counter == 1);
+    CHECK(store.pending_size() == 1);
+
+    store.tick();
+    CHECK(microtask_counter == 2);
+    CHECK(store.pending_size() == 1);
+
+    store.tick();
+    CHECK(microtask_counter == 12);
+    CHECK(store.pending_size() == 0);
+    CHECK(thread->completed());
+}
+
 TEST_CASE("Backpressure counters and may_leave guards")
 {
     ComponentInstance inst;
@@ -306,6 +384,73 @@ TEST_CASE("Error context APIs manage debug messages")
     CHECK(empty_len == 0);
 
     canon_error_context_drop(task, empty_index, trap);
+}
+
+TEST_CASE("Waitable sets deliver events and enforce invariants")
+{
+    Store store;
+    ComponentInstance inst;
+    inst.store = &store;
+
+    HostTrap trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    std::shared_ptr<TableEntry> null_entry;
+    CHECK_THROWS(inst.table.add(null_entry, trap));
+
+    auto waitable = std::make_shared<Waitable>();
+    uint32_t waitable_index = inst.table.add(waitable, trap);
+    uint32_t set_index = canon_waitable_set_new(inst, trap);
+
+    uint32_t fail_set_index = canon_waitable_set_new(inst, trap);
+    auto fail_set = inst.table.get<WaitableSet>(fail_set_index, trap);
+    Waitable stack_waitable;
+    fail_set->add_waitable(stack_waitable);
+    CHECK_THROWS(fail_set->drop(trap));
+    fail_set->remove_waitable(stack_waitable);
+    canon_waitable_set_drop(inst, fail_set_index, trap);
+
+    canon_waitable_join(inst, waitable_index, set_index, trap);
+    CHECK(waitable->joined_set() != nullptr);
+
+    Event pending{EventCode::STREAM_READ, 7, 99};
+    waitable->set_pending_event(pending);
+    CHECK_THROWS(waitable->drop(trap));
+    waitable->clear_pending_event();
+
+    Heap heap(64);
+    GuestMemory mem(heap.memory.data(), heap.memory.size());
+    uint32_t record_ptr = 8;
+
+    auto blocked = canon_waitable_set_wait(false, mem, inst, set_index, record_ptr, trap);
+    CHECK(blocked == BLOCKED);
+    uint32_t recorded_index = 123;
+    std::memcpy(&recorded_index, heap.memory.data() + record_ptr, sizeof(uint32_t));
+    CHECK(recorded_index == 0);
+
+    waitable->set_pending_event(pending);
+    auto polled = canon_waitable_set_poll(false, mem, inst, set_index, record_ptr, trap);
+    CHECK(polled == static_cast<uint32_t>(EventCode::STREAM_READ));
+
+    uint32_t stored_index = 0;
+    std::memcpy(&stored_index, heap.memory.data() + record_ptr, sizeof(uint32_t));
+    CHECK(stored_index == pending.index);
+    uint32_t stored_payload = 0;
+    std::memcpy(&stored_payload, heap.memory.data() + record_ptr + sizeof(uint32_t), sizeof(uint32_t));
+    CHECK(stored_payload == pending.payload);
+
+    waitable->set_pending_event(pending);
+    auto waited = canon_waitable_set_wait(false, mem, inst, set_index, record_ptr, trap);
+    CHECK(waited == static_cast<uint32_t>(EventCode::STREAM_READ));
+
+    canon_waitable_join(inst, waitable_index, 0, trap);
+    CHECK(waitable->joined_set() == nullptr);
+
+    canon_waitable_set_drop(inst, set_index, trap);
+    CHECK_THROWS(inst.table.get<WaitableSet>(set_index, trap));
+    CHECK_THROWS(inst.table.get<WaitableSet>(waitable_index, trap));
 }
 
 TEST_CASE("Task yield, cancel, and return")
@@ -494,6 +639,125 @@ TEST_CASE("Canonical options control lift/lower callbacks")
         CHECK(observed_payload == pack_copy_result(CopyResult::Completed, 1));
         CHECK(heap.memory[read_ptr] == heap.memory[write_ptr]);
     }
+}
+
+TEST_CASE("InstanceContext wires canonical options")
+{
+    Heap heap(512);
+    int post_return_calls = 0;
+    std::vector<Event> observed_events;
+
+    HostTrap trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    auto realloc_fn = [&](int ptr, int old_size, int align, int new_size)
+    {
+        return heap.realloc(ptr, static_cast<size_t>(old_size), static_cast<uint32_t>(align), static_cast<size_t>(new_size));
+    };
+
+    auto icx = createInstanceContext(trap, convert, realloc_fn);
+
+    CanonicalOptions options;
+    options.memory = GuestMemory(heap.memory.data(), heap.memory.size());
+    options.realloc = realloc_fn;
+    options.sync = false;
+    options.post_return = GuestPostReturn([&]()
+                                          { ++post_return_calls; });
+    options.callback = GuestCallback([&](EventCode code, uint32_t index, uint32_t payload)
+                                     { observed_events.push_back({code, index, payload}); });
+
+    auto lift_cx = icx->createLiftLowerContext(options);
+
+    REQUIRE(lift_cx->canonical_options() != nullptr);
+    CHECK_FALSE(lift_cx->is_sync());
+    CHECK(lift_cx->opts.memory.data() == heap.memory.data());
+
+    auto lowered = lower_flat_values<int32_t>(*lift_cx, MAX_FLAT_RESULTS, nullptr, int32_t{77});
+    CHECK(lowered.size() == 1);
+    CHECK(post_return_calls == 1);
+
+    lift_cx->notify_async_event(EventCode::STREAM_READ, 5, 0xCAFE'BEEFu);
+    REQUIRE(observed_events.size() == 1);
+    CHECK(observed_events.back().code == EventCode::STREAM_READ);
+    CHECK(observed_events.back().index == 5);
+    CHECK(observed_events.back().payload == 0xCAFE'BEEFu);
+}
+
+TEST_CASE("Canonical callbacks surface waitable events")
+{
+    ComponentInstance inst;
+    Heap heap(512);
+    std::vector<Event> observed_events;
+
+    HostTrap trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    auto realloc_fn = [&](int ptr, int old_size, int align, int new_size)
+    {
+        return heap.realloc(ptr, static_cast<size_t>(old_size), static_cast<uint32_t>(align), static_cast<size_t>(new_size));
+    };
+
+    auto icx = createInstanceContext(trap, convert, realloc_fn);
+
+    CanonicalOptions options;
+    options.memory = GuestMemory(heap.memory.data(), heap.memory.size());
+    options.realloc = realloc_fn;
+    options.sync = false;
+    options.callback = GuestCallback([&](EventCode code, uint32_t index, uint32_t payload)
+                                     { observed_events.push_back({code, index, payload}); });
+
+    auto lift_unique = icx->createLiftLowerContext(options);
+    std::shared_ptr<LiftLowerContext> cx(lift_unique.release(), [](LiftLowerContext *ptr)
+                                         { delete ptr; });
+    cx->inst = &inst;
+
+    auto desc = make_stream_descriptor<int32_t>();
+    uint64_t handles = canon_stream_new(inst, desc, trap);
+    uint32_t readable = static_cast<uint32_t>(handles & 0xFFFF'FFFFu);
+    uint32_t writable = static_cast<uint32_t>(handles >> 32);
+
+    uint32_t waitable_set = canon_waitable_set_new(inst, trap);
+    canon_waitable_join(inst, readable, waitable_set, trap);
+
+    uint32_t read_ptr = 0;
+    uint32_t write_ptr = 96;
+    uint32_t event_ptr = 160;
+
+    auto blocked = canon_stream_read(inst, desc, readable, cx, read_ptr, 2, false, trap);
+    CHECK(blocked == BLOCKED);
+    CHECK(observed_events.empty());
+
+    int32_t payload[2] = {11, 22};
+    std::memcpy(heap.memory.data() + write_ptr, payload, sizeof(payload));
+    auto write_payload = canon_stream_write(inst, desc, writable, cx, write_ptr, 2, trap);
+    CHECK((write_payload & 0xF) == static_cast<uint32_t>(CopyResult::Completed));
+
+    REQUIRE(observed_events.size() == 1);
+    CHECK(observed_events.back().code == EventCode::STREAM_READ);
+    CHECK(observed_events.back().index == readable);
+    CHECK(observed_events.back().payload == pack_copy_result(CopyResult::Completed, 2));
+
+    GuestMemory mem(heap.memory.data(), heap.memory.size());
+    auto code = canon_waitable_set_poll(false, mem, inst, waitable_set, event_ptr, trap);
+    CHECK(code == static_cast<uint32_t>(EventCode::STREAM_READ));
+
+    uint32_t recorded_index = integer::load<uint32_t>(*cx, event_ptr);
+    uint32_t recorded_payload = integer::load<uint32_t>(*cx, event_ptr + 4);
+    CHECK(recorded_index == readable);
+    CHECK(recorded_payload == pack_copy_result(CopyResult::Completed, 2));
+
+    int32_t read_values[2] = {0, 0};
+    std::memcpy(read_values, heap.memory.data() + read_ptr, sizeof(read_values));
+    CHECK(read_values[0] == 11);
+    CHECK(read_values[1] == 22);
+
+    canon_stream_drop_readable(inst, readable, trap);
+    canon_stream_drop_writable(inst, writable, trap);
+    canon_waitable_set_drop(inst, waitable_set, trap);
 }
 
 TEST_CASE("Resource handle lifecycle mirrors canonical definitions")

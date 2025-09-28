@@ -6,6 +6,7 @@ Draft issues ready to be copy-pasted into GitHub. Each entry lists a suggested t
 
 ## Issue: Implement canonical async runtime scaffolding
 - **Labels:** `enhancement`, `async`
+- **Status:** Done
 
 ### Background
 The canonical ABI reference (`design/mvp/canonical-abi/definitions.py`) includes a `Store`, `Thread`, and scheduling loop that enable cooperative async execution via `tick()`. The current C++ headers lack any runtime to drive asynchronous component calls.
@@ -26,6 +27,7 @@ The canonical ABI reference (`design/mvp/canonical-abi/definitions.py`) includes
 
 ## Issue: Complete resource handle lifecycle
 - **Labels:** `enhancement`, `abi`
+- **Status:** Done
 
 ### Background
 `ResourceHandle`, `ResourceType`, and `ComponentInstance.resources` are currently empty shells. The canonical implementation tracks ownership, borrow counts, destructors, and exposes `canon resource.{new,drop,rep}`.
@@ -49,6 +51,7 @@ The canonical ABI reference (`design/mvp/canonical-abi/definitions.py`) includes
 
 ### Background
 Canonical ABI defines waitables, waitable-sets, buffers, streams, and futures plus their cancellation behaviors. Our headers only contain empty structs.
+- **Status:** Done
 
 ### Scope
 - Model waitable and waitable-set state, including registration with the component store.
@@ -66,6 +69,7 @@ Canonical ABI defines waitables, waitable-sets, buffers, streams, and futures pl
 
 ## Issue: Implement backpressure and task lifecycle management
 - **Labels:** `enhancement`, `async`
+- **Status:** Done
 
 ### Background
 `ComponentInstance` holds flags for `may_leave`, `backpressure`, and call-state tracking but they are unused. Canonical ABI specifies `canon task.{return,cancel}`, `canon yield`, and backpressure counters governing concurrent entry.
@@ -86,6 +90,7 @@ Canonical ABI defines waitables, waitable-sets, buffers, streams, and futures pl
 
 ## Issue: Support context locals and error-context APIs
 - **Labels:** `enhancement`, `abi`
+- **Status:** Done
 
 ### Background
 `LiftLowerContext` currently omits instance references and borrow scopes, and `ContextLocalStorage`/`ErrorContext` types are unused. The canonical ABI exposes `canon context.{get,set}` and `canon error-context.{new,debug-message,drop}`.
@@ -106,6 +111,7 @@ Canonical ABI defines waitables, waitable-sets, buffers, streams, and futures pl
 
 ## Issue: Finish function flattening utilities
 - **Labels:** `enhancement`, `abi`
+- **Status:** Done
 
 ### Background
 `include/cmcpp/func.hpp` contains commented-out flattening helpers. Canonical ABI requires flattening functions to honor `MAX_FLAT_PARAMS/RESULTS` and spill to heap memory via the provided `realloc`.
@@ -146,6 +152,7 @@ Canonical ABI defines waitables, waitable-sets, buffers, streams, and futures pl
 
 ## Issue: Expand docs and tests for canonical runtime features
 - **Labels:** `documentation`, `testing`
+- **Status:** Done
 
 ### Background
 New runtime pieces require supporting documentation and tests. Currently, README lacks guidance and test coverage mirrors only existing functionality.
