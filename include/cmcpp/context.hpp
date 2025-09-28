@@ -80,18 +80,16 @@ namespace cmcpp
 
     inline void trap_if(const LiftLowerContext &cx, bool condition, const char *message = nullptr) noexcept(false)
     {
-        if (!condition)
+        if (condition)
         {
-            return;
+            const char *msg = message == nullptr ? "Unknown trap" : message;
+            if (cx.trap)
+            {
+                cx.trap(msg);
+                return;
+            }
+            throw std::runtime_error(msg);
         }
-
-        const char *msg = message == nullptr ? "Unknown trap" : message;
-        if (cx.trap)
-        {
-            cx.trap(msg);
-            return;
-        }
-        throw std::runtime_error(msg);
     }
 
     inline LiftLowerContext make_trap_context(const HostTrap &trap)
