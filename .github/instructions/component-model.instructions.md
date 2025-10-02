@@ -7,6 +7,22 @@ applyTo: '**'
 
 This repository implements a C++ ABI (Application Binary Interface) for the WebAssembly Component Model, providing host bindings that allow C++ applications to interact with WebAssembly components.
 
+### Relationship to the Official Specification
+
+**This implementation directly mirrors the canonical Python reference implementation.** The C++ code in this repository is designed to be a faithful translation of:
+
+- **Python definitions**: `ref/component-model/design/mvp/canonical-abi/definitions.py` - The authoritative reference implementation
+- **Specification**: `ref/component-model/design/mvp/CanonicalABI.md` - The formal specification document
+- **Test suite**: `ref/component-model/design/mvp/canonical-abi/run_tests.py` - Validation tests
+
+The C++ implementation maintains structural and semantic alignment with the Python code:
+- Class names map directly (e.g., `Task`, `Store`, `Thread`, `ComponentInstance`)
+- State machines follow the same transitions (e.g., `Task::State` enum values)
+- Method signatures and behavior match the Python counterparts
+- Error conditions and trap points are equivalent
+
+When modifying or extending the C++ implementation, **always cross-reference the Python code** to ensure conformance. Any divergence from the reference implementation should be documented and justified.
+
 ### WebAssembly Component Model Overview
 The [WebAssembly Component Model](https://github.com/WebAssembly/component-model) is a specification that extends WebAssembly with:
 - **Interface Types**: Rich type system beyond basic WebAssembly types
@@ -21,12 +37,16 @@ The [WebAssembly Component Model](https://github.com/WebAssembly/component-model
   - Primitive types: bool, integers (s8-s64, u8-u64), floats (f32, f64), char
   - String types: UTF-8, UTF-16, Latin-1+UTF-16 encoding support  
   - Composite types: lists, records, tuples, variants, enums, options, results, flags
-  - Resource types: own, borrow (planned)
+  - Resource types: own, borrow
+  - Async types: streams (readable/writable), futures (readable/writable), waitables, tasks
+  - Error handling: error contexts with debug messages
 
 - **ABI Functions**: Core Component Model operations
   - `lower_flat_values`: Convert C++ values to WebAssembly flat representation
   - `lift_flat_values`: Convert WebAssembly flat values to C++ types
   - Memory management with proper encoding handling
+  - Canonical operations: `canon_waitable_*`, `canon_stream_*`, `canon_future_*`, `canon_task_*`, `canon_error_context_*`
+  - Async runtime: `Store`, `Thread`, `Call`, cooperative scheduling with tick-based execution
 
 #### Architecture
 - **Header-only Library**: Pure template-based implementation in `include/cmcpp/`
@@ -50,6 +70,19 @@ When working with this library:
 2. **Host Functions**: Implement host functions using the provided type wrappers
 3. **Guest Interaction**: Use lift/lower functions to marshal data between host and guest
 4. **Memory Management**: Use the provided realloc functions for guest memory allocation
+5. **Async Operations**: Use `Store::invoke` and `Store::tick()` for cooperative async execution
+6. **Resource Management**: Use `ComponentInstance::table` for handle tracking and canonical resource operations
+7. **Error Contexts**: Use `canon_error_context_*` functions for debug message handling
+8. **Validation**: Cross-check behavior against the Python reference in `ref/component-model/design/mvp/canonical-abi/definitions.py` when implementing new features
+
+### Testing Against the Python Reference
+
+When adding or modifying canonical ABI operations:
+1. Read the corresponding Python function in `definitions.py` to understand the expected behavior
+2. Ensure your C++ implementation produces equivalent results for the same inputs
+3. Run `python3 ref/component-model/design/mvp/canonical-abi/run_tests.py` to verify the reference tests still pass
+4. Add corresponding C++ tests in `test/main.cpp` that exercise the same edge cases
+5. Document any intentional deviations (e.g., performance optimizations) with clear justification
 
 ### References
 - [WebAssembly Component Model Specification](https://github.com/WebAssembly/component-model)

@@ -26,12 +26,30 @@ namespace cmcpp
             return f;
         }
 
+        inline float64_t core_f64_reinterpret_i64(int64_t i)
+        {
+            float64_t f;
+            std::memcpy(&f, &i, sizeof f);
+            return f;
+        }
+
         template <Float T>
         T canonicalize_nan(T f)
         {
-            if (!std::isfinite(f))
+            if (std::isnan(f))
             {
-                f = std::numeric_limits<T>::quiet_NaN();
+                // Use canonical NaN bit patterns per Component Model spec
+                // Ref: ref/component-model/design/mvp/canonical-abi/definitions.py
+                if constexpr (std::is_same_v<T, float32_t>)
+                {
+                    constexpr uint32_t CANONICAL_FLOAT32_NAN = 0x7fc00000;
+                    return core_f32_reinterpret_i32(CANONICAL_FLOAT32_NAN);
+                }
+                else if constexpr (std::is_same_v<T, float64_t>)
+                {
+                    constexpr uint64_t CANONICAL_FLOAT64_NAN = 0x7ff8000000000000;
+                    return core_f64_reinterpret_i64(CANONICAL_FLOAT64_NAN);
+                }
             }
             return f;
         }
@@ -71,13 +89,13 @@ namespace cmcpp
         template <>
         inline float32_t load<float32_t>(const LiftLowerContext &cx, offset ptr)
         {
-            return decode_i32_as_float(integer::load<int32_t>(cx, ptr));
+            return canonicalize_nan(decode_i32_as_float(integer::load<int32_t>(cx, ptr)));
         }
 
         template <>
         inline float64_t load<float64_t>(const LiftLowerContext &cx, offset ptr)
         {
-            return decode_i64_as_float(integer::load<int64_t>(cx, ptr));
+            return canonicalize_nan(decode_i64_as_float(integer::load<int64_t>(cx, ptr)));
         }
     }
 

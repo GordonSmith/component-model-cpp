@@ -25,13 +25,14 @@ This repository is a modern C++20 header-only library implementing WebAssembly C
 - **Template Specializations**: Use template specialization for different WebAssembly types
 
 ### Build System
-- **CMake**: Uses CMake 3.5+ with modern CMake practices
+- **CMake**: Uses CMake 3.5+ with modern CMake practices (3.22+ recommended for presets)
 - **Interface Library**: Configured as an interface library target
-- **Cross-platform**: Supports Ubuntu, macOS, and Windows
+- **Cross-platform**: Supports Ubuntu 24.04 and Windows 2022
 - **Compiler Requirements**: Requires C++20 support
 - **Dependencies**: Uses vcpkg for third-party library management
   - Package definitions in `vcpkg.json` and `vcpkg-configuration.json`
   - Key dependencies: doctest (testing), ICU (Unicode), wasm-micro-runtime, wasi-sdk
+- **Coverage**: GCC/Clang builds enable coverage instrumentation; use lcov for report generation
 
 ### Type Safety and WebAssembly ABI
 - **Strong Typing**: Use distinct types for WebAssembly values (bool_t, char_t, etc.)
@@ -45,3 +46,4 @@ This repository is a modern C++20 header-only library implementing WebAssembly C
 - **SFINAE/Concepts**: Use concepts or SFINAE for template constraints
 - **Const Correctness**: Maintain const correctness throughout
 - **Naming**: Use snake_case for variables, PascalCase for types
+- **Commit Messages**: Use conventional commits (`feat:`, `fix:`, etc.) for Release Please automation

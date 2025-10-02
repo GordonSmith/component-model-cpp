@@ -16,7 +16,8 @@ namespace cmcpp
             size_t nbytes = ValTrait<T>::size;
             for (size_t i = 0; i < v.size(); ++i)
             {
-                cmcpp::store<T>(cx, v[i], ptr + i * nbytes);
+                T elem = v[i]; // Convert to actual type (important for std::vector<bool>)
+                cmcpp::store<T>(cx, elem, ptr + i * nbytes);
             }
             return {ptr, v.size()};
         }

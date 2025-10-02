@@ -53,7 +53,8 @@ namespace cmcpp
     template <Boolean T>
     inline void store(LiftLowerContext &cx, const T &v, uint32_t ptr)
     {
-        integer::store<T>(cx, v, ptr);
+        uint8_t byte = v ? 1 : 0;
+        integer::store<uint8_t>(cx, byte, ptr);
     }
     template <Boolean T>
     inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v)

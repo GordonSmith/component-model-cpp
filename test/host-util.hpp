@@ -35,7 +35,6 @@ public:
         last_alloc = ret + new_size;
         if (last_alloc > memory.size())
         {
-            std::cout << "oom: have " << memory.size() << " need " << last_alloc << std::endl;
             trap("oom");
         }
         std::memcpy(&memory[ret], &memory[original_ptr], original_size);
