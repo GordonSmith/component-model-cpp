@@ -86,15 +86,53 @@ if (NOT WAMR_INCLUDE_DIRS OR NOT IWASM_LIB OR (_wamr_require_vmlib AND NOT _wamr
     endif()
 endif()
 
-set(WAMR_SAMPLE_AVAILABLE TRUE)
+# Check if wit-bindgen is available (required for wasm guest build)
+find_program(WIT_BINDGEN_EXECUTABLE wit-bindgen HINTS $ENV{HOME}/.cargo/bin)
+if (NOT WIT_BINDGEN_EXECUTABLE)
+    message(WARNING "wit-bindgen not found. Wasm guest samples will not be built. Install with: cargo install wit-bindgen-cli")
+    set(WAMR_SAMPLE_AVAILABLE FALSE)
+else()
+    set(WAMR_SAMPLE_AVAILABLE TRUE)
+endif()
 
+# Generate host bindings from WIT file using wit-codegen
+set(WIT_FILE "${CMAKE_SOURCE_DIR}/samples/wasm/sample.wit")
+set(GENERATED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/generated")
+# Package name 'example:sample' will be extracted to 'sample' by wit-codegen
+set(GENERATED_HEADER "${GENERATED_DIR}/sample.hpp")
+set(GENERATED_WAMR_BINDINGS "${GENERATED_DIR}/sample_wamr.cpp")
+
+# Create custom command to generate bindings
+# Note: wit-codegen automatically derives the output name from the package name in the WIT file
+add_custom_command(
+    OUTPUT ${GENERATED_HEADER} ${GENERATED_WAMR_BINDINGS}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${GENERATED_DIR}
+    COMMAND cd ${GENERATED_DIR} && $<TARGET_FILE:wit-codegen> ${WIT_FILE}
+    DEPENDS wit-codegen ${WIT_FILE}
+    COMMENT "Generating host bindings from WIT file (output name derived from package)"
+    VERBATIM
+)
+
+# Create a custom target for the generated files
+add_custom_target(generate-sample-host-bindings
+    DEPENDS ${GENERATED_HEADER} ${GENERATED_WAMR_BINDINGS}
+)
+
+# WAMR sample executable that runs both hand-coded and generated implementations
 add_executable(wamr
     main.cpp
+    host_impl.cpp  # Host-provided implementations of generated interfaces
+    ${GENERATED_WAMR_BINDINGS}  # Generated WAMR symbol arrays
 )
+
+# Make sure bindings are generated before building
+add_dependencies(wamr generate-sample-host-bindings)
 
 target_include_directories(wamr
     PRIVATE
         ${WAMR_INCLUDE_DIRS}
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${GENERATED_DIR}  # Add generated directory to include path
 )
 
 if (MSVC)
@@ -115,4 +153,9 @@ endif()
 
 target_link_libraries(wamr PRIVATE cmcpp ${_wamr_link_libs})
 
-set(WAMR_SAMPLE_AVAILABLE TRUE PARENT_SCOPE)
+# Only propagate TRUE to parent if wit-bindgen is available
+if (WIT_BINDGEN_EXECUTABLE)
+    set(WAMR_SAMPLE_AVAILABLE TRUE PARENT_SCOPE)
+else()
+    set(WAMR_SAMPLE_AVAILABLE FALSE PARENT_SCOPE)
+endif()

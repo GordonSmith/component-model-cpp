@@ -613,6 +613,53 @@ namespace cmcpp
         return (ptr + static_cast<int32_t>(alignment) - 1) & ~(static_cast<int32_t>(alignment) - 1);
     }
 
+    // Helper to compute tuple alignment at compile time
+    template <Field... Ts>
+    constexpr uint32_t compute_tuple_alignment()
+    {
+        uint32_t a = 1;
+        ((a = std::max(a, ValTrait<Ts>::alignment)), ...);
+        return a;
+    }
+
+    // Helper to compute tuple size at compile time
+    template <Field... Ts>
+    constexpr uint32_t compute_tuple_size()
+    {
+        constexpr uint32_t alignment = compute_tuple_alignment<Ts...>();
+        uint32_t s = 0;
+        ((s = align_to(s, ValTrait<Ts>::alignment), (s += ValTrait<Ts>::size)), ...);
+        return align_to(s, alignment);
+    }
+
+    // Helper to compute tuple flat_types length at compile time
+    template <Field... Ts>
+    constexpr size_t compute_tuple_flat_types_len()
+    {
+        size_t i = 0;
+        ((i += ValTrait<Ts>::flat_types.size()), ...);
+        return i;
+    }
+
+    // Helper to compute tuple flat_types at compile time
+    template <size_t N, Field... Ts>
+    constexpr std::array<WasmValType, N> compute_tuple_flat_types()
+    {
+        std::array<WasmValType, N> v{};
+        size_t idx = 0;
+        auto append = [&v, &idx](auto ft) constexpr
+        {
+            v[idx++] = ft;
+        };
+        (([&append]() constexpr
+          {
+            for (auto ft : ValTrait<Ts>::flat_types) {
+                append(ft);
+            } }()),
+         ...);
+        return v;
+    }
+
     template <Field... Ts>
     using tuple_t = std::tuple<Ts...>;
     template <Field... Ts>
@@ -620,36 +667,10 @@ namespace cmcpp
     {
         static constexpr ValType type = ValType::Tuple;
         using inner_type = typename std::tuple<Ts...>;
-        static constexpr uint32_t alignment = []() constexpr
-        {
-            uint32_t a = 1;
-            ((a = std::max(a, ValTrait<Ts>::alignment)), ...);
-            return a;
-        }();
-        static constexpr uint32_t size = []() constexpr
-        {
-            uint32_t s = 0;
-            ((s = align_to(s, ValTrait<Ts>::alignment), (s += ValTrait<Ts>::size)), ...);
-            return align_to(s, alignment);
-        }();
-        static constexpr size_t flat_types_len = []() constexpr
-        {
-            size_t i = 0;
-            ((i += ValTrait<Ts>::flat_types.size()), ...);
-            return i;
-        }();
-        static constexpr std::array<WasmValType, flat_types_len> flat_types = []() constexpr
-        {
-            std::array<WasmValType, flat_types_len> v;
-            size_t i = 0;
-            (([&v, &i]()
-              {
-                for (auto &ft : ValTrait<Ts>::flat_types) {
-                    v[i++] = ft;
-                } }()),
-             ...);
-            return v;
-        }();
+        static constexpr uint32_t alignment = compute_tuple_alignment<Ts...>();
+        static constexpr uint32_t size = compute_tuple_size<Ts...>();
+        static constexpr size_t flat_types_len = compute_tuple_flat_types_len<Ts...>();
+        static constexpr std::array<WasmValType, flat_types_len> flat_types = compute_tuple_flat_types<flat_types_len, Ts...>();
     };
     template <typename T>
     concept Tuple = ValTrait<T>::type == ValType::Tuple;
@@ -703,6 +724,43 @@ namespace cmcpp
         return WasmValType::i64;
     }
 
+    // Helper to compute variant max_case_alignment at compile time
+    template <Field... Ts>
+    constexpr uint32_t compute_variant_max_case_alignment()
+    {
+        uint32_t a = 1;
+        ((a = std::max(a, ValTrait<Ts>::alignment)), ...);
+        return a;
+    }
+
+    // Helper to compute variant max_case_size at compile time
+    template <Field... Ts>
+    constexpr uint32_t compute_variant_max_case_size()
+    {
+        uint32_t cs = 0;
+        ((cs = std::max(cs, ValTrait<Ts>::size)), ...);
+        return cs;
+    }
+
+    // Helper to compute variant size at compile time
+    template <typename DiscriminantType, uint32_t MaxCaseAlignment, uint32_t MaxCaseSize, uint32_t AlignmentVariant>
+    constexpr uint32_t compute_variant_size()
+    {
+        uint32_t s = ValTrait<DiscriminantType>::size;
+        s = align_to(s, MaxCaseAlignment);
+        s += MaxCaseSize;
+        return align_to(s, AlignmentVariant);
+    }
+
+    // Helper to compute variant flat_types_len at compile time
+    template <Field... Ts>
+    constexpr size_t compute_variant_flat_types_len()
+    {
+        size_t i = 0;
+        ((i = std::max(i, ValTrait<Ts>::flat_types.size())), ...);
+        return i + 1;
+    }
+
     template <Field... Ts>
     using variant_t = std::variant<Ts...>;
     template <Field... Ts>
@@ -726,34 +784,14 @@ namespace cmcpp
                 discriminant_bytes <= 2,
                 uint16_t,
                 uint32_t>>;
-        static constexpr uint32_t max_case_alignment = []() constexpr
-        {
-            uint32_t a = 1;
-            ((a = std::max(a, ValTrait<Ts>::alignment)), ...);
-            return a;
-        }();
+        static constexpr uint32_t max_case_alignment = compute_variant_max_case_alignment<Ts...>();
         static constexpr uint32_t alignment_variant = std::max(ValTrait<discriminant_type>::alignment, max_case_alignment);
         static constexpr uint32_t alignment = std::max(ValTrait<discriminant_type>::alignment, static_cast<uint32_t>(1));
-        static constexpr uint32_t max_case_size = []() constexpr
-        {
-            uint32_t cs = 0;
-            ((cs = std::max(cs, ValTrait<Ts>::size)), ...);
-            return cs;
-        }();
-        static constexpr uint32_t size = []() constexpr
-        {
-            uint32_t s = ValTrait<discriminant_type>::size;
-            s = align_to(s, max_case_alignment);
-            s += max_case_size;
-            return align_to(s, alignment_variant);
-        }();
+        static constexpr uint32_t max_case_size = compute_variant_max_case_size<Ts...>();
+        static constexpr uint32_t size = compute_variant_size<discriminant_type, max_case_alignment, max_case_size, alignment_variant>();
         static_assert(size > 0 && size < std::numeric_limits<uint32_t>::max());
-        static constexpr size_t flat_types_len = []() constexpr
-        {
-            size_t i = 0;
-            ((i = std::max(i, ValTrait<Ts>::flat_types.size())), ...);
-            return i + 1;
-        }();
+        static constexpr size_t flat_types_len = compute_variant_flat_types_len<Ts...>();
+
         template <typename Case>
         static constexpr void merge_case_types(std::array<WasmValType, flat_types_len> &flat)
         {
@@ -823,6 +861,37 @@ namespace cmcpp
     template <typename F>
     using func_t = typename func_t_impl<F>::type;
 
+    // Helper to compute host_flat_params_types at compile time
+    template <typename ParamsT, typename ResultT, size_t Size>
+    constexpr std::array<WasmValType, Size> compute_host_flat_params_types()
+    {
+        std::array<WasmValType, Size> arr{};
+        for (size_t i = 0; i < ValTrait<ParamsT>::flat_types.size(); ++i)
+        {
+            arr[i] = ValTrait<ParamsT>::flat_types[i];
+        }
+        if constexpr (ValTrait<ResultT>::flat_types.size() > MAX_FLAT_RESULTS)
+        {
+            arr[ValTrait<ParamsT>::flat_types.size()] = WasmValType::i32;
+        }
+        return arr;
+    }
+
+    // Helper to compute host_flat_result_types at compile time
+    template <typename ResultT, size_t Size>
+    constexpr std::array<WasmValType, Size> compute_host_flat_result_types()
+    {
+        std::array<WasmValType, Size> arr{};
+        if constexpr (ValTrait<ResultT>::flat_types.size() <= MAX_FLAT_RESULTS)
+        {
+            for (size_t i = 0; i < ValTrait<ResultT>::flat_types.size(); ++i)
+            {
+                arr[i] = ValTrait<ResultT>::flat_types[i];
+            }
+        }
+        return arr;
+    }
+
     template <Field R, Field... Args>
     struct ValTrait<std::function<R(Args...)>>
     {
@@ -836,34 +905,11 @@ namespace cmcpp
         static constexpr size_t host_flat_params_types_size = (ValTrait<result_t>::flat_types.size() > MAX_FLAT_RESULTS)
                                                                   ? (ValTrait<params_t>::flat_types.size() + 1)
                                                                   : ValTrait<params_t>::flat_types.size();
-        static constexpr auto host_flat_params_types = []() constexpr
-        {
-            std::array<WasmValType, host_flat_params_types_size> arr{};
-            for (size_t i = 0; i < ValTrait<params_t>::flat_types.size(); ++i)
-            {
-                arr[i] = ValTrait<params_t>::flat_types[i];
-            }
-            if constexpr (ValTrait<result_t>::flat_types.size() > MAX_FLAT_RESULTS)
-            {
-                arr[ValTrait<params_t>::flat_types.size()] = WasmValType::i32;
-            }
-            return arr;
-        }();
+        static constexpr auto host_flat_params_types = compute_host_flat_params_types<params_t, result_t, host_flat_params_types_size>();
         static constexpr size_t host_flat_result_types_size = (ValTrait<result_t>::flat_types.size() > MAX_FLAT_RESULTS)
                                                                   ? 0
                                                                   : ValTrait<result_t>::flat_types.size();
-        static constexpr auto host_flat_result_types = []() constexpr
-        {
-            std::array<WasmValType, host_flat_result_types_size> arr{};
-            if constexpr (ValTrait<result_t>::flat_types.size() <= MAX_FLAT_RESULTS)
-            {
-                for (size_t i = 0; i < ValTrait<result_t>::flat_types.size(); ++i)
-                {
-                    arr[i] = ValTrait<result_t>::flat_types[i];
-                }
-            }
-            return arr;
-        }();
+        static constexpr auto host_flat_result_types = compute_host_flat_result_types<result_t, host_flat_result_types_size>();
     };
 
     template <typename T>

@@ -1,0 +1,22 @@
+[cmake] antlr4 provides CMake targets:
+[cmake] 
+[cmake]   # this is heuristically generated, and may not be correct
+[cmake]   find_package(antlr4-runtime CONFIG REQUIRED)
+[cmake]   target_link_libraries(main PRIVATE antlr4_shared)
+[cmake] 
+[cmake] doctest provides CMake targets:
+[cmake] 
+[cmake]   # this is heuristically generated, and may not be correct
+[cmake]   find_package(doctest CONFIG REQUIRED)
+[cmake]   target_link_libraries(main PRIVATE doctest::doctest)
+[cmake] 
+[cmake] icu provides pkg-config modules:
+[cmake] 
+[cmake]   # International Components for Unicode: Internationalization library
+[cmake]   icu-i18n
+[cmake] 
+[cmake]   # International Components for Unicode: Stream and I/O Library
+[cmake]   icu-io
+[cmake] 
+[cmake]   # International Components for Unicode: Common and Data libraries
+[cmake]   icu-uc

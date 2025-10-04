@@ -1,4 +1,4 @@
-#include "wamr.hpp"
+#include "generated/sample_wamr.hpp" // Includes wamr.hpp, sample.hpp and all helpers
 #include <algorithm>
 #include <cfloat>
 #include <filesystem>
@@ -10,9 +10,7 @@
 
 using namespace cmcpp;
 
-// Configuration constants
-constexpr uint32_t DEFAULT_STACK_SIZE = 8192;
-constexpr uint32_t DEFAULT_HEAP_SIZE = 8192;
+// WASM file location
 const std::filesystem::path WASM_RELATIVE_PATH = std::filesystem::path("bin") / "sample.wasm";
 
 std::filesystem::path resolve_wasm_path(const std::filesystem::path &start_dir)
@@ -74,59 +72,12 @@ char *read_wasm_binary_to_buffer(const std::filesystem::path &filename, uint32_t
     return buffer;
 }
 
-void_t void_func()
-{
-    std::cout << "Hello, Void_Func!" << std::endl;
-}
-NativeSymbol root_symbol[] = {
-    host_function("void-func", void_func),
-};
-
-cmcpp::bool_t and_func(cmcpp::bool_t a, cmcpp::bool_t b)
-{
-    return a && b;
-}
-NativeSymbol booleans_symbol[] = {
-    host_function("and", and_func),
-};
-
-float64_t add(float64_t a, float64_t b)
-{
-    return a + b;
-}
-NativeSymbol floats_symbol[] = {
-    host_function("add", add),
-};
-
-string_t reverse(const string_t &a)
-{
-    std::string result = a;
-    std::transform(result.begin(), result.end(), result.begin(), ::toupper);
-    return result;
-}
-uint32_t lots(const string_t &p1, const string_t &p2, const string_t &p3, const string_t &p4, const string_t &p5, const string_t &p6, const string_t &p7, const string_t &p8, const string_t &p9, const string_t &p10, const string_t &p11, const string_t &p12, const string_t &p13, const string_t &p14, const string_t &p15, const string_t &p16, const string_t &p17)
-{
-    return p1.length() + p2.length() + p3.length() + p4.length() + p5.length() + p6.length() + p7.length() + p8.length() + p9.length() + p10.length() + p11.length() + p12.length() + p13.length() + p14.length() + p15.length() + p16.length() + p17.length();
-}
-NativeSymbol strings_symbol[] = {
-    host_function("reverse", reverse),
-    host_function("lots", lots),
-};
-
-void_t log_u32(uint32_t a, string_t b)
-{
-    std::cout << "wasm-log:  " << b << a << std::endl;
-}
-NativeSymbol logging_symbol[] = {
-    host_function("log-u32", log_u32),
-};
-
 int main(int argc, char **argv)
 {
     static_cast<void>(argc);
 
-    std::cout << "WAMR Component Model C++ Sample" << std::endl;
-    std::cout << "===============================" << std::endl;
+    std::cout << "WAMR Component Model C++ Sample (Using Generated Code)" << std::endl;
+    std::cout << "======================================================" << std::endl;
     std::cout << "Starting WAMR runtime initialization..." << std::endl;
 
     std::filesystem::path exe_dir = std::filesystem::current_path();
@@ -158,7 +109,7 @@ int main(int argc, char **argv)
     wasm_module_inst_t module_inst;
     wasm_function_inst_t cabi_realloc;
     wasm_exec_env_t exec_env;
-    uint32_t size, stack_size = DEFAULT_STACK_SIZE, heap_size = DEFAULT_HEAP_SIZE;
+    uint32_t size, stack_size = wasm_utils::DEFAULT_STACK_SIZE, heap_size = wasm_utils::DEFAULT_HEAP_SIZE;
 
     /* initialize the wasm runtime by default configurations */
     wasm_runtime_init();
@@ -173,39 +124,21 @@ int main(int argc, char **argv)
     }
     std::cout << "Successfully loaded WASM file (" << size << " bytes)" << std::endl;
 
-    // /* add line below if we want to export native functions to WASM app */
-    bool success = wasm_runtime_register_natives_raw("$root", root_symbol, sizeof(root_symbol) / sizeof(NativeSymbol));
-    if (!success)
+    // Register native functions using generated code
+    // Note: We only register functions that are IMPORTED by the guest (what the host provides)
+    std::cout << "\n=== Registering Host Functions (Imports) ===" << std::endl;
+
+    // Use the generated helper to register all interface imports
+    int registered_count = register_all_imports();
+    if (registered_count < 0)
     {
-        std::cerr << "Failed to register $root natives" << std::endl;
-        return 1;
-    }
-    success = wasm_runtime_register_natives_raw("example:sample/booleans", booleans_symbol, sizeof(booleans_symbol) / sizeof(NativeSymbol));
-    if (!success)
-    {
-        std::cerr << "Failed to register booleans natives" << std::endl;
-        return 1;
-    }
-    success = wasm_runtime_register_natives_raw("example:sample/floats", floats_symbol, sizeof(floats_symbol) / sizeof(NativeSymbol));
-    if (!success)
-    {
-        std::cerr << "Failed to register floats natives" << std::endl;
-        return 1;
-    }
-    success = wasm_runtime_register_natives_raw("example:sample/strings", strings_symbol, sizeof(strings_symbol) / sizeof(NativeSymbol));
-    if (!success)
-    {
-        std::cerr << "Failed to register strings natives" << std::endl;
-        return 1;
-    }
-    success = wasm_runtime_register_natives_raw("example:sample/logging", logging_symbol, sizeof(logging_symbol) / sizeof(NativeSymbol));
-    if (!success)
-    {
-        std::cerr << "Failed to register logging natives" << std::endl;
+        std::cerr << "Failed to register import interfaces" << std::endl;
         return 1;
     }
 
-    // /* parse the WASM file from buffer and create a WASM module */
+    std::cout << "\nTotal: " << (registered_count + 1) << " host functions registered (all imports from guest perspective)" << std::endl;
+
+    // Parse the WASM file from buffer and create a WASM module
     module = wasm_runtime_load((uint8_t *)buffer, size, error_buf, sizeof(error_buf));
     if (!module)
     {
@@ -214,9 +147,9 @@ int main(int argc, char **argv)
         wasm_runtime_destroy();
         return 1;
     }
-    std::cout << "Successfully loaded WASM module" << std::endl;
+    std::cout << "\nSuccessfully loaded WASM module" << std::endl;
 
-    // /* create an instance of the WASM module (WASM linear memory is ready) */
+    // Create an instance of the WASM module (WASM linear memory is ready)
     module_inst = wasm_runtime_instantiate(module, stack_size, heap_size, error_buf, sizeof(error_buf));
     if (!module_inst)
     {
@@ -227,17 +160,6 @@ int main(int argc, char **argv)
         return 1;
     }
     std::cout << "Successfully instantiated WASM module" << std::endl;
-
-    wasm_memory_inst_t memory = wasm_runtime_lookup_memory(module_inst, "memory");
-    if (!memory)
-    {
-        std::cerr << "Failed to lookup memory instance" << std::endl;
-        wasm_runtime_deinstantiate(module_inst);
-        wasm_runtime_unload(module);
-        delete[] buffer;
-        wasm_runtime_destroy();
-        return 1;
-    }
 
     cabi_realloc = wasm_runtime_lookup_function(module_inst, "cabi_realloc");
     if (!cabi_realloc)
@@ -250,64 +172,18 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // auto cx = createCallContext(&heap, Encoding::Utf8);
-
     exec_env = wasm_runtime_create_exec_env(module_inst, stack_size);
 
-    GuestRealloc realloc = [exec_env, cabi_realloc](int original_ptr, int original_size, int alignment, int new_size) -> int
-    {
-        uint32_t argv[4];
-        argv[0] = original_ptr;
-        argv[1] = original_size;
-        argv[2] = alignment;
-        argv[3] = new_size;
-        wasm_runtime_call_wasm(exec_env, cabi_realloc, 4, argv);
-        return argv[0];
-    };
+    // Use the helper from wamr.hpp to create the LiftLowerContext
+    LiftLowerContext liftLowerContext = cmcpp::create_lift_lower_context(module_inst, exec_env, cabi_realloc);
 
-    uint8_t *mem_start_addr = (uint8_t *)wasm_memory_get_base_address(memory);
-    uint8_t *mem_end_addr = NULL;
-    wasm_runtime_get_native_addr_range(module_inst, mem_start_addr, NULL, &mem_end_addr);
-    LiftLowerOptions opts(Encoding::Utf8, std::span<uint8_t>(mem_start_addr, mem_end_addr - mem_start_addr), realloc);
+    std::cout << "\n=== Testing Guest Functions (Exports) ===" << std::endl;
+    std::cout << "Note: These are functions the GUEST implements, HOST calls them\n"
+              << std::endl;
 
-    LiftLowerContext liftLowerContext(trap, convert, opts);
-
-    std::cout << "\n=== Testing Guest Functions ===" << std::endl;
-
-    std::cout << "\n--- String Functions ---" << std::endl;
-    auto call_reverse = guest_function<string_t(string_t)>(module_inst, exec_env, liftLowerContext,
-                                                           "example:sample/strings#reverse");
-    auto call_reverse_result = call_reverse("Hello World!");
-    std::cout << "call_reverse(\"Hello World!\"): " << call_reverse_result << std::endl;
-    std::cout << "call_reverse(call_reverse(\"Hello World!\")): " << call_reverse(call_reverse_result) << std::endl;
-
-    std::cout << "\n--- Variant Functions ---" << std::endl;
-    auto variant_func = guest_function<variant_t<bool_t, uint32_t>(variant_t<bool_t, uint32_t>)>(module_inst, exec_env, liftLowerContext, "example:sample/variants#variant-func");
-    std::cout << "variant_func((uint32_t)40)" << std::get<1>(variant_func((uint32_t)40)) << std::endl;
-    std::cout << "variant_func((bool_t)true)" << std::get<0>(variant_func((bool_t) true)) << std::endl;
-    std::cout << "variant_func((bool_t)false)" << std::get<0>(variant_func((bool_t) false)) << std::endl;
-
-    std::cout << "\n--- Option Functions ---" << std::endl;
-    auto option_func = guest_function<option_t<uint32_t>(option_t<uint32_t>)>(module_inst, exec_env, liftLowerContext, "option-func");
-    std::cout << "option_func((uint32_t)40).has_value()" << option_func((uint32_t)40).has_value() << std::endl;
-    std::cout << "option_func((uint32_t)40).value()" << option_func((uint32_t)40).value() << std::endl;
-    std::cout << "option_func(std::nullopt).has_value()" << option_func(std::nullopt).has_value() << std::endl;
-
-    std::cout << "\n--- Void Functions ---" << std::endl;
-    auto void_func = guest_function<void()>(module_inst, exec_env, liftLowerContext, "void-func");
-    void_func();
-
-    std::cout << "\n--- Result Functions ---" << std::endl;
-    auto ok_func = guest_function<result_t<uint32_t, string_t>(uint32_t, uint32_t)>(module_inst, exec_env, liftLowerContext, "ok-func");
-    auto ok_func_result = ok_func(40, 2);
-    std::cout << "ok_func result: " << std::get<uint32_t>(ok_func_result) << std::endl;
-
-    auto err_func = guest_function<result_t<uint32_t, string_t>(uint32_t, uint32_t)>(module_inst, exec_env, liftLowerContext, "err-func");
-    auto err_func_result = err_func(40, 2);
-    std::cout << "err_func result: " << std::get<string_t>(err_func_result) << std::endl;
-
-    std::cout << "\n--- Boolean Functions ---" << std::endl;
-    auto call_and = guest_function<bool_t(bool_t, bool_t)>(module_inst, exec_env, liftLowerContext,
+    // Using generated typedefs from sample_host.hpp for guest exports
+    std::cout << "\n--- Boolean Functions (Guest Export) ---" << std::endl;
+    auto call_and = guest_function<guest::booleans::and_t>(module_inst, exec_env, liftLowerContext,
                                                            "example:sample/booleans#and");
     std::cout << "call_and(false, false): " << call_and(false, false) << std::endl;
     std::cout << "call_and(false, true): " << call_and(false, true) << std::endl;
@@ -315,15 +191,51 @@ int main(int argc, char **argv)
     std::cout << "call_and(true, true): " << call_and(true, true) << std::endl;
 
     std::cout << "\n--- Float Functions ---" << std::endl;
-    auto call_add = guest_function<float64_t(float64_t, float64_t)>(module_inst, exec_env, liftLowerContext,
-                                                                    "example:sample/floats#add");
+    auto call_add = guest_function<guest::floats::add_t>(module_inst, exec_env, liftLowerContext,
+                                                         "example:sample/floats#add");
     std::cout << "call_add(3.1, 0.2): " << call_add(3.1, 0.2) << std::endl;
     std::cout << "call_add(1.5, 2.5): " << call_add(1.5, 2.5) << std::endl;
     std::cout << "call_add(DBL_MAX, 0.0): " << call_add(DBL_MAX / 2, 0.0) << std::endl;
     std::cout << "call_add(DBL_MAX / 2, DBL_MAX / 2): " << call_add(DBL_MAX / 2, DBL_MAX / 2) << std::endl;
 
+    std::cout << "\n--- String Functions ---" << std::endl;
+    auto call_reverse = guest_function<guest::strings::reverse_t>(module_inst, exec_env, liftLowerContext,
+                                                                  "example:sample/strings#reverse");
+    auto call_reverse_result = call_reverse("Hello World!");
+    std::cout << "reverse(\"Hello World!\"): " << call_reverse_result << std::endl;
+    std::cout << "reverse(reverse(\"Hello World!\")): " << call_reverse(call_reverse_result) << std::endl;
+
+    std::cout << "\n--- Variant Functions ---" << std::endl;
+    auto variant_func = guest_function<guest::variants::variant_func_t>(
+        module_inst, exec_env, liftLowerContext, "example:sample/variants#variant-func");
+    std::cout << "variant_func((uint32_t)40): " << std::get<1>(variant_func((uint32_t)40)) << std::endl;
+    std::cout << "variant_func((bool_t)true): " << std::get<0>(variant_func((bool_t) true)) << std::endl;
+    std::cout << "variant_func((bool_t)false): " << std::get<0>(variant_func((bool_t) false)) << std::endl;
+
+    std::cout << "\n--- Option Functions ---" << std::endl;
+    auto option_func = guest_function<guest::option_func_t>(
+        module_inst, exec_env, liftLowerContext, "option-func");
+    std::cout << "option_func((uint32_t)40).has_value(): " << option_func((uint32_t)40).has_value() << std::endl;
+    std::cout << "option_func((uint32_t)40).value(): " << option_func((uint32_t)40).value() << std::endl;
+    std::cout << "option_func(std::nullopt).has_value(): " << option_func(std::nullopt).has_value() << std::endl;
+
+    std::cout << "\n--- Void Functions ---" << std::endl;
+    auto void_func_guest = guest_function<guest::void_func_t>(module_inst, exec_env, liftLowerContext, "void-func");
+    void_func_guest();
+
+    std::cout << "\n--- Result Functions ---" << std::endl;
+    auto ok_func = guest_function<guest::ok_func_t>(
+        module_inst, exec_env, liftLowerContext, "ok-func");
+    auto ok_result = ok_func(40, 2);
+    std::cout << "ok_func result: " << std::get<uint32_t>(ok_result) << std::endl;
+
+    auto err_func = guest_function<guest::err_func_t>(
+        module_inst, exec_env, liftLowerContext, "err-func");
+    auto err_result = err_func(40, 2);
+    std::cout << "err_func result: " << std::get<string_t>(err_result) << std::endl;
+
     std::cout << "\n--- Complex String Functions ---" << std::endl;
-    auto call_lots = guest_function<uint32_t(string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t, string_t)>(
+    auto call_lots = guest_function<guest::strings::lots_t>(
         module_inst, exec_env, liftLowerContext,
         "example:sample/strings#lots");
 
@@ -333,45 +245,34 @@ int main(int argc, char **argv)
     std::cout << "call_lots result: " << call_lots_result << std::endl;
 
     std::cout << "\n--- Tuple Functions ---" << std::endl;
-    func_t<tuple_t<string_t, bool_t>(tuple_t<bool_t, string_t>)> host_reverse_tuple = [](tuple_t<bool_t, string_t> a) -> tuple_t<string_t, bool_t>
-    {
-        return {std::get<string_t>(a), std::get<bool_t>(a)};
-    };
-    // auto xxxx = host<tuple_t<string_t, bool_t>(tuple_t<bool_t, string_t>)>(liftLowerContext,
-    //                                                                        "example:sample/tuples#reverse",
-    //                                                                        host_reverse_tuple);
-    auto call_reverse_tuple = guest_function<tuple_t<string_t, bool_t>(tuple_t<bool_t, string_t>)>(module_inst, exec_env, liftLowerContext,
-                                                                                                   "example:sample/tuples#reverse");
+    auto call_reverse_tuple = guest_function<guest::tuples::reverse_t>(module_inst, exec_env, liftLowerContext,
+                                                                       "example:sample/tuples#reverse");
     auto call_reverse_tuple_result = call_reverse_tuple({false, "Hello World!"});
     std::cout << "call_reverse_tuple({false, \"Hello World!\"}): " << std::get<0>(call_reverse_tuple_result) << ", " << std::get<1>(call_reverse_tuple_result) << std::endl;
 
     std::cout << "\n--- List Functions ---" << std::endl;
-    auto call_list_filter = guest_function<list_t<string_t>(list_t<variant_t<bool_t, string_t>>)>(module_inst, exec_env, liftLowerContext, "example:sample/lists#filter-bool");
+    auto call_list_filter = guest_function<guest::lists::filter_bool_t>(module_inst, exec_env, liftLowerContext, "example:sample/lists#filter-bool");
     auto call_list_filter_result = call_list_filter({{false}, {"Hello World!"}, {"Another String"}, {true}, {false}});
     std::cout << "call_list_filter result: " << call_list_filter_result.size() << std::endl;
 
     std::cout << "\n--- Enum Functions ---" << std::endl;
-    enum e
-    {
-        a,
-        b,
-        c
-    };
+    using e = guest::enums::e;
 
-    auto enum_func = guest_function<enum_t<e>(enum_t<e>)>(module_inst, exec_env, liftLowerContext, "example:sample/enums#enum-func");
-    std::cout << "enum_func(e::a): " << enum_func(e::a) << std::endl;
-    std::cout << "enum_func(e::b): " << enum_func(e::b) << std::endl;
-    std::cout << "enum_func(e::c): " << enum_func(e::c) << std::endl;
+    auto enum_func = guest_function<guest::enums::enum_func_t>(module_inst, exec_env, liftLowerContext, "example:sample/enums#enum-func");
+    std::cout << "enum_func(e::a): " << enum_func(static_cast<enum_t<e>>(e::a)) << std::endl;
+    std::cout << "enum_func(e::b): " << enum_func(static_cast<enum_t<e>>(e::b)) << std::endl;
+    std::cout << "enum_func(e::c): " << enum_func(static_cast<enum_t<e>>(e::c)) << std::endl;
+
+    std::cout << "\n=== Test Complete ===" << std::endl;
 
     std::cout << "\n=== Cleanup and Summary ===" << std::endl;
     // Clean up resources
     delete[] buffer;
     wasm_runtime_destroy_exec_env(exec_env);
-    wasm_runtime_unregister_natives("$root", root_symbol);
-    wasm_runtime_unregister_natives("example:sample/booleans", booleans_symbol);
-    wasm_runtime_unregister_natives("example:sample/floats", floats_symbol);
-    wasm_runtime_unregister_natives("example:sample/strings", strings_symbol);
-    wasm_runtime_unregister_natives("example:sample/logging", logging_symbol);
+
+    // Unregister all interface imports using the generated helper
+    unregister_all_imports();
+
     wasm_runtime_deinstantiate(module_inst);
     wasm_runtime_unload(module);
     wasm_runtime_destroy();

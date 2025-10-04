@@ -1683,6 +1683,11 @@ namespace cmcpp
         HostUnicodeConversion convert;
         GuestRealloc realloc;
 
+        InstanceContext() = default;
+
+        InstanceContext(const HostTrap &trap_fn, HostUnicodeConversion convert_fn, const GuestRealloc &realloc_fn)
+            : trap(trap_fn), convert(convert_fn), realloc(realloc_fn) {}
+
         std::unique_ptr<LiftLowerContext> createLiftLowerContext(const GuestMemory &memory,
                                                                  const Encoding &string_encoding = Encoding::Utf8,
                                                                  const std::optional<GuestPostReturn> &post_return = std::nullopt,

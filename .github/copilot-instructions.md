@@ -4,6 +4,10 @@
 - **Implementation mirrors the official Python reference**: The C++ code structure, type names, and semantics directly correspond to the Python implementation in `ref/component-model/design/mvp/canonical-abi/definitions.py` and the specification in `ref/component-model/design/mvp/CanonicalABI.md`. When making changes, cross-reference these files to ensure alignment.
 - Supports async runtime primitives (`Store`, `Thread`, `Task`), resource management (`own`, `borrow`), streams/futures, waitables, and error contexts.
 
+## Working style
+- **Do not create summary documents**: Avoid creating markdown files in `docs/` to summarize work sessions, changes, or fixes unless explicitly requested. The git commit history and code comments are sufficient documentation.
+- Focus on making changes directly to code, updating existing documentation only when functionality changes, and providing concise summaries in responses rather than generating files.
+
 ## Core headers
 - `include/cmcpp/traits.hpp` defines `ValTrait`, type aliases (e.g., `bool_t`, `string_t`), and concept shortcuts that every new type must implement.
 - `include/cmcpp/context.hpp` encapsulates `LiftLowerContext`, `ComponentInstance`, `Task`, resource tables (`HandleTable`, `InstanceTable`), and canonical operations like `canon_waitable_*`, `canon_stream_*`, `canon_future_*`.
@@ -37,5 +41,4 @@
 ## Tooling notes
 - Dependencies are managed through `vcpkg.json` with overlays in `vcpkg_overlays/` (notably for WAMR); stick with preset builds so CMake wires in the correct toolchain file automatically.
 - Cargo manifest (`Cargo.toml`) is only for fetching `wasm-tools` and `wit-bindgen-cli`; if you touch wasm generation logic, update both the manifest and any scripts referencing those versions.
-- Release management uses Release Please with conventional commits (`feat:`, `fix:`, etc.) to automate changelog and version bumps.
 - Keep documentation alongside code: update `README.md` when introducing new host types or workflows so downstream integrators stay aligned with the canonical ABI behavior.
