@@ -6,4 +6,7 @@
 	url = https://github.com/WebAssembly/component-model.git
 [submodule "ref/wasm-micro-runtime"]
 	path = ref/wasm-micro-runtime
-	url = git@github.com:bytecodealliance/wasm-micro-runtime.git
+	url = https://github.com/bytecodealliance/wasm-micro-runtime.git
+[submodule "ref/wit-bindgen"]
+	path = ref/wit-bindgen
+	url = https://github.com/bytecodealliance/wit-bindgen.git

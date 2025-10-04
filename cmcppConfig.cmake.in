@@ -1,0 +1,33 @@
+@PACKAGE_INIT@
+
+# cmcppConfig.cmake - CMake package configuration file for cmcpp
+# This file allows other projects to find and use cmcpp via find_package()
+
+include(CMakeFindDependencyMacro)
+
+# cmcpp is a header-only library, but users may need these dependencies
+# for the complete Component Model functionality
+# Note: These are optional - users can choose to provide their own implementations
+# find_dependency(ICU COMPONENTS uc dt in io)
+
+# Include the targets file which defines cmcpp::cmcpp
+include("${CMAKE_CURRENT_LIST_DIR}/cmcppTargets.cmake")
+
+# Define convenient variables for users
+set(CMCPP_INCLUDE_DIRS "@PACKAGE_CMAKE_INSTALL_INCLUDEDIR@")
+set(CMCPP_LIBRARIES cmcpp::cmcpp)
+
+# Check that the library target was imported successfully
+if(NOT TARGET cmcpp::cmcpp)
+    message(FATAL_ERROR "cmcpp::cmcpp target not found!")
+endif()
+
+check_required_components(cmcpp)
+
+# Provide information about optional tools
+if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/../../../@CMAKE_INSTALL_BINDIR@/wit-codegen@CMAKE_EXECUTABLE_SUFFIX@")
+    set(CMCPP_WIT_CODEGEN_EXECUTABLE "${CMAKE_CURRENT_LIST_DIR}/../../../@CMAKE_INSTALL_BINDIR@/wit-codegen@CMAKE_EXECUTABLE_SUFFIX@")
+    message(STATUS "Found wit-codegen: ${CMCPP_WIT_CODEGEN_EXECUTABLE}")
+endif()
+
+message(STATUS "Found cmcpp: ${CMAKE_CURRENT_LIST_DIR}")

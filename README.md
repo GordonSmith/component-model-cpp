@@ -16,6 +16,8 @@ This repository contains a C++ ABI implementation of the WebAssembly Component M
 
 Automated releases are handled by [Release Please](https://github.com/googleapis/release-please) via GitHub Actions. Conventional commit messages (`feat:`, `fix:`, etc.) keep the changelog accurate and drive version bumps; when enough changes accumulate, the workflow opens a release PR that can be merged to publish a GitHub release.
 
+See [docs/RELEASE.md](docs/RELEASE.md) for complete documentation on the automated release process, including how to create releases and what packages are generated.
+
 ## Features
 
 ### OS
@@ -78,6 +80,9 @@ When expanding the canonical ABI surface, cross-check the Python reference tests
 **Ubuntu/Linux:**
 ```bash
 sudo apt-get install -y autoconf autoconf-archive automake build-essential ninja-build
+
+# Optional: for creating RPM packages
+sudo apt-get install -y rpm
 ```
 
 **macOS:**
@@ -166,6 +171,35 @@ ctest -VV  # Run tests
 
 ### Build Options
 
+The following CMake options control what gets built:
+
+- `BUILD_TESTING` (default: ON) - Build unit tests
+- `BUILD_SAMPLES` (default: ON) - Build sample applications demonstrating runtime integration
+- `BUILD_GRAMMAR` (default: OFF) - Generate C++ code from ANTLR grammar for WIT parsing
+
+Example:
+```bash
+cmake -DBUILD_TESTING=ON -DBUILD_SAMPLES=ON -DBUILD_GRAMMAR=ON ..
+```
+
+#### Grammar Code Generation
+
+The project includes an ANTLR grammar for parsing WebAssembly Interface Types (WIT). To generate C++ parser code:
+
+```bash
+# Enable grammar generation during configuration
+cmake -DBUILD_GRAMMAR=ON ..
+
+# Generate the code
+cmake --build . --target generate-grammar
+```
+
+**Requirements:**
+- Java runtime (for ANTLR)
+- The ANTLR jar is automatically downloaded during CMake configuration
+
+Generated C++ files are compiled into a static library `wit-grammar` in the build tree that can be linked by tools. See [grammar/README.md](grammar/README.md) for details.
+
 
 ### Coverage
 
@@ -195,11 +229,69 @@ genhtml coverage.filtered.info --output-directory coverage-html  # optional
 
 Generated artifacts live in the `build/` directory (`coverage.info`, `coverage.filtered.info`, and optionally `coverage-html/`). The same commands work on other platforms once the equivalent of `lcov` (or LLVM's `llvm-cov`) is installed.
 
+## Installation and Packaging
+
+### Installing Locally
+
+Install cmcpp to a local directory (default: `build/stage`):
+
+```bash
+cmake --preset linux-ninja-Debug
+cmake --build build
+cmake --build build --target install
+```
+
+### Using in Other CMake Projects
+
+Once installed, use `find_package()` to integrate cmcpp:
+
+```cmake
+find_package(cmcpp REQUIRED)
+target_link_libraries(my_app PRIVATE cmcpp::cmcpp)
+```
+
+Build your project:
+
+```bash
+cmake . -DCMAKE_PREFIX_PATH=/path/to/cmcpp/install
+cmake --build .
+```
+
+### Creating Distribution Packages
+
+Generate packages with CPack:
+
+```bash
+cd build
+
+# All default packages for your platform
+cpack
+
+# Specific formats
+cpack -G TGZ          # Tar.gz archive (cross-platform)
+cpack -G DEB          # Debian package (.deb)
+cpack -G RPM          # RPM package (.rpm) - requires 'rpm' package installed
+cpack -G ZIP          # ZIP archive (Windows)
+```
+
+**Note:** To create RPM packages on Ubuntu/Debian, install the `rpm` package first:
+```bash
+sudo apt-get install -y rpm
+```
+
+Packages include:
+- Complete header-only library
+- CMake config files for `find_package()`
+- `wit-codegen` tool for generating C++ bindings from WIT files (if `BUILD_GRAMMAR=ON`)
+
+See [docs/PACKAGING.md](docs/PACKAGING.md) for complete packaging documentation.
+
 ## Usage
 
 This library is a header only library. To use it in your project, you can:
 - [x] Copy the contents of the `include` directory to your project.
-- [ ] Use `vcpkg` to install the library and its dependencies.
+- [x] Install via `cmake --build build --target install` and use `find_package(cmcpp)`.
+- [ ] Use `vcpkg` to install the library and its dependencies (planned).
 
 ### Configuring `InstanceContext` and canonical options
 

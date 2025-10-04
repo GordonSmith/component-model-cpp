@@ -1,3 +1,31 @@
+#pragma once
+
+// WAMR Integration for WebAssembly Component Model
+//
+// This header provides integration between WAMR (WebAssembly Micro Runtime) and the
+// Component Model canonical ABI implementation. It enables C++ applications to:
+// - Call WebAssembly guest functions with automatic type conversion
+// - Export C++ functions to be called from WebAssembly guests
+// - Create lift/lower contexts for marshaling data between host and guest
+//
+// Key Functions:
+// - guest_function<F>() - Create a callable wrapper for a guest function
+// - host_function() - Export a C++ function to WebAssembly
+// - create_guest_realloc() - Create a realloc function for guest memory
+// - create_lift_lower_context() - Set up complete context for guest calls
+//
+// Example Usage:
+//   wasm_module_inst_t module_inst = /* initialize WAMR module */;
+//   wasm_exec_env_t exec_env = /* create execution environment */;
+//   wasm_function_inst_t cabi_realloc = wasm_runtime_lookup_function(module_inst, "cabi_realloc");
+//
+//   auto ctx = cmcpp::create_lift_lower_context(module_inst, exec_env, cabi_realloc);
+//   auto guest_fn = cmcpp::guest_function<bool(bool, bool)>(module_inst, exec_env, ctx, "my-function");
+//   bool result = guest_fn(true, false);
+//
+// Thread Safety: Functions are not thread-safe by default. Each thread should maintain
+// its own execution environment and context.
+
 #include "wasm_export.h"
 #include "cmcpp.hpp"
 #include <array>
@@ -5,12 +33,12 @@
 namespace cmcpp
 {
 
-    void trap(const char *msg)
+    inline void trap(const char *msg)
     {
-        throw new std::runtime_error(msg);
+        throw std::runtime_error(msg);
     }
 
-    std::vector<wasm_val_t> wasmVal2wam_val_t(const WasmValVector &values)
+    inline std::vector<wasm_val_t> wasmVal2wam_val_t(const WasmValVector &values)
     {
         std::vector<wasm_val_t> result;
         result.reserve(values.size());
@@ -42,7 +70,7 @@ namespace cmcpp
         return result;
     }
 
-    WasmValVector wam_val_t2wasmVal(size_t count, const wasm_val_t *values)
+    inline WasmValVector wam_val_t2wasmVal(size_t count, const wasm_val_t *values)
     {
         WasmValVector result;
         result.reserve(count);
@@ -123,7 +151,18 @@ namespace cmcpp
         };
     }
 
-    std::pair<void *, size_t> convert(void *dest, uint32_t dest_byte_len, const void *src, uint32_t src_byte_len, Encoding from_encoding, Encoding to_encoding)
+    // String encoding conversion function
+    // Currently only supports same-encoding passthrough (no actual conversion)
+    // For cross-encoding conversion, use ICU or another Unicode library
+    // @param dest: Destination buffer
+    // @param dest_byte_len: Size of destination buffer
+    // @param src: Source buffer
+    // @param src_byte_len: Size of source data
+    // @param from_encoding: Source encoding
+    // @param to_encoding: Target encoding
+    // @return: Pair of (destination pointer, bytes written)
+    // @note: Currently asserts if encodings differ - full conversion not implemented
+    inline std::pair<void *, size_t> convert(void *dest, uint32_t dest_byte_len, const void *src, uint32_t src_byte_len, Encoding from_encoding, Encoding to_encoding)
     {
         if (from_encoding == to_encoding)
         {
@@ -135,7 +174,10 @@ namespace cmcpp
             }
             return std::make_pair(nullptr, 0);
         }
-        assert(false);
+        // TODO: Implement cross-encoding conversion using ICU
+        // See test/host-util.cpp for a reference implementation
+        assert(false && "Cross-encoding conversion not implemented");
+        return std::make_pair(nullptr, 0);
     }
 
     template <Field T>
@@ -175,6 +217,54 @@ namespace cmcpp
         return retVal;
     }
 
+    // Create a GuestRealloc function from WAMR execution environment
+    // @param exec_env: WAMR execution environment
+    // @param cabi_realloc: The cabi_realloc function from the WASM module
+    // @return: GuestRealloc function ready to use with LiftLowerOptions
+    inline GuestRealloc create_guest_realloc(wasm_exec_env_t exec_env, wasm_function_inst_t cabi_realloc)
+    {
+        return [exec_env, cabi_realloc](int original_ptr, int original_size, int alignment, int new_size) -> int
+        {
+            uint32_t argv[4];
+            argv[0] = original_ptr;
+            argv[1] = original_size;
+            argv[2] = alignment;
+            argv[3] = new_size;
+            wasm_runtime_call_wasm(exec_env, cabi_realloc, 4, argv);
+            return argv[0];
+        };
+    }
+
+    // Create a complete LiftLowerContext from WAMR module instance
+    // This helper combines all the steps needed to set up a context for calling guest functions
+    // @param module_inst: WAMR module instance
+    // @param exec_env: WAMR execution environment
+    // @param cabi_realloc: The cabi_realloc function from the WASM module
+    // @param encoding: String encoding (default: Utf8)
+    // @return: LiftLowerContext ready for use with guest_function<>()
+    // @throws: std::runtime_error if memory lookup fails
+    inline LiftLowerContext create_lift_lower_context(
+        wasm_module_inst_t module_inst,
+        wasm_exec_env_t exec_env,
+        wasm_function_inst_t cabi_realloc,
+        Encoding encoding = Encoding::Utf8)
+    {
+        wasm_memory_inst_t memory = wasm_runtime_lookup_memory(module_inst, "memory");
+        if (!memory)
+        {
+            throw std::runtime_error("Failed to lookup memory instance");
+        }
+
+        uint8_t *mem_start_addr = static_cast<uint8_t *>(wasm_memory_get_base_address(memory));
+        uint8_t *mem_end_addr = nullptr;
+        wasm_runtime_get_native_addr_range(module_inst, mem_start_addr, nullptr, &mem_end_addr);
+
+        GuestRealloc realloc = create_guest_realloc(exec_env, cabi_realloc);
+        LiftLowerOptions opts(encoding, std::span<uint8_t>(mem_start_addr, mem_end_addr - mem_start_addr), realloc);
+
+        return LiftLowerContext(trap, convert, opts);
+    }
+
     template <typename F>
     void export_func(wasm_exec_env_t exec_env, uint64_t *args)
     {
@@ -187,24 +277,10 @@ namespace cmcpp
         auto lower_params = rawWamrArg2Wasm<params_t>(exec_env, args);
 
         wasm_module_inst_t module_inst = wasm_runtime_get_module_inst(exec_env);
-        wasm_memory_inst_t memory = wasm_runtime_lookup_memory(module_inst, "memory");
         wasm_function_inst_t cabi_realloc = wasm_runtime_lookup_function(module_inst, "cabi_realloc");
-        GuestRealloc realloc = [exec_env, cabi_realloc](int original_ptr, int original_size, int alignment, int new_size) -> int
-        {
-            uint32_t argv[4];
-            argv[0] = original_ptr;
-            argv[1] = original_size;
-            argv[2] = alignment;
-            argv[3] = new_size;
-            wasm_runtime_call_wasm(exec_env, cabi_realloc, 4, argv);
-            return argv[0];
-        };
 
-        uint8_t *mem_start_addr = (uint8_t *)wasm_memory_get_base_address(memory);
-        uint8_t *mem_end_addr = NULL;
-        wasm_runtime_get_native_addr_range(module_inst, mem_start_addr, NULL, &mem_end_addr);
-        LiftLowerOptions opts(Encoding::Utf8, std::span<uint8_t>(mem_start_addr, mem_end_addr - mem_start_addr), realloc);
-        LiftLowerContext liftLowerContext(trap, convert, opts);
+        // Use the helper function to create LiftLowerContext
+        LiftLowerContext liftLowerContext = create_lift_lower_context(module_inst, exec_env, cabi_realloc);
         auto params = lift_flat_values<params_t>(liftLowerContext, MAX_FLAT_PARAMS, lower_params);
 
         if constexpr (ValTrait<result_t>::flat_types.size() > 0)
@@ -238,7 +314,7 @@ namespace cmcpp
         return symbol;
     }
 
-    bool host_module(const char *module_name, NativeSymbol *native_symbols, uint32_t n_native_symbols)
+    inline bool host_module(const char *module_name, NativeSymbol *native_symbols, uint32_t n_native_symbols)
     {
         return wasm_runtime_register_natives_raw(module_name, native_symbols, n_native_symbols);
     }

@@ -1,10 +1,13 @@
-/build*
+/build
 /.vscode/settings.json
 /cpm_modules
 /vcpkg_installed
 /test/wasm/build*
 .DS_Store
 
+# ANTLR jar files
+antlr-*.jar
+*.jar
 
 # Added by cargo
 

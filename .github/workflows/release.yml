@@ -1,4 +1,4 @@
-name: C++ Release CI
+name: Release
 
 on:
   push:
@@ -9,17 +9,11 @@ env:
   CTEST_OUTPUT_ON_FAILURE: 1
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        include:
-          - os: "ubuntu-24.04"
-      fail-fast: false
-
-    runs-on: ${{ matrix.os }}
-
+  build-linux:
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
+    
     steps:
       - uses: actions/checkout@v4
         with:
@@ -47,7 +41,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-vcpkg-
 
-      - name: install dependencies
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -55,39 +49,201 @@ jobs:
           autoconf-archive \
           automake \
           build-essential \
-          ninja-build
+          ninja-build \
+          rpm
 
-      - name: Install rust dependencies
+      - name: Install Rust dependencies
         run: |
           cargo install wasm-tools wit-bindgen-cli || true
 
-      - name: configure
+      - name: Configure CMake
         run: |
           cmake --preset linux-ninja-Release
 
-      - name: build
+      - name: Build
         run: |
           cmake --build --preset linux-ninja-Release
 
-      - name: test
+      - name: Run Tests
         working-directory: build
         run: |
           ctest -VV
 
-      - name: Package
+      - name: Create Packages
+        working-directory: build
         run: |
-          tar -czvf cmcpp-${GITHUB_REF_NAME}.tar.gz include LICENSE LICENSE-BOOST-PFR
+          # Create tar.gz package
+          cpack -G TGZ
+          # Create DEB package
+          cpack -G DEB
+          # Create RPM package
+          cpack -G RPM
 
-      - name: Create Release
-        uses: ncipollo/release-action@v1
+      - name: Upload Linux Packages
+        uses: softprops/action-gh-release@v2
         with:
-          generateReleaseNotes: true
-          tag: ${{ github.ref_name }}
-          artifacts: cmcpp-${{ github.ref_name }}.tar.gz
+          files: |
+            build/cmcpp-*.tar.gz
+            build/cmcpp_*.deb
+            build/cmcpp-*.rpm
+          fail_on_unmatched_files: false
 
       - name: Upload error logs
         if: ${{ failure() || cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-logs
+          name: linux-logs
           path: ./**/*.log
+
+  build-windows:
+    runs-on: windows-2022
+    permissions:
+      contents: write
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache vcpkg registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/vcpkg_installed/
+            build/vcpkg_packages/
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('./vcpkg*.json') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-
+
+      - name: Install Rust dependencies
+        run: |
+          cargo install wasm-tools wit-bindgen-cli
+
+      - name: Configure CMake
+        run: |
+          cmake --preset vcpkg-VS-17
+
+      - name: Build
+        run: |
+          cmake --build --preset VS-17-Release
+
+      - name: Run Tests
+        working-directory: build
+        run: |
+          ctest -C Release -VV
+
+      - name: Create Packages
+        working-directory: build
+        run: |
+          # Create ZIP package
+          cpack -C Release -G ZIP
+
+      - name: Upload Windows Packages
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/cmcpp-*.zip
+          fail_on_unmatched_files: false
+
+      - name: Upload error logs
+        if: ${{ failure() || cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-logs
+          path: ./**/*.log
+
+  build-macos:
+    runs-on: macos-14
+    permissions:
+      contents: write
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache vcpkg registry
+        if: always()
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/vcpkg_installed/
+            build/vcpkg_packages/
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('./vcpkg*.json') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-
+
+      - name: Install dependencies
+        run: |
+          brew install \
+          pkg-config \
+          autoconf \
+          autoconf-archive \
+          automake \
+          coreutils \
+          libtool \
+          cmake \
+          ninja
+
+      - name: Install Rust dependencies
+        run: |
+          cargo install wasm-tools wit-bindgen-cli || true
+
+      - name: Configure CMake
+        run: |
+          cmake --preset linux-ninja-Release
+
+      - name: Build
+        run: |
+          cmake --build --preset linux-ninja-Release
+
+      - name: Run Tests
+        working-directory: build
+        run: |
+          ctest -VV
+
+      - name: Create Packages
+        working-directory: build
+        run: |
+          # Create tar.gz package
+          cpack -G TGZ
+          # Create ZIP package
+          cpack -G ZIP
+
+      - name: Upload macOS Packages
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/cmcpp-*.tar.gz
+            build/cmcpp-*.zip
+          fail_on_unmatched_files: false
+
+      - name: Upload error logs
+        if: ${{ failure() || cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-logs
+          path: ./**/*.log
+

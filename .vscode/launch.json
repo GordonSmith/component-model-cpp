@@ -70,6 +70,56 @@
             "environment": [],
             "externalConsole": false,
             "preLaunchTask": "CMake: build"
+        },
+        {
+            "name": "(gdb) test-wit-grammar",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/test/test-wit-grammar",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "preLaunchTask": "CMake: build"
+        },
+        {
+            "name": "(gdb) test-wit-grammar (verbose)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/test/test-wit-grammar",
+            "args": [
+                "--verbose"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "preLaunchTask": "CMake: build"
+        },
+        {
+            "name": "(win) test-wit-grammar",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/test/Debug/test-wit-grammar.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "preLaunchTask": "CMake: build"
+        },
+        {
+            "name": "(win) test-wit-grammar (verbose)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/test/Debug/test-wit-grammar.exe",
+            "args": [
+                "--verbose"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "preLaunchTask": "CMake: build"
         }
     ]
 }
