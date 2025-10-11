@@ -69,6 +69,17 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Install dependencies
+        if: matrix.extra-deps != ''
+        run: ${{ matrix.extra-deps }}
+
+      - name: Set up JDK 17
+        if: startsWith(matrix.os, 'windows')
+        uses: actions/setup-java@v5
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
       - name: Cache Cargo registry
         uses: actions/cache@v4
         with:
@@ -90,10 +101,6 @@ jobs:
           key: ${{ runner.os }}-vcpkg-${{ hashFiles('./vcpkg*.json') }}
           restore-keys: |
             ${{ runner.os }}-vcpkg-
-
-      - name: Install dependencies
-        if: matrix.extra-deps != ''
-        run: ${{ matrix.extra-deps }}
 
       - name: Install Rust dependencies
         run: |
