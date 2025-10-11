@@ -77,4 +77,5 @@ world sample {
   import booleans;
   import floats;
   import strings;
+  import lists;
 }

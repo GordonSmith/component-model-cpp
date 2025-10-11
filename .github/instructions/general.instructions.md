@@ -46,4 +46,3 @@ This repository is a modern C++20 header-only library implementing WebAssembly C
 - **SFINAE/Concepts**: Use concepts or SFINAE for template constraints
 - **Const Correctness**: Maintain const correctness throughout
 - **Naming**: Use snake_case for variables, PascalCase for types
-- **Commit Messages**: Use conventional commits (`feat:`, `fix:`, etc.) for Release Please automation

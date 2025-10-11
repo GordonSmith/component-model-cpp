@@ -1894,14 +1894,14 @@ TEST_CASE("Heap Memory Layout - Python Reference Parity")
 
     // Test list of chars - UTF-32 code points as 32-bit values
     {
-        list_t<char_t> chars = {U'A', U'B', U'c', U'🌍'};
+        list_t<char_t> chars = {U'A', U'B', U'c', 0x1F30D}; // 🌍 Earth Globe emoji
         store(*cx, chars, 900);
         auto loaded = load<list_t<char_t>>(*cx, 900);
         CHECK(loaded.size() == 4);
         CHECK(loaded[0] == U'A');
         CHECK(loaded[1] == U'B');
         CHECK(loaded[2] == U'c');
-        CHECK(loaded[3] == U'🌍'); // Verify Unicode support
+        CHECK(loaded[3] == 0x1F30D); // 🌍 Earth Globe emoji - Verify Unicode support
     }
 
     // Test list of tuples - verifies padding between tuple fields

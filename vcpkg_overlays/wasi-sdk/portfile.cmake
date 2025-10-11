@@ -3,7 +3,7 @@
 if(APPLE)
     vcpkg_download_distfile(ARCHIVE
         URLS "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/wasi-sdk-${VERSION}-arm64-macos.tar.gz"
-        FILENAME "wasi-sdk-${VERSION}-x86_64-linux.tar.gz"
+        FILENAME "wasi-sdk-${VERSION}-arm64-macos.tar.gz"
         SHA512 fa4852de1995eaaf5aa57dab9896604a27f157b6113ca0daa27fe7588f4276e18362e650bdb6c65fd83f14d4b8347f8134c9b531a8b872ad83c18d481eeef6c5
     )
 elseif(UNIX)
@@ -27,6 +27,21 @@ vcpkg_extract_source_archive_ex(
 )
 
 file(COPY ${SOURCE_PATH}/. DESTINATION ${CURRENT_PACKAGES_DIR}/wasi-sdk)
+
+# On macOS, copy libclang-cpp.dylib to the lib directory if it exists in libexec
+if(APPLE)
+    if(EXISTS "${CURRENT_PACKAGES_DIR}/wasi-sdk/libexec/libclang-cpp.dylib")
+        file(COPY "${CURRENT_PACKAGES_DIR}/wasi-sdk/libexec/libclang-cpp.dylib"
+             DESTINATION "${CURRENT_PACKAGES_DIR}/wasi-sdk/lib")
+    endif()
+    # Also set up proper @rpath for the clang binary
+    if(EXISTS "${CURRENT_PACKAGES_DIR}/wasi-sdk/bin/clang-19")
+        execute_process(
+            COMMAND install_name_tool -add_rpath "@executable_path/../lib" "${CURRENT_PACKAGES_DIR}/wasi-sdk/bin/clang-19"
+            ERROR_QUIET
+        )
+    endif()
+endif()
 
 file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/wasi-sdk/share/wasi-sysroot/include/net" "${CURRENT_PACKAGES_DIR}/wasi-sdk/share/wasi-sysroot/include/scsi")
 
