@@ -207,6 +207,67 @@ namespace cmcpp
     template <typename T>
     concept Void = ValTrait<T>::type == ValType::Void;
 
+    //  Monostate (for variant cases without payload) ---------------------------
+    using monostate = std::monostate;
+
+    template <>
+    struct ValTrait<monostate>
+    {
+        static constexpr ValType type = ValType::Void; // Monostate behaves like void
+        using inner_type = std::monostate;
+        static constexpr uint32_t size = 0;
+        static constexpr uint32_t alignment = 1;
+        static constexpr std::array<WasmValType, 0> flat_types = {};
+    };
+
+    // Result-specific types (defined later, forward declared for use here)
+    template <typename T>
+    struct result_ok_wrapper;
+    template <typename T>
+    struct result_err_wrapper;
+    struct result_ok_monostate;
+    struct result_err_monostate;
+
+    template <>
+    struct ValTrait<result_ok_monostate>
+    {
+        static constexpr ValType type = ValType::Void;
+        using inner_type = result_ok_monostate;
+        static constexpr uint32_t size = 0;
+        static constexpr uint32_t alignment = 1;
+        static constexpr std::array<WasmValType, 0> flat_types = {};
+    };
+
+    template <>
+    struct ValTrait<result_err_monostate>
+    {
+        static constexpr ValType type = ValType::Void;
+        using inner_type = result_err_monostate;
+        static constexpr uint32_t size = 0;
+        static constexpr uint32_t alignment = 1;
+        static constexpr std::array<WasmValType, 0> flat_types = {};
+    };
+
+    template <typename T>
+    struct ValTrait<result_ok_wrapper<T>>
+    {
+        static constexpr ValType type = ValTrait<T>::type;
+        using inner_type = T;
+        static constexpr uint32_t size = ValTrait<T>::size;
+        static constexpr uint32_t alignment = ValTrait<T>::alignment;
+        static constexpr auto flat_types = ValTrait<T>::flat_types;
+    };
+
+    template <typename T>
+    struct ValTrait<result_err_wrapper<T>>
+    {
+        static constexpr ValType type = ValTrait<T>::type;
+        using inner_type = T;
+        static constexpr uint32_t size = ValTrait<T>::size;
+        static constexpr uint32_t alignment = ValTrait<T>::alignment;
+        static constexpr auto flat_types = ValTrait<T>::flat_types;
+    };
+
     //  Boolean  --------------------------------------------------------------------
     using bool_t = bool;
 
@@ -595,8 +656,8 @@ namespace cmcpp
     {
         static constexpr ValType type = ValType::Flags;
         using inner_type = std::bitset<sizeof...(Ts)>;
-        static constexpr auto size = byteSize<Ts...>();
-        static constexpr auto alignment = byteSize<Ts...>();
+        static constexpr uint32_t size = byteSize<Ts...>();
+        static constexpr uint32_t alignment = byteSize<Ts...>();
         static constexpr std::array<WasmValType, 1> flat_types = {WasmValType::i32};
     };
 
@@ -618,7 +679,7 @@ namespace cmcpp
     constexpr uint32_t compute_tuple_alignment()
     {
         uint32_t a = 1;
-        ((a = std::max(a, ValTrait<Ts>::alignment)), ...);
+        ((a = std::max(a, static_cast<uint32_t>(ValTrait<Ts>::alignment))), ...);
         return a;
     }
 
@@ -693,10 +754,27 @@ namespace cmcpp
         static constexpr uint32_t alignment = ValTrait<tuple_type>::alignment;
         static constexpr uint32_t size = ValTrait<tuple_type>::size;
         static constexpr size_t flat_types_len = ValTrait<tuple_type>::flat_types_len;
-        static constexpr auto flat_types = ValTrait<tuple_type>::flat_types;
+        static constexpr std::array<WasmValType, flat_types_len> flat_types = ValTrait<tuple_type>::flat_types;
     };
+
+    // Helper to detect wrapper types
     template <typename T>
-    concept Record = ValTrait<T>::type == ValType::Record;
+    struct is_result_wrapper : std::false_type
+    {
+    };
+
+    template <typename T>
+    struct is_result_wrapper<result_ok_wrapper<T>> : std::true_type
+    {
+    };
+
+    template <typename T>
+    struct is_result_wrapper<result_err_wrapper<T>> : std::true_type
+    {
+    };
+
+    template <typename T>
+    concept Record = ValTrait<T>::type == ValType::Record && !is_result_wrapper<T>::value;
 
     template <Record R, Tuple T, std::size_t... I>
     R to_struct_impl(const T &t, std::index_sequence<I...>)
@@ -828,7 +906,7 @@ namespace cmcpp
     {
         static constexpr ValType type = ValType::Option;
         using inner_type = T;
-        using variant_type = variant_t<bool_t, T>;
+        using variant_type = variant_t<monostate, T>;
         static constexpr uint32_t size = ValTrait<variant_type>::size;
         static constexpr uint32_t alignment = ValTrait<variant_type>::alignment;
         static constexpr auto flat_types = ValTrait<variant_type>::flat_types;
@@ -837,8 +915,43 @@ namespace cmcpp
     concept Option = ValTrait<T>::type == ValType::Option;
 
     //  Result  --------------------------------------------------------------------
+    // When Ok and Err are the same type, we need wrappers to distinguish them
+    // to avoid std::variant<T, T> which has duplicate types
+    template <typename T>
+    struct result_ok_wrapper
+    {
+        T value;
+    };
+    template <typename T>
+    struct result_err_wrapper
+    {
+        T value;
+    };
+
+    // Specialized wrappers for monostate (no value to wrap)
+    struct result_ok_monostate
+    {
+    };
+    struct result_err_monostate
+    {
+    };
+
     template <Field Ok, Field Err>
-    using result_t = variant_t<Ok, Err>;
+    using result_t = std::conditional_t<
+        std::is_same_v<Ok, Err>,
+        // When Ok and Err are the same type, use wrappers
+        std::conditional_t<
+            std::is_same_v<Ok, monostate>,
+            variant_t<result_ok_monostate, result_err_monostate>,
+            variant_t<result_ok_wrapper<Ok>, result_err_wrapper<Err>>>,
+        // When Ok and Err are different types, use them directly but replace monostate with markers
+        std::conditional_t<
+            std::is_same_v<Ok, monostate>,
+            variant_t<result_ok_monostate, Err>,
+            std::conditional_t<
+                std::is_same_v<Err, monostate>,
+                variant_t<Ok, result_err_monostate>,
+                variant_t<Ok, Err>>>>;
 
     //  Enum  --------------------------------------------------------------------
     template <typename T>

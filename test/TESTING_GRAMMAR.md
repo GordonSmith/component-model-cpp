@@ -229,6 +229,99 @@ To test against additional WIT files:
    ./build/grammar/test-wit-grammar --directory /path/to/your/wit/files
    ```
 
+## Generating C++ Stubs from Test Files
+
+The test suite includes tools to generate C++ host function stubs from all WIT test files. This is useful for:
+- Testing the `wit-codegen` code generator
+- Creating reference implementations
+- Validating end-to-end WIT parsing and code generation
+
+### Quick Start
+
+**Python script (recommended):**
+```bash
+# Generate stubs for all test files
+./test/generate_test_stubs.py
+
+# Verbose output
+./test/generate_test_stubs.py -v
+
+# Filter specific files
+./test/generate_test_stubs.py -f "streams"
+
+# Custom paths
+./test/generate_test_stubs.py \
+  --test-dir ref/wit-bindgen/tests/codegen \
+  --output-dir my_stubs \
+  --codegen build/tools/wit-codegen/wit-codegen
+```
+
+**Bash script:**
+```bash
+# Generate stubs for all test files
+./test/generate_test_stubs.sh
+
+# With custom environment variables
+WIT_TEST_DIR=ref/wit-bindgen/tests/codegen \
+OUTPUT_DIR=generated_stubs \
+CODEGEN_TOOL=build/tools/wit-codegen/wit-codegen \
+  ./test/generate_test_stubs.sh
+```
+
+### Generated Files
+
+For each `.wit` file, the generator creates:
+- `<name>.hpp` - Host function declarations with cmcpp types
+- `<name>.cpp` - Implementation stubs (empty functions to fill in)
+- `<name>_bindings.cpp` - WAMR NativeSymbol registration
+
+The directory structure of the test suite is preserved in the output.
+
+### Example Output
+
+For a test file `ref/wit-bindgen/tests/codegen/streams.wit`:
+```
+generated_stubs/
+└── streams.hpp
+└── streams.cpp
+└── streams_bindings.cpp
+```
+
+### Prerequisites
+
+Before generating stubs, ensure `wit-codegen` is built:
+```bash
+cmake -B build -DBUILD_GRAMMAR=ON
+cmake --build build --target wit-codegen
+```
+
+### Script Options
+
+**Python script options:**
+- `-d, --test-dir PATH` - Directory containing WIT test files (default: `../ref/wit-bindgen/tests/codegen`)
+- `-o, --output-dir PATH` - Output directory for stubs (default: `generated_stubs`)
+- `-c, --codegen PATH` - Path to wit-codegen tool (default: `../build/tools/wit-codegen/wit-codegen`)
+- `-v, --verbose` - Print detailed output including generated files
+- `-f, --filter PATTERN` - Only process files matching the pattern
+
+**Bash script environment variables:**
+- `WIT_TEST_DIR` - Test directory path
+- `OUTPUT_DIR` - Output directory path
+- `CODEGEN_TOOL` - Code generator tool path
+
+### Using Generated Stubs
+
+The generated stubs can be used as:
+1. **Reference implementations** - See how different WIT features map to C++
+2. **Integration tests** - Verify the full toolchain works end-to-end
+3. **Starting point** - Copy and modify for your own projects
+
+To compile generated stubs:
+```bash
+# Link against cmcpp and your WebAssembly runtime
+g++ -std=c++20 -I include generated_stubs/streams.cpp -o my_host
+```
+
 ## Grammar Coverage
 
 The test suite ensures complete coverage of the WIT specification:

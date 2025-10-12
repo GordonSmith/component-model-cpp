@@ -2582,6 +2582,37 @@ TEST_CASE("Records")
     CHECK(pex3_in.p.weight == pex3_out.p.weight);
     CHECK(pex3_in.p.address == pex3_out.p.address);
     CHECK(pex3_in.p.phones == pex3_out.p.phones);
+
+    // Test direct store/load operations for record.hpp coverage
+    SUBCASE("Direct record store/load")
+    {
+        // Allocate memory for storing the record
+        uint32_t ptr = heap.realloc(0, 0, ValTrait<Person>::alignment, ValTrait<Person>::size);
+
+        // Store the record directly
+        store(*cx, p_in, ptr);
+
+        // Load the record back
+        auto p_loaded = load<Person>(*cx, ptr);
+
+        CHECK(p_loaded.name == p_in.name);
+        CHECK(p_loaded.age == p_in.age);
+        CHECK(p_loaded.weight == p_in.weight);
+    }
+
+    // Test tuple_to_struct conversion for record.hpp coverage
+    SUBCASE("tuple_to_struct conversion")
+    {
+        // Create a tuple matching PersonStruct
+        auto person_tuple = std::make_tuple(string_t{"Jane"}, uint16_t{25}, uint32_t{120});
+
+        // Convert to struct using tuple_to_struct
+        PersonStruct person = tuple_to_struct<PersonStruct>(person_tuple);
+
+        CHECK(person.name == "Jane");
+        CHECK(person.age == 25);
+        CHECK(person.weight == 120);
+    }
 }
 
 TEST_CASE("Function flattening honors canonical limits")

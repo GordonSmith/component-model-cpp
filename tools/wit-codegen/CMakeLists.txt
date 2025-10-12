@@ -36,6 +36,10 @@ set_source_files_properties(${ANTLR_GENERATED_SOURCES} PROPERTIES GENERATED TRUE
 # WIT code generator using ANTLR grammar
 add_executable(wit-codegen
     wit-codegen.cpp
+    wit_visitor.cpp
+    wit_parser.cpp
+    code_generator.cpp
+    type_mapper.cpp
     ${ANTLR_GENERATED_SOURCES}
 )
 
@@ -44,8 +48,9 @@ target_link_libraries(wit-codegen PRIVATE
     ${ANTLR4_LIBRARY}
 )
 
-# Add include directories for ANTLR generated code
+# Add include directories for ANTLR generated code and local headers
 target_include_directories(wit-codegen PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_BINARY_DIR}/grammar
     ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include/antlr4-runtime
 )
