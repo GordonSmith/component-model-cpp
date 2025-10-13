@@ -5,7 +5,7 @@
 
 // Generated WAMR bindings for package: example:sample
 // These symbol arrays can be used with wasm_runtime_register_natives_raw()
-// NOTE: You must implement the functions declared in the imports namespace
+// NOTE: You must implement the functions declared in the host namespace
 // (See sample.hpp for declarations, provide implementations in your host code)
 
 using namespace cmcpp;

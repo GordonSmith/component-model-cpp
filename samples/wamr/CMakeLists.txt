@@ -136,7 +136,14 @@ target_include_directories(wamr
 )
 
 if (MSVC)
-    target_compile_options(wamr PRIVATE /EHsc /permissive-)
+    target_compile_options(wamr PRIVATE 
+        /EHsc 
+        /permissive-
+        /wd4244  # conversion from 'type1' to 'type2', possible loss of data
+        /wd4267  # conversion from 'size_t' to 'type', possible loss of data
+        /wd4305  # truncation from 'type1' to 'type2'
+        /wd4309  # truncation of constant value
+    )
 else()
     target_compile_options(wamr PRIVATE -Wno-error=maybe-uninitialized -Wno-error=jump-misses-init)
 endif()

@@ -6,23 +6,27 @@
 // Local modular headers
 #include "wit_parser.hpp"
 #include "code_generator.hpp"
+#include "package_registry.hpp"
+#include "dependency_resolver.hpp"
+#include "type_mapper.hpp"
 
 void print_help(const char *program_name)
 {
     std::cout << "wit-codegen - WebAssembly Interface Types (WIT) Code Generator\n\n";
     std::cout << "USAGE:\n";
-    std::cout << "  " << program_name << " <wit-file> [output-prefix]\n";
+    std::cout << "  " << program_name << " <wit-file-or-dir> [output-prefix]\n";
     std::cout << "  " << program_name << " --help\n";
     std::cout << "  " << program_name << " -h\n\n";
     std::cout << "ARGUMENTS:\n";
-    std::cout << "  <wit-file>       Path to the WIT file to parse\n";
-    std::cout << "  [output-prefix]  Optional output file prefix (default: derived from package name)\n\n";
+    std::cout << "  <wit-file-or-dir> Path to WIT file or directory with WIT package\n";
+    std::cout << "  [output-prefix]   Optional output file prefix (default: derived from package name)\n\n";
     std::cout << "OPTIONS:\n";
-    std::cout << "  -h, --help       Show this help message and exit\n\n";
+    std::cout << "  -h, --help        Show this help message and exit\n\n";
     std::cout << "DESCRIPTION:\n";
     std::cout << "  Generates C++ host function bindings from WebAssembly Interface Types (WIT)\n";
     std::cout << "  files. The tool parses WIT syntax and generates type-safe C++ code for\n";
     std::cout << "  interfacing with WebAssembly components.\n\n";
+    std::cout << "  Supports multi-file WIT packages with deps/ folder dependencies.\n\n";
     std::cout << "GENERATED FILES:\n";
     std::cout << "  <prefix>.hpp          - C++ header with type definitions and declarations\n";
     std::cout << "  <prefix>_wamr.hpp     - WAMR runtime integration header\n";
@@ -33,10 +37,13 @@ void print_help(const char *program_name)
     std::cout << "  - Generates bidirectional bindings (imports and exports)\n";
     std::cout << "  - Type-safe C++ wrappers using cmcpp canonical ABI\n";
     std::cout << "  - WAMR native function registration helpers\n";
-    std::cout << "  - Automatic memory management for complex types\n\n";
+    std::cout << "  - Automatic memory management for complex types\n";
+    std::cout << "  - Multi-file package support with deps/ folder resolution\n\n";
     std::cout << "EXAMPLES:\n";
-    std::cout << "  # Generate bindings using package-derived prefix\n";
+    std::cout << "  # Generate bindings from single WIT file\n";
     std::cout << "  " << program_name << " example.wit\n\n";
+    std::cout << "  # Generate bindings from WIT package directory\n";
+    std::cout << "  " << program_name << " wit/\n\n";
     std::cout << "  # Generate bindings with custom prefix\n";
     std::cout << "  " << program_name << " example.wit my_bindings\n\n";
     std::cout << "  # Show help message\n";
@@ -70,23 +77,111 @@ int main(int argc, char *argv[])
 
     try
     {
-        // Parse WIT file using ANTLR grammar
-        auto parseResult = WitGrammarParser::parse(witFile);
+        PackageRegistry registry;
+        ParseResult parseResult;
 
-        if (parseResult.interfaces.empty())
+        // Detect input mode: directory with deps/ or single file
+        bool isDirectory = std::filesystem::is_directory(witFile);
+
+        if (isDirectory)
         {
-            // Check if this is a world-only file (has world imports/exports but no interfaces)
-            if (parseResult.hasWorld)
+            // Multi-file mode: process directory with potential deps/
+            std::cout << "Processing WIT package directory: " << witFile << "\n";
+
+            DependencyResolver resolver;
+
+            // 1. Discover dependencies from deps/ folder
+            auto dep_files = resolver.discover_dependencies(witFile);
+            std::cout << "Found " << dep_files.size() << " dependency files\n";
+
+            // 2. Sort dependencies by load order
+            if (!dep_files.empty())
             {
-                // World-only files that reference external interfaces are not currently supported
-                return 0; // Success - nothing to generate
+                dep_files = resolver.sort_by_dependencies(dep_files);
+
+                // 3. Load all dependencies first
+                for (const auto &dep_file : dep_files)
+                {
+                    std::cout << "Loading dependency: " << dep_file << "\n";
+                    if (!registry.load_package(dep_file))
+                    {
+                        std::cerr << "Warning: Failed to load dependency: " << dep_file << "\n";
+                    }
+                }
             }
-            else
+
+            // 4. Find and load root WIT file(s) from main directory
+            auto root_file = resolver.find_root_wit_file(witFile);
+            if (root_file.empty())
             {
-                // Empty world with no interfaces, imports, or exports
-                return 0; // Success - nothing to generate
+                std::cerr << "Error: No root WIT file found in directory: " << witFile << "\n";
+                return 1;
+            }
+
+            std::cout << "Loading root file: " << root_file << "\n";
+            parseResult = WitGrammarParser::parse(root_file.string());
+
+            // Add root package to registry
+            if (!parseResult.packageName.empty() && parseResult.package_id)
+            {
+                auto root_package = std::make_unique<WitPackage>();
+                root_package->id = *parseResult.package_id;
+                root_package->source_path = root_file;
+                for (const auto &iface : parseResult.interfaces)
+                {
+                    root_package->add_interface(iface);
+                }
+                // Note: We don't actually need to add it to registry for code gen,
+                // but it's good for consistency
             }
         }
+        else
+        {
+            // Single-file mode (original behavior)
+            std::cout << "Processing single WIT file: " << witFile << "\n";
+
+            // Check if this file has a deps/ folder in its parent directory
+            std::filesystem::path file_path(witFile);
+            auto parent_dir = file_path.parent_path();
+            auto deps_dir = parent_dir / "deps";
+
+            if (std::filesystem::exists(deps_dir) && std::filesystem::is_directory(deps_dir))
+            {
+                // This single file has dependencies - load them
+                std::cout << "Found deps/ folder, loading dependencies...\n";
+
+                DependencyResolver resolver;
+                // Pass parent_dir to discover_dependencies, not the file path
+                auto dep_files = resolver.discover_dependencies(parent_dir);
+
+                if (!dep_files.empty())
+                {
+                    std::cout << "Found " << dep_files.size() << " dependency files\n";
+                    dep_files = resolver.sort_by_dependencies(dep_files);
+                    for (const auto &dep_file : dep_files)
+                    {
+                        std::cout << "Loading dependency: " << dep_file << "\n";
+                        if (!registry.load_package(dep_file))
+                        {
+                            std::cerr << "Warning: Failed to load dependency: " << dep_file << "\n";
+                        }
+                    }
+                }
+            }
+
+            parseResult = WitGrammarParser::parse(witFile);
+        }
+
+        // Set up TypeMapper with registry for external type resolution
+        if (registry.get_packages().size() > 0)
+        {
+            TypeMapper::setPackageRegistry(&registry);
+            std::cout << "Loaded " << registry.get_packages().size() << " packages into registry\n";
+        }
+
+        // Note: We now generate files even if interfaces are empty, to provide
+        // consistent output for world-only files that reference external packages.
+        // The generated files will contain minimal stub code with empty namespaces.
 
         // If no output prefix provided, derive it from the package name
         if (outputPrefix.empty())
@@ -145,9 +240,20 @@ int main(int argc, char *argv[])
         std::filesystem::path wamrHeaderPath(wamrHeaderFile);
         std::string wamrHeaderFilename = wamrHeaderPath.filename().string();
 
-        CodeGenerator::generateHeader(parseResult.interfaces, headerFile);
-        CodeGenerator::generateWAMRHeader(parseResult.interfaces, wamrHeaderFile, parseResult.packageName, headerFilename);
-        CodeGenerator::generateWAMRBindings(parseResult.interfaces, wamrBindingsFile, parseResult.packageName, headerFilename, wamrHeaderFilename);
+        // Generate code with registry for external package support
+        PackageRegistry *registryPtr = (registry.get_packages().size() > 0) ? &registry : nullptr;
+        const std::set<std::string> *external_deps_ptr = parseResult.external_dependencies.empty() ? nullptr : &parseResult.external_dependencies;
+        const std::set<std::string> *world_imports_ptr = parseResult.worldImports.empty() ? nullptr : &parseResult.worldImports;
+        const std::set<std::string> *world_exports_ptr = parseResult.worldExports.empty() ? nullptr : &parseResult.worldExports;
+
+        CodeGenerator::generateHeader(parseResult.interfaces, headerFile, registryPtr, external_deps_ptr, world_imports_ptr, world_exports_ptr);
+        CodeGenerator::generateWAMRHeader(parseResult.interfaces, wamrHeaderFile, parseResult.packageName, headerFilename, registryPtr, world_imports_ptr, world_exports_ptr);
+        CodeGenerator::generateWAMRBindings(parseResult.interfaces, wamrBindingsFile, parseResult.packageName, headerFilename, wamrHeaderFilename, registryPtr, world_imports_ptr, world_exports_ptr);
+
+        std::cout << "Generated files:\n";
+        std::cout << "  " << headerFile << "\n";
+        std::cout << "  " << wamrHeaderFile << "\n";
+        std::cout << "  " << wamrBindingsFile << "\n";
     }
     catch (const std::exception &e)
     {

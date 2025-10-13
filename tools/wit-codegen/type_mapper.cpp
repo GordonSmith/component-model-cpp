@@ -1,11 +1,18 @@
 #include "type_mapper.hpp"
+#include "package_registry.hpp"
 
-// Define static member
+// Define static members
 const std::vector<InterfaceInfo> *TypeMapper::all_interfaces = nullptr;
+PackageRegistry *TypeMapper::package_registry = nullptr;
 
 void TypeMapper::setInterfaces(const std::vector<InterfaceInfo> *interfaces)
 {
     all_interfaces = interfaces;
+}
+
+void TypeMapper::setPackageRegistry(PackageRegistry *registry)
+{
+    package_registry = registry;
 }
 
 std::string TypeMapper::mapType(const std::string &witType, const InterfaceInfo *iface)
@@ -148,12 +155,26 @@ std::string TypeMapper::mapType(const std::string &witType, const InterfaceInfo 
                 const InterfaceInfo *sourceIface = nullptr;
                 if (all_interfaces)
                 {
+                    // First, try to find an interface with the same kind as current interface (prefer same namespace)
                     for (const auto &other : *all_interfaces)
                     {
-                        if (other.name == useStmt.source_interface)
+                        if (other.name == useStmt.source_interface && other.kind == iface->kind)
                         {
                             sourceIface = &other;
                             break;
+                        }
+                    }
+
+                    // If not found, fall back to any interface with matching name
+                    if (!sourceIface)
+                    {
+                        for (const auto &other : *all_interfaces)
+                        {
+                            if (other.name == useStmt.source_interface)
+                            {
+                                sourceIface = &other;
+                                break;
+                            }
                         }
                     }
                 }
@@ -225,12 +246,26 @@ std::string TypeMapper::mapType(const std::string &witType, const InterfaceInfo 
                     const InterfaceInfo *sourceIface = nullptr;
                     if (all_interfaces)
                     {
+                        // First, try to find an interface with the same kind as current interface (prefer same namespace)
                         for (const auto &other : *all_interfaces)
                         {
-                            if (other.name == useStmt.source_interface)
+                            if (other.name == useStmt.source_interface && other.kind == iface->kind)
                             {
                                 sourceIface = &other;
                                 break;
+                            }
+                        }
+
+                        // If not found, fall back to any interface with matching name
+                        if (!sourceIface)
+                        {
+                            for (const auto &other : *all_interfaces)
+                            {
+                                if (other.name == useStmt.source_interface)
+                                {
+                                    sourceIface = &other;
+                                    break;
+                                }
                             }
                         }
                     }
@@ -274,12 +309,26 @@ std::string TypeMapper::mapType(const std::string &witType, const InterfaceInfo 
                         {
                             // Find the source interface to determine its namespace
                             const InterfaceInfo *sourceIface = nullptr;
+                            // First, try to find an interface with Export kind for world-level types
                             for (const auto &srcIface : *all_interfaces)
                             {
-                                if (srcIface.name == useStmt.source_interface)
+                                if (srcIface.name == useStmt.source_interface && srcIface.kind == InterfaceKind::Export)
                                 {
                                     sourceIface = &srcIface;
                                     break;
+                                }
+                            }
+
+                            // If not found, fall back to any interface with matching name
+                            if (!sourceIface)
+                            {
+                                for (const auto &srcIface : *all_interfaces)
+                                {
+                                    if (srcIface.name == useStmt.source_interface)
+                                    {
+                                        sourceIface = &srcIface;
+                                        break;
+                                    }
                                 }
                             }
 
@@ -300,12 +349,26 @@ std::string TypeMapper::mapType(const std::string &witType, const InterfaceInfo 
                         {
                             // Find the source interface to determine its namespace
                             const InterfaceInfo *sourceIface = nullptr;
+                            // First, try to find an interface with Export kind for world-level types
                             for (const auto &srcIface : *all_interfaces)
                             {
-                                if (srcIface.name == useStmt.source_interface)
+                                if (srcIface.name == useStmt.source_interface && srcIface.kind == InterfaceKind::Export)
                                 {
                                     sourceIface = &srcIface;
                                     break;
+                                }
+                            }
+
+                            // If not found, fall back to any interface with matching name
+                            if (!sourceIface)
+                            {
+                                for (const auto &srcIface : *all_interfaces)
+                                {
+                                    if (srcIface.name == useStmt.source_interface)
+                                    {
+                                        sourceIface = &srcIface;
+                                        break;
+                                    }
                                 }
                             }
 
@@ -482,4 +545,37 @@ std::string TypeMapper::mapType(const std::string &witType, const InterfaceInfo 
 
     // Unknown type - return as-is (but sanitize the identifier)
     return sanitize_identifier(type);
+}
+
+std::string TypeMapper::resolveExternalType(const std::string &package_spec,
+                                            const std::string &interface_name,
+                                            const std::string &type_name)
+{
+    if (!package_registry)
+    {
+        // No registry available - generate a placeholder
+        return "uint32_t /* external: " + package_spec + "/" + interface_name + "::" + type_name + " */";
+    }
+
+    // Parse package ID from spec
+    auto package_id = PackageId::parse(package_spec);
+    if (!package_id)
+    {
+        return "uint32_t /* invalid package spec: " + package_spec + " */";
+    }
+
+    // Look up the package
+    auto package = package_registry->get_package(*package_id);
+    if (!package)
+    {
+        // Package not found - generate a placeholder
+        return "uint32_t /* missing package: " + package_spec + " */";
+    }
+
+    // Get the C++ namespace for this package
+    std::string cpp_namespace = package_id->to_cpp_namespace();
+
+    // Build the fully qualified type reference
+    // e.g., "::ext_my_dep_v0_1_0::a::foo"
+    return "::" + cpp_namespace + "::" + interface_name + "::" + type_name;
 }

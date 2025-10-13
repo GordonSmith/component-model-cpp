@@ -1,6 +1,7 @@
 #include "code_generator.hpp"
 #include "type_mapper.hpp"
 #include "utils.hpp"
+#include "package_registry.hpp"
 #include <algorithm>
 #include <cctype>
 #include <filesystem>
@@ -9,7 +10,7 @@
 #include <set>
 #include <sstream>
 
-void CodeGenerator::generateHeader(const std::vector<InterfaceInfo> &interfaces, const std::string &filename)
+void CodeGenerator::generateHeader(const std::vector<InterfaceInfo> &interfaces, const std::string &filename, const PackageRegistry *registry, const std::set<std::string> *external_deps, const std::set<std::string> *world_imports, const std::set<std::string> *world_exports)
 {
     // Set interfaces for TypeMapper to resolve cross-namespace references
     TypeMapper::setInterfaces(&interfaces);
@@ -31,6 +32,188 @@ void CodeGenerator::generateHeader(const std::vector<InterfaceInfo> &interfaces,
     out << "// Generated host function declarations from WIT\n";
     out << "// - 'host' namespace: Guest imports (host implements these)\n";
     out << "// - 'guest' namespace: Guest exports (guest implements these, host calls them)\n\n";
+
+    // Generate external package stubs if we have a registry
+    if (registry && (external_deps || !interfaces.empty()))
+    {
+        generateExternalPackageStubs(out, interfaces, registry, external_deps);
+    }
+
+    // If no interfaces, check if we have world imports/exports
+    if (interfaces.empty())
+    {
+        out << "// Note: This WIT file contains no concrete interface definitions.\n";
+        out << "// It may reference external packages that are defined elsewhere.\n\n";
+
+        // Generate host namespace (for world imports - host implements these)
+        if (world_imports && !world_imports->empty())
+        {
+            out << "// Host implements these interfaces (world imports)\n";
+            out << "namespace host {\n";
+
+            // Track interface names to avoid conflicts when multiple versions are imported
+            std::map<std::string, int> interface_name_counts;
+            for (const auto &import : *world_imports)
+            {
+                if (import.find(':') != std::string::npos && import.find('/') != std::string::npos)
+                {
+                    size_t slash_pos = import.find('/');
+                    std::string after_slash = import.substr(slash_pos + 1);
+                    size_t at_pos = after_slash.find('@');
+                    std::string interface_name = (at_pos != std::string::npos) ? after_slash.substr(0, at_pos) : after_slash;
+                    interface_name_counts[interface_name]++;
+                }
+            }
+
+            for (const auto &import : *world_imports)
+            {
+                // Parse the import: "my:dep/a@0.1.0" -> package="my:dep@0.1.0", interface="a"
+                if (import.find(':') != std::string::npos && import.find('/') != std::string::npos)
+                {
+                    size_t slash_pos = import.find('/');
+                    std::string before_slash = import.substr(0, slash_pos);
+                    std::string after_slash = import.substr(slash_pos + 1);
+
+                    // Extract interface name and version
+                    std::string interface_name = after_slash;
+                    std::string package_spec = before_slash;
+
+                    size_t at_pos = after_slash.find('@');
+                    if (at_pos != std::string::npos)
+                    {
+                        interface_name = after_slash.substr(0, at_pos);
+                        std::string version = after_slash.substr(at_pos);
+                        package_spec = before_slash + version;
+                    }
+
+                    // Parse package ID and get namespace
+                    auto pkg_id = PackageId::parse(package_spec);
+                    if (pkg_id)
+                    {
+                        std::string cpp_namespace = pkg_id->to_cpp_namespace();
+                        out << "    // Interface: " << import << "\n";
+
+                        // If there are multiple versions of the same interface, use versioned namespace names
+                        std::string local_namespace = sanitize_identifier(interface_name);
+                        if (interface_name_counts[interface_name] > 1)
+                        {
+                            // Sanitize version for namespace name
+                            std::string version_suffix = pkg_id->version;
+                            // Remove leading @ if present
+                            if (!version_suffix.empty() && version_suffix[0] == '@')
+                            {
+                                version_suffix = version_suffix.substr(1);
+                            }
+                            std::replace(version_suffix.begin(), version_suffix.end(), '.', '_');
+                            std::replace(version_suffix.begin(), version_suffix.end(), '-', '_');
+                            local_namespace += "_v" + version_suffix;
+                        }
+
+                        out << "    namespace " << local_namespace << " {\n";
+
+                        // Check if the interface exists in the registry
+                        if (registry)
+                        {
+                            auto iface_info = registry->resolve_interface(package_spec, interface_name);
+                            if (iface_info)
+                            {
+                                // Interface found - use using directive
+                                out << "        using namespace ::" << cpp_namespace << "::" << sanitize_identifier(interface_name) << ";\n";
+                            }
+                            else
+                            {
+                                // Interface not found in registry - generate placeholder comment
+                                out << "        // External interface not loaded: " << import << "\n";
+                                out << "        // Host must provide implementations for functions from this interface\n";
+                            }
+                        }
+                        else
+                        {
+                            // No registry - assume external stub exists
+                            out << "        using namespace ::" << cpp_namespace << "::" << sanitize_identifier(interface_name) << ";\n";
+                        }
+
+                        out << "    }\n";
+                    }
+                }
+            }
+            out << "} // namespace host\n\n";
+        }
+        else
+        {
+            out << "namespace host {}\n\n";
+        }
+
+        // Generate guest namespace (for world exports - guest implements these)
+        if (world_exports && !world_exports->empty())
+        {
+            out << "// Guest implements these interfaces (world exports)\n";
+            out << "namespace guest {\n";
+            for (const auto &export_name : *world_exports)
+            {
+                // Parse the export: "my:dep/a@0.2.0" -> package="my:dep@0.2.0", interface="a"
+                if (export_name.find(':') != std::string::npos && export_name.find('/') != std::string::npos)
+                {
+                    size_t slash_pos = export_name.find('/');
+                    std::string before_slash = export_name.substr(0, slash_pos);
+                    std::string after_slash = export_name.substr(slash_pos + 1);
+
+                    // Extract interface name and version
+                    std::string interface_name = after_slash;
+                    std::string package_spec = before_slash;
+
+                    size_t at_pos = after_slash.find('@');
+                    if (at_pos != std::string::npos)
+                    {
+                        interface_name = after_slash.substr(0, at_pos);
+                        std::string version = after_slash.substr(at_pos);
+                        package_spec = before_slash + version;
+                    }
+
+                    // Parse package ID and get namespace
+                    auto pkg_id = PackageId::parse(package_spec);
+                    if (pkg_id)
+                    {
+                        std::string cpp_namespace = pkg_id->to_cpp_namespace();
+                        out << "    // Interface: " << export_name << "\n";
+                        out << "    namespace " << sanitize_identifier(interface_name) << " {\n";
+
+                        // Check if the interface exists in the registry
+                        if (registry)
+                        {
+                            auto iface_info = registry->resolve_interface(package_spec, interface_name);
+                            if (iface_info)
+                            {
+                                // Interface found - use using directive
+                                out << "        using namespace ::" << cpp_namespace << "::" << sanitize_identifier(interface_name) << ";\n";
+                            }
+                            else
+                            {
+                                // Interface not found in registry - generate placeholder comment
+                                out << "        // External interface not loaded: " << export_name << "\n";
+                                out << "        // Guest must implement functions from this interface\n";
+                            }
+                        }
+                        else
+                        {
+                            // No registry - assume external stub exists
+                            out << "        using namespace ::" << cpp_namespace << "::" << sanitize_identifier(interface_name) << ";\n";
+                        }
+
+                        out << "    }\n";
+                    }
+                }
+            }
+            out << "} // namespace guest\n\n";
+        }
+        else
+        {
+            out << "namespace guest {}\n\n";
+        }
+
+        out << "#endif // " << guard << "\n";
+        return;
+    }
 
     // Helper lambda to topologically sort interfaces based on use dependencies
     auto sort_by_dependencies = [](std::vector<const InterfaceInfo *> &ifaces)
@@ -137,53 +320,58 @@ void CodeGenerator::generateHeader(const std::vector<InterfaceInfo> &interfaces,
         out << "// Phase 1: Type definitions\n";
         out << "namespace guest {\n\n";
 
+        // First pass: Generate all regular interface types (non-world-level)
         for (const auto *iface : exports)
         {
-            // Skip standalone functions in type generation phase
-            if (iface->is_standalone_function)
+            // Skip standalone functions and world-level types in first pass
+            if (iface->is_standalone_function || iface->is_world_level)
             {
                 continue;
             }
 
-            // Regular interface - create namespace (unless it's world-level types)
-            if (!iface->is_world_level)
+            // Regular interface - create namespace
+            out << "// Interface: " << iface->name << "\n";
+            if (!iface->package_name.empty())
             {
-                out << "// Interface: " << iface->name << "\n";
-                if (!iface->package_name.empty())
-                {
-                    out << "// Package: " << iface->package_name << "\n";
-                }
-                out << "namespace " << sanitize_identifier(iface->name) << " {\n\n";
+                out << "// Package: " << iface->package_name << "\n";
             }
-            else
-            {
-                out << "// World-level types\n";
-                if (!iface->package_name.empty())
-                {
-                    out << "// Package: " << iface->package_name << "\n";
-                }
-                // Add using directives for all non-world interfaces so world types can reference them
-                for (const auto *otherIface : exports)
-                {
-                    if (otherIface != iface && !otherIface->is_world_level && !otherIface->is_standalone_function)
-                    {
-                        out << "using namespace " << sanitize_identifier(otherIface->name) << ";\n";
-                    }
-                }
-                if (!exports.empty())
-                {
-                    out << "\n";
-                }
-            }
+            out << "namespace " << sanitize_identifier(iface->name) << " {\n\n";
 
             // Generate ONLY type definitions (no functions yet)
             generateTypeDefinitions(out, *iface);
 
-            // Close namespace (unless world-level)
+            // Close namespace
+            out << "} // namespace " << sanitize_identifier(iface->name) << "\n\n";
+        }
+
+        // Second pass: Generate world-level types AFTER all interface namespaces are defined
+        for (const auto *iface : exports)
+        {
             if (!iface->is_world_level)
             {
-                out << "} // namespace " << sanitize_identifier(iface->name) << "\n\n";
+                continue;
             }
+
+            out << "// World-level types\n";
+            if (!iface->package_name.empty())
+            {
+                out << "// Package: " << iface->package_name << "\n";
+            }
+            // Add using directives for all non-world interfaces so world types can reference them
+            for (const auto *otherIface : exports)
+            {
+                if (otherIface != iface && !otherIface->is_world_level && !otherIface->is_standalone_function)
+                {
+                    out << "using namespace " << sanitize_identifier(otherIface->name) << ";\n";
+                }
+            }
+            if (!exports.empty())
+            {
+                out << "\n";
+            }
+
+            // Generate ONLY type definitions (no functions yet)
+            generateTypeDefinitions(out, *iface);
         }
 
         out << "} // namespace guest\n\n";
@@ -437,7 +625,7 @@ void CodeGenerator::generateImplementation(const std::vector<InterfaceInfo> &int
     out << "} // namespace host\n";
 }
 
-void CodeGenerator::generateWAMRBindings(const std::vector<InterfaceInfo> &interfaces, const std::string &filename, const std::string &packageName, const std::string &headerFile, const std::string &wamrHeaderFile)
+void CodeGenerator::generateWAMRBindings(const std::vector<InterfaceInfo> &interfaces, const std::string &filename, const std::string &packageName, const std::string &headerFile, const std::string &wamrHeaderFile, const PackageRegistry *registry, const std::set<std::string> *world_imports, const std::set<std::string> *world_exports)
 {
     std::ofstream out(filename);
     if (!out.is_open())
@@ -450,10 +638,14 @@ void CodeGenerator::generateWAMRBindings(const std::vector<InterfaceInfo> &inter
     out << "#include <vector>\n\n";
     out << "// Generated WAMR bindings for package: " << packageName << "\n";
     out << "// These symbol arrays can be used with wasm_runtime_register_natives_raw()\n";
-    out << "// NOTE: You must implement the functions declared in the imports namespace\n";
+    out << "// NOTE: You must implement the functions declared in the host namespace\n";
     out << "// (See " << headerFile << " for declarations, provide implementations in your host code)\n\n";
 
     out << "using namespace cmcpp;\n\n";
+
+    // If world imports/exports are provided, use them to determine which interfaces to register
+    // Otherwise fall back to InterfaceKind
+    bool use_world_declarations = (world_imports && !world_imports->empty()) || (world_exports && !world_exports->empty());
 
     // Group interfaces by kind (Import vs Export)
     std::vector<const InterfaceInfo *> importInterfaces;
@@ -503,6 +695,83 @@ void CodeGenerator::generateWAMRBindings(const std::vector<InterfaceInfo> &inter
         out << "};\n\n";
     }
 
+    // Also generate symbol arrays for world imports from external packages
+    if (registry && world_imports && !world_imports->empty())
+    {
+        // Track interface name counts to match the versioning logic from generateHeader
+        std::map<std::string, int> interface_name_counts;
+        for (const auto &import_spec : *world_imports)
+        {
+            if (import_spec.find(':') != std::string::npos && import_spec.find('/') != std::string::npos)
+            {
+                size_t slash_pos = import_spec.find('/');
+                std::string after_slash = import_spec.substr(slash_pos + 1);
+                size_t at_pos = after_slash.find('@');
+                std::string interface_name = (at_pos != std::string::npos) ? after_slash.substr(0, at_pos) : after_slash;
+                interface_name_counts[interface_name]++;
+            }
+        }
+
+        for (const auto &import_spec : *world_imports)
+        {
+            // Parse "my:dep/a@0.1.0" into package and interface
+            if (import_spec.find(':') != std::string::npos && import_spec.find('/') != std::string::npos)
+            {
+                size_t slash_pos = import_spec.find('/');
+                std::string before_slash = import_spec.substr(0, slash_pos);
+                std::string after_slash = import_spec.substr(slash_pos + 1);
+
+                std::string interface_name = after_slash;
+                std::string package_spec = before_slash;
+
+                size_t at_pos = after_slash.find('@');
+                if (at_pos != std::string::npos)
+                {
+                    interface_name = after_slash.substr(0, at_pos);
+                    std::string version = after_slash.substr(at_pos);
+                    package_spec = before_slash + version;
+                }
+
+                // Parse package ID
+                auto pkg_id = PackageId::parse(package_spec);
+                if (!pkg_id)
+                    continue;
+
+                // Look up the interface in the registry
+                auto iface_info = registry->resolve_interface(package_spec, interface_name);
+                if (!iface_info || iface_info->functions.empty())
+                    continue;
+
+                // Determine the local namespace name (with versioning if needed)
+                std::string local_namespace = interface_name;
+                if (interface_name_counts[interface_name] > 1)
+                {
+                    std::string version_suffix = pkg_id->version;
+                    if (!version_suffix.empty() && version_suffix[0] == '@')
+                        version_suffix = version_suffix.substr(1);
+                    std::replace(version_suffix.begin(), version_suffix.end(), '.', '_');
+                    std::replace(version_suffix.begin(), version_suffix.end(), '-', '_');
+                    local_namespace += "_v" + version_suffix;
+                }
+
+                std::string arrayName = sanitize_identifier(local_namespace) + "_symbols";
+                std::string moduleName = import_spec; // Full spec like "my:dep/a@0.1.0"
+
+                out << "// World import (external package): " << import_spec << "\n";
+                out << "// Register with: wasm_runtime_register_natives_raw(\"" << moduleName << "\", " << arrayName << ", " << iface_info->functions.size() << ")\n";
+                out << "NativeSymbol " << arrayName << "[] = {\n";
+
+                for (const auto &func : iface_info->functions)
+                {
+                    std::string funcName = sanitize_identifier(func.name);
+                    out << "    host_function(\"" << func.name << "\", host::" << sanitize_identifier(local_namespace) << "::" << funcName << "),\n";
+                }
+
+                out << "};\n\n";
+            }
+        }
+    }
+
     // Add a helper function that returns all symbol arrays
     out << "// Get all import interfaces for registration\n";
     out << "// Usage:\n";
@@ -517,6 +786,68 @@ void CodeGenerator::generateWAMRBindings(const std::vector<InterfaceInfo> &inter
         std::string arrayName = sanitize_identifier(iface->name) + "_symbols";
         std::string moduleName = iface->is_standalone_function ? "$root" : (packageName + "/" + iface->name);
         out << "        {\"" << moduleName << "\", " << arrayName << ", " << iface->functions.size() << "},\n";
+    }
+
+    // Also add world imports from external packages
+    if (registry && world_imports && !world_imports->empty())
+    {
+        std::map<std::string, int> interface_name_counts;
+        for (const auto &import_spec : *world_imports)
+        {
+            if (import_spec.find(':') != std::string::npos && import_spec.find('/') != std::string::npos)
+            {
+                size_t slash_pos = import_spec.find('/');
+                std::string after_slash = import_spec.substr(slash_pos + 1);
+                size_t at_pos = after_slash.find('@');
+                std::string interface_name = (at_pos != std::string::npos) ? after_slash.substr(0, at_pos) : after_slash;
+                interface_name_counts[interface_name]++;
+            }
+        }
+
+        for (const auto &import_spec : *world_imports)
+        {
+            if (import_spec.find(':') != std::string::npos && import_spec.find('/') != std::string::npos)
+            {
+                size_t slash_pos = import_spec.find('/');
+                std::string before_slash = import_spec.substr(0, slash_pos);
+                std::string after_slash = import_spec.substr(slash_pos + 1);
+
+                std::string interface_name = after_slash;
+                std::string package_spec = before_slash;
+
+                size_t at_pos = after_slash.find('@');
+                if (at_pos != std::string::npos)
+                {
+                    interface_name = after_slash.substr(0, at_pos);
+                    std::string version = after_slash.substr(at_pos);
+                    package_spec = before_slash + version;
+                }
+
+                auto pkg_id = PackageId::parse(package_spec);
+                if (!pkg_id)
+                    continue;
+
+                auto iface_info = registry->resolve_interface(package_spec, interface_name);
+                if (!iface_info || iface_info->functions.empty())
+                    continue;
+
+                std::string local_namespace = interface_name;
+                if (interface_name_counts[interface_name] > 1)
+                {
+                    std::string version_suffix = pkg_id->version;
+                    if (!version_suffix.empty() && version_suffix[0] == '@')
+                        version_suffix = version_suffix.substr(1);
+                    std::replace(version_suffix.begin(), version_suffix.end(), '.', '_');
+                    std::replace(version_suffix.begin(), version_suffix.end(), '-', '_');
+                    local_namespace += "_v" + version_suffix;
+                }
+
+                std::string arrayName = sanitize_identifier(local_namespace) + "_symbols";
+                std::string moduleName = import_spec;
+
+                out << "        {\"" << moduleName << "\", " << arrayName << ", " << iface_info->functions.size() << "},\n";
+            }
+        }
     }
 
     out << "    };\n";
@@ -556,7 +887,7 @@ void CodeGenerator::generateWAMRBindings(const std::vector<InterfaceInfo> &inter
     out << "} // namespace wasm_utils\n";
 }
 
-void CodeGenerator::generateWAMRHeader(const std::vector<InterfaceInfo> &interfaces, const std::string &filename, const std::string &packageName, const std::string &sampleHeaderFile)
+void CodeGenerator::generateWAMRHeader(const std::vector<InterfaceInfo> &interfaces, const std::string &filename, const std::string &packageName, const std::string &sampleHeaderFile, const PackageRegistry *registry, const std::set<std::string> *world_imports, const std::set<std::string> *world_exports)
 {
     std::ofstream out(filename);
     if (!out.is_open())
@@ -1006,6 +1337,35 @@ void CodeGenerator::generateTypeDefinitions(std::ofstream &out, const InterfaceI
 
 void CodeGenerator::generateFunctionDeclaration(std::ofstream &out, const FunctionSignature &func, const InterfaceInfo *iface)
 {
+    // Helper: check if function name conflicts with a type name in the interface
+    auto function_name_conflicts_with_type = [&](const std::string &name) -> bool
+    {
+        if (!iface)
+            return false;
+
+        // Check all type names in the interface (sanitized to match C++ identifiers)
+        for (const auto &variant : iface->variants)
+            if (sanitize_identifier(variant.name) == name)
+                return true;
+        for (const auto &record : iface->records)
+            if (sanitize_identifier(record.name) == name)
+                return true;
+        for (const auto &enumDef : iface->enums)
+            if (sanitize_identifier(enumDef.name) == name)
+                return true;
+        for (const auto &flagsDef : iface->flags)
+            if (sanitize_identifier(flagsDef.name) == name)
+                return true;
+        for (const auto &resourceDef : iface->resources)
+            if (sanitize_identifier(resourceDef.name) == name)
+                return true;
+        for (const auto &typeAlias : iface->type_aliases)
+            if (sanitize_identifier(typeAlias.name) == name)
+                return true;
+
+        return false;
+    };
+
     // Determine return type
     std::string return_type = "void";
     if (func.results.size() == 1)
@@ -1025,15 +1385,36 @@ void CodeGenerator::generateFunctionDeclaration(std::ofstream &out, const Functi
         return_type += ">";
     }
 
+    // Sanitize function name and check for type conflicts
+    std::string function_name = sanitize_identifier(func.name);
+
+    // If this is a resource method, prefix with resource name to avoid collisions
+    if (!func.resource_name.empty())
+    {
+        function_name = sanitize_identifier(func.resource_name) + "_" + function_name;
+    }
+
+    // Check if the (possibly prefixed) function name conflicts with a type
+    if (function_name_conflicts_with_type(function_name))
+    {
+        function_name += "_";
+    }
+
     // Generate host function declaration
-    out << return_type << " " << sanitize_identifier(func.name) << "(";
+    out << return_type << " " << function_name << "(";
 
     // Parameters
     for (size_t i = 0; i < func.parameters.size(); ++i)
     {
         if (i > 0)
             out << ", ";
-        out << TypeMapper::mapType(func.parameters[i].type, iface) << " " << sanitize_identifier(func.parameters[i].name);
+        // Also sanitize parameter names that conflict with types
+        std::string param_name = sanitize_identifier(func.parameters[i].name);
+        if (function_name_conflicts_with_type(func.parameters[i].name))
+        {
+            param_name += "_";
+        }
+        out << TypeMapper::mapType(func.parameters[i].type, iface) << " " << param_name;
     }
 
     out << ");\n\n";
@@ -1186,6 +1567,35 @@ void CodeGenerator::generateGuestFunctionTypeAlias(std::ofstream &out, const Fun
 
 void CodeGenerator::generateFunctionImplementation(std::ofstream &out, const FunctionSignature &func, const InterfaceInfo *iface)
 {
+    // Helper: check if function name conflicts with a type name in the interface
+    auto function_name_conflicts_with_type = [&](const std::string &name) -> bool
+    {
+        if (!iface)
+            return false;
+
+        // Check all type names in the interface (sanitized to match C++ identifiers)
+        for (const auto &variant : iface->variants)
+            if (sanitize_identifier(variant.name) == name)
+                return true;
+        for (const auto &record : iface->records)
+            if (sanitize_identifier(record.name) == name)
+                return true;
+        for (const auto &enumDef : iface->enums)
+            if (sanitize_identifier(enumDef.name) == name)
+                return true;
+        for (const auto &flagsDef : iface->flags)
+            if (sanitize_identifier(flagsDef.name) == name)
+                return true;
+        for (const auto &resourceDef : iface->resources)
+            if (sanitize_identifier(resourceDef.name) == name)
+                return true;
+        for (const auto &typeAlias : iface->type_aliases)
+            if (sanitize_identifier(typeAlias.name) == name)
+                return true;
+
+        return false;
+    };
+
     // Determine return type
     std::string return_type = "void";
     if (func.results.size() == 1)
@@ -1204,14 +1614,35 @@ void CodeGenerator::generateFunctionImplementation(std::ofstream &out, const Fun
         return_type += ">";
     }
 
-    out << return_type << " " << sanitize_identifier(func.name) << "(";
+    // Sanitize function name and check for type conflicts
+    std::string function_name = sanitize_identifier(func.name);
+
+    // If this is a resource method, prefix with resource name to avoid collisions
+    if (!func.resource_name.empty())
+    {
+        function_name = sanitize_identifier(func.resource_name) + "_" + function_name;
+    }
+
+    // Check if the (possibly prefixed) function name conflicts with a type
+    if (function_name_conflicts_with_type(function_name))
+    {
+        function_name += "_";
+    }
+
+    out << return_type << " " << function_name << "(";
 
     // Parameters
     for (size_t i = 0; i < func.parameters.size(); ++i)
     {
         if (i > 0)
             out << ", ";
-        out << TypeMapper::mapType(func.parameters[i].type, iface) << " " << sanitize_identifier(func.parameters[i].name);
+        // Also sanitize parameter names that conflict with types
+        std::string param_name = sanitize_identifier(func.parameters[i].name);
+        if (function_name_conflicts_with_type(func.parameters[i].name))
+        {
+            param_name += "_";
+        }
+        out << TypeMapper::mapType(func.parameters[i].type, iface) << " " << param_name;
     }
 
     out << ") {\n";
@@ -1223,4 +1654,327 @@ void CodeGenerator::generateFunctionImplementation(std::ofstream &out, const Fun
     }
 
     out << "}\n\n";
+}
+
+void CodeGenerator::generateExternalPackageStubs(std::ofstream &out,
+                                                 const std::vector<InterfaceInfo> &interfaces,
+                                                 const PackageRegistry *registry,
+                                                 const std::set<std::string> *external_deps)
+{
+    if (!registry)
+        return;
+
+    // Collect all external package references from use statements
+    std::set<std::string> external_packages;
+    std::map<std::string, std::set<std::string>> package_interfaces; // package -> interface names
+
+    for (const auto &iface : interfaces)
+    {
+        for (const auto &use_stmt : iface.use_statements)
+        {
+            if (!use_stmt.source_package.empty())
+            {
+                external_packages.insert(use_stmt.source_package);
+                package_interfaces[use_stmt.source_package].insert(use_stmt.source_interface);
+            }
+        }
+    }
+
+    // Also add external dependencies from world imports/exports
+    if (external_deps)
+    {
+        for (const auto &dep : *external_deps)
+        {
+            external_packages.insert(dep);
+            // Extract interface names from deps (format: "namespace:package/interface@version")
+            // For now, we'll just note the package is referenced
+        }
+    }
+
+    // Recursively collect transitive dependencies
+    // When an external package references another package via use statements,
+    // we need to generate stubs for those packages too
+    std::set<std::string> packages_to_process = external_packages;
+    while (!packages_to_process.empty())
+    {
+        std::set<std::string> newly_discovered;
+        for (const auto &package_spec : packages_to_process)
+        {
+            auto package = registry->get_package(package_spec);
+            if (!package)
+                continue;
+
+            // Check all interfaces in this package for use statements
+            for (const auto &iface : package->interfaces)
+            {
+                for (const auto &use_stmt : iface.use_statements)
+                {
+                    if (!use_stmt.source_package.empty() &&
+                        external_packages.find(use_stmt.source_package) == external_packages.end())
+                    {
+                        newly_discovered.insert(use_stmt.source_package);
+                        external_packages.insert(use_stmt.source_package);
+                    }
+                }
+            }
+        }
+        packages_to_process = newly_discovered;
+    }
+
+    if (external_packages.empty())
+        return;
+
+    out << "// External package stub declarations\n";
+    out << "// These are minimal type stubs for packages referenced from external sources\n\n";
+
+    // Sort packages by dependencies (topological sort)
+    // We need to ensure that if package A uses types from package B, B is generated before A
+    std::vector<std::string> sorted_packages;
+    std::set<std::string> processed;
+    std::map<std::string, std::set<std::string>> package_deps; // package -> packages it depends on
+
+    // First, build the dependency map
+    for (const auto &package_spec : external_packages)
+    {
+        auto package = registry->get_package(package_spec);
+        if (!package)
+            continue;
+
+        std::set<std::string> deps;
+        for (const auto &iface : package->interfaces)
+        {
+            for (const auto &use_stmt : iface.use_statements)
+            {
+                if (!use_stmt.source_package.empty() &&
+                    external_packages.find(use_stmt.source_package) != external_packages.end())
+                {
+                    deps.insert(use_stmt.source_package);
+                }
+            }
+        }
+        package_deps[package_spec] = deps;
+    }
+
+    // Topological sort using DFS
+    std::function<void(const std::string &)> visit = [&](const std::string &pkg)
+    {
+        if (processed.find(pkg) != processed.end())
+            return;
+        processed.insert(pkg);
+
+        // Visit dependencies first
+        if (package_deps.count(pkg))
+        {
+            for (const auto &dep : package_deps[pkg])
+            {
+                visit(dep);
+            }
+        }
+
+        sorted_packages.push_back(pkg);
+    };
+
+    for (const auto &package_spec : external_packages)
+    {
+        visit(package_spec);
+    }
+
+    for (const auto &package_spec : sorted_packages)
+    {
+        auto package_id = PackageId::parse(package_spec);
+        if (!package_id)
+            continue;
+
+        auto package = registry->get_package(*package_id);
+        if (!package)
+        {
+            // Package not loaded - generate placeholder comment
+            out << "// External package not loaded: " << package_spec << "\n";
+            continue;
+        }
+
+        std::string cpp_namespace = package_id->to_cpp_namespace();
+        out << "// Package: " << package_spec << "\n";
+        out << "namespace " << cpp_namespace << " {\n";
+
+        // Determine which interfaces to generate
+        std::set<std::string> interfaces_to_generate;
+        if (package_interfaces.count(package_spec) && !package_interfaces[package_spec].empty())
+        {
+            // Specific interfaces requested via use statements
+            interfaces_to_generate = package_interfaces[package_spec];
+        }
+        else
+        {
+            // Generate all interfaces in the package (for world imports/exports)
+            for (const auto &iface : package->interfaces)
+            {
+                interfaces_to_generate.insert(iface.name);
+            }
+        }
+
+        // Generate stub interfaces
+        for (const auto &iface_name : interfaces_to_generate)
+        {
+            auto *iface_ptr = package->get_interface(iface_name);
+            if (!iface_ptr)
+            {
+                out << "    // Interface not found: " << iface_name << "\n";
+                continue;
+            }
+
+            out << "    namespace " << sanitize_identifier(iface_name) << " {\n";
+
+            // Generate use declarations (type imports from other packages)
+            for (const auto &use_stmt : iface_ptr->use_statements)
+            {
+                if (!use_stmt.source_package.empty())
+                {
+                    // This is a cross-package use - generate using declaration
+                    auto use_pkg_id = PackageId::parse(use_stmt.source_package);
+                    if (use_pkg_id)
+                    {
+                        std::string use_cpp_ns = use_pkg_id->to_cpp_namespace();
+                        for (const auto &type_name : use_stmt.imported_types)
+                        {
+                            std::string local_name = use_stmt.type_renames.count(type_name)
+                                                         ? use_stmt.type_renames.at(type_name)
+                                                         : type_name;
+                            out << "        using " << sanitize_identifier(local_name)
+                                << " = ::" << use_cpp_ns << "::" << sanitize_identifier(use_stmt.source_interface)
+                                << "::" << sanitize_identifier(type_name) << ";\n";
+                        }
+                    }
+                }
+            }
+
+            // Generate type aliases for types used from this interface
+            // For now, we'll generate stubs for all types in the interface
+            for (const auto &type_alias : iface_ptr->type_aliases)
+            {
+                out << "        using " << sanitize_identifier(type_alias.name)
+                    << " = " << TypeMapper::mapType(type_alias.target_type, iface_ptr) << ";\n";
+            }
+
+            // Generate record stubs
+            for (const auto &record : iface_ptr->records)
+            {
+                out << "        struct " << sanitize_identifier(record.name) << " {\n";
+                for (const auto &field : record.fields)
+                {
+                    out << "            " << TypeMapper::mapType(field.type, iface_ptr)
+                        << " " << sanitize_identifier(field.name) << ";\n";
+                }
+                out << "        };\n";
+            }
+
+            // Generate enum stubs
+            for (const auto &enum_def : iface_ptr->enums)
+            {
+                out << "        enum class " << sanitize_identifier(enum_def.name) << " {\n";
+                for (size_t i = 0; i < enum_def.values.size(); ++i)
+                {
+                    out << "            " << sanitize_identifier(enum_def.values[i]);
+                    if (i < enum_def.values.size() - 1)
+                        out << ",";
+                    out << "\n";
+                }
+                out << "        };\n";
+            }
+
+            // Generate variant stubs
+            for (const auto &variant : iface_ptr->variants)
+            {
+                out << "        using " << sanitize_identifier(variant.name)
+                    << " = cmcpp::variant_t<";
+                for (size_t i = 0; i < variant.cases.size(); ++i)
+                {
+                    if (i > 0)
+                        out << ", ";
+                    if (variant.cases[i].type.empty() || variant.cases[i].type == "_")
+                    {
+                        out << "cmcpp::monostate";
+                    }
+                    else
+                    {
+                        out << TypeMapper::mapType(variant.cases[i].type, iface_ptr);
+                    }
+                }
+                out << ">;\n";
+            }
+
+            // Generate function declarations
+            for (const auto &func : iface_ptr->functions)
+            {
+                // Determine return type
+                // For external package stubs, use simple type names since we generate
+                // all necessary using declarations above
+                std::string return_type = "void";
+                if (func.results.size() == 1)
+                {
+                    std::string result_type = func.results[0];
+                    // Remove whitespace
+                    result_type.erase(std::remove_if(result_type.begin(), result_type.end(), ::isspace), result_type.end());
+
+                    // Check if this is a type available via use statement
+                    bool is_imported = false;
+                    for (const auto &use_stmt : iface_ptr->use_statements)
+                    {
+                        for (const auto &imported : use_stmt.imported_types)
+                        {
+                            std::string local_name = use_stmt.type_renames.count(imported)
+                                                         ? use_stmt.type_renames.at(imported)
+                                                         : imported;
+                            if (result_type == local_name)
+                            {
+                                is_imported = true;
+                                break;
+                            }
+                        }
+                        if (is_imported)
+                            break;
+                    }
+
+                    // If it's imported or a local type alias, use the simple name
+                    if (is_imported || std::any_of(iface_ptr->type_aliases.begin(), iface_ptr->type_aliases.end(),
+                                                   [&](const TypeAliasDef &ta)
+                                                   { return ta.name == result_type; }))
+                    {
+                        return_type = sanitize_identifier(result_type);
+                    }
+                    else
+                    {
+                        return_type = TypeMapper::mapType(func.results[0], iface_ptr);
+                    }
+                }
+                else if (func.results.size() > 1)
+                {
+                    return_type = "cmcpp::tuple_t<";
+                    for (size_t i = 0; i < func.results.size(); ++i)
+                    {
+                        if (i > 0)
+                            return_type += ", ";
+                        return_type += TypeMapper::mapType(func.results[i], iface_ptr);
+                    }
+                    return_type += ">";
+                }
+
+                out << "        " << return_type << " " << sanitize_identifier(func.name) << "(";
+
+                // Parameters
+                for (size_t i = 0; i < func.parameters.size(); ++i)
+                {
+                    if (i > 0)
+                        out << ", ";
+                    out << TypeMapper::mapType(func.parameters[i].type, iface_ptr) << " " << sanitize_identifier(func.parameters[i].name);
+                }
+
+                out << ");\n";
+            }
+
+            out << "    } // namespace " << sanitize_identifier(iface_name) << "\n";
+        }
+
+        out << "} // namespace " << cpp_namespace << "\n\n";
+    }
 }

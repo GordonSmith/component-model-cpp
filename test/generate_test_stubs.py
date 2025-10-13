@@ -11,6 +11,12 @@ from pathlib import Path
 from typing import List, Tuple
 import argparse
 
+# Force UTF-8 encoding for stdout on Windows
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 # ANSI color codes
 class Colors:
     RED = '\033[0;31m'
@@ -30,6 +36,16 @@ class Colors:
         if cls.supports_color():
             return f"{color_code}{text}{cls.NC}"
         return text
+
+# Platform-specific symbols
+if sys.platform == 'win32':
+    CHECKMARK = "OK"
+    CROSSMARK = "FAIL"
+    SKIPMARK = "SKIP"
+else:
+    CHECKMARK = "✓"
+    CROSSMARK = "✗"
+    SKIPMARK = "⊘"
 
 def find_wit_files(directory: Path) -> List[Path]:
     """Recursively find all .wit files in a directory"""
@@ -174,15 +190,15 @@ def main():
         success, message = generate_stub(wit_file, output_prefix, codegen_tool, args.verbose)
         
         if success:
-            print(Colors.color("✓", Colors.GREEN))
+            print(Colors.color(CHECKMARK, Colors.GREEN))
             if args.verbose and message:
                 print(f"       {message}")
             success_count += 1
         elif "No output files generated" in message:
-            print(Colors.color("⊘ (no output)", Colors.YELLOW))
+            print(Colors.color(f"{SKIPMARK} (no output)", Colors.YELLOW))
             skipped_count += 1
         else:
-            print(Colors.color("✗", Colors.RED))
+            print(Colors.color(CROSSMARK, Colors.RED))
             if args.verbose:
                 print(f"       Error: {message}")
             failure_count += 1
@@ -203,7 +219,7 @@ def main():
             if args.verbose:
                 print(f"    Error: {error}")
     
-    print(f"\n{Colors.color('✓', Colors.GREEN)} Stub generation complete!")
+    print(f"\n{Colors.color(CHECKMARK, Colors.GREEN)} Stub generation complete!")
     print(f"Output directory: {output_dir}")
     
     # Exit with 0 if we have successful generations, even with some failures
