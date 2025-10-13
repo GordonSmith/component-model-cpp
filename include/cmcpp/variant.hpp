@@ -170,7 +170,7 @@ namespace cmcpp
     template <Option T>
     inline void store(LiftLowerContext &cx, const T &v, uint32_t ptr)
     {
-        using V = variant_t<bool_t, typename ValTrait<T>::inner_type>;
+        using V = variant_t<monostate, typename ValTrait<T>::inner_type>;
         if (v.has_value())
         {
             V variant_val = V(std::in_place_index<1>, v.value());
@@ -178,7 +178,7 @@ namespace cmcpp
         }
         else
         {
-            V variant_val = V(std::in_place_index<0>, bool_t{false});
+            V variant_val = V(std::in_place_index<0>, monostate{});
             variant::store<V>(cx, variant_val, ptr);
         }
     }
@@ -194,7 +194,7 @@ namespace cmcpp
         }
         else
         {
-            V variant_val = V(std::in_place_index<0>, bool_t{false});
+            V variant_val = V(std::in_place_index<0>, monostate{});
             return variant::lower_flat<V>(cx, variant_val);
         }
     }
@@ -203,7 +203,7 @@ namespace cmcpp
     inline T load(const LiftLowerContext &cx, uint32_t ptr)
     {
         T retVal;
-        using V = variant_t<bool_t, typename ValTrait<T>::inner_type>;
+        using V = variant_t<monostate, typename ValTrait<T>::inner_type>;
         auto v = variant::load<V>(cx, ptr);
         if (v.index() == 1)
         {
@@ -216,7 +216,7 @@ namespace cmcpp
     inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
     {
         T retVal;
-        using V = variant_t<bool_t, typename ValTrait<T>::inner_type>;
+        using V = variant_t<monostate, typename ValTrait<T>::inner_type>;
         auto v = variant::lift_flat<V>(cx, vi);
         if (v.index() == 1)
         {

@@ -1,0 +1,138 @@
+WIT-Bindgen Test Suite Validation
+============================================================
+Found 199 WIT files in wit-bindgen test suite
+Using 32 parallel workers
+
+[  1/199] [93m⚠[0m empty.wit                                                     [  2/199] [93m⚠[0m issue569/wit/issue569.wit                                     [  3/199] [93m⚠[0m keywords-in-interfaces-and-worlds.wit                       
+[  4/199] [92m✓[0m char.wit                                                      [  5/199] [92m✓[0m import_export_func.wit                                        [  6/199] [92m✓[0m import-func.wit                                             
+[  7/199] [92m✓[0m import-export-same-func.wit                                   [  8/199] [91m✗[0m just-export.wit                                               [  9/199] [92m✓[0m floats.wit                                                  
+[ 10/199] [92m✓[0m enum-has-go-keyword.wit                                       [ 11/199] [92m✓[0m interface-has-go-keyword.wit                                  [ 12/199] [92m✓[0m issue668.wit                                                
+[ 13/199] [92m✓[0m issue569/wit/deps/poll/poll.wit                               [ 14/199] [92m✓[0m issue929-no-import.wit                                        [ 15/199] [92m✓[0m async-trait-function.wit                                    
+[ 16/199] [92m✓[0m allow-unused.wit                                              [ 17/199] [92m✓[0m guest-name.wit                                                [ 18/199] [93m⚠[0m multiversion/wit/root.wit                                   
+[ 19/199] [92m✓[0m issue929.wit                                                  [ 20/199] [92m✓[0m import-and-export-resource.wit                                [ 21/199] [92m✓[0m issue607.wit                                                
+[ 22/199] [92m✓[0m issue929-no-export.wit                                        [ 23/199] [91m✗[0m error-context.wit                                             [ 24/199] [92m✓[0m import-and-export-resource-alias.wit                        
+[ 25/199] [92m✓[0m integers.wit                                                  [ 26/199] [92m✓[0m go_params.wit                                                 [ 27/199] [92m✓[0m fully-qualified-java-address.wit                            
+[ 28/199] [92m✓[0m issue929-only-methods.wit                                     [ 29/199] [91m✗[0m issue569/wit/deps/io/streams.wit                              [ 30/199] [92m✓[0m issue551.wit                                                
+[ 31/199] [92m✓[0m flags.wit                                                     [ 32/199] [92m✓[0m keywords.wit                                                  [ 33/199] [92m✓[0m conventions.wit                                             
+[ 34/199] [92m✓[0m issue544.wit                                                  [ 35/199] [91m✗[0m issue573.wit                                                  [ 36/199] [92m✓[0m futures.wit                                                 
+[ 37/199] [91m✗[0m resource-alias.wit                                            [ 38/199] [92m✓[0m multi-return.wit                                              [ 39/199] [91m✗[0m multiversion/wit/deps/v2/root.wit                           
+[ 40/199] [92m✓[0m record-has-go-keyword-and-used-in-fn.wit                      [ 41/199] [92m✓[0m resource-borrow-in-record-export.wit                          [ 42/199] [92m✓[0m resource-own-in-other-interface.wit                         
+[ 43/199] [92m✓[0m rename-interface.wit                                          [ 44/199] [92m✓[0m resource-fallible-constructor.wit                             [ 45/199] [92m✓[0m resource-local-alias.wit                                    
+[ 46/199] [93m⚠[0m smoke-export.wit                                              [ 47/199] [91m✗[0m resource-borrow-in-record.wit                                 [ 48/199] [92m✓[0m multiversion/wit/deps/v1/root.wit                           
+[ 49/199] [92m✓[0m resources-with-futures.wit                                    [ 50/199] [92m✓[0m resource-local-alias-borrow-import.wit                        [ 51/199] [93m⚠[0m smoke.wit                                                   
+[ 52/199] [92m✓[0m resource-local-alias-borrow.wit                               [ 53/199] [92m✓[0m return-resource-from-export.wit                               [ 54/199] [93m⚠[0m wasi-cli/wit/command.wit                                    
+[ 55/199] [92m✓[0m resources-with-lists.wit                                      [ 56/199] [92m✓[0m option-result.wit                                             [ 57/199] [91m✗[0m resources-in-aggregates.wit                                 
+[ 58/199] [92m✓[0m resources-with-streams.wit                                    [ 59/199] [92m✓[0m records.wit                                                   [ 60/199] [93m⚠[0m wasi-cli/wit/deps/filesystem/world.wit                      
+[ 61/199] [92m✓[0m many-arguments.wit                                            [ 62/199] [93m⚠[0m wasi-cli/wit/deps/clocks/world.wit                            [ 63/199] [92m✓[0m same-names1.wit                                             
+[ 64/199] [92m✓[0m same-names3.wit                                               [ 65/199] [92m✓[0m result-empty.wit                                              [ 66/199] [93m⚠[0m wasi-cli/wit/deps/io/world.wit                              
+[ 67/199] [91m✗[0m lift-lower-foreign.wit                                        [ 68/199] [92m✓[0m same-names4.wit                                               [ 69/199] [93m⚠[0m wasi-cli/wit/deps/random/world.wit                          
+[ 70/199] [92m✓[0m lists.wit                                                     [ 71/199] [92m✓[0m same-names5.wit                                               [ 72/199] [92m✓[0m same-names2.wit                                             
+[ 73/199] [92m✓[0m ret-areas.wit                                                 [ 74/199] [92m✓[0m resources.wit                                                 [ 75/199] [93m⚠[0m wasi-cli/wit/deps/sockets/world.wit                         
+[ 76/199] [92m✓[0m simple-functions.wit                                          [ 77/199] [92m✓[0m simple-enum.wit                                               [ 78/199] [92m✓[0m smoke-default.wit                                           
+[ 79/199] [92m✓[0m small-anonymous.wit                                           [ 80/199] [92m✓[0m simple-lists.wit                                              [ 81/199] [93m⚠[0m wasi-cli/wit/imports.wit                                    
+[ 82/199] [92m✓[0m strings.wit                                                   [ 83/199] [92m✓[0m use-across-interfaces.wit                                     [ 84/199] [92m✓[0m simple-option.wit                                           
+[ 85/199] [92m✓[0m simple-http.wit                                               [ 86/199] [93m⚠[0m wasi-clocks/wit/deps/io/world.wit                             [ 87/199] [92m✓[0m unused-import.wit                                           
+[ 88/199] [92m✓[0m wasi-cli/wit/deps/random/insecure-seed.wit                    [ 89/199] [92m✓[0m wasi-cli/wit/deps/io/error.wit                                [ 90/199] [91m✗[0m wasi-cli/wit/deps/filesystem/preopens.wit                   
+[ 91/199] [93m⚠[0m wasi-clocks/wit/world.wit                                     [ 92/199] [92m✓[0m wasi-cli/wit/deps/io/poll.wit                                 [ 93/199] [91m✗[0m wasi-cli/wit/deps/clocks/monotonic-clock.wit                
+[ 94/199] [92m✓[0m wasi-cli/wit/deps/random/random.wit                           [ 95/199] [92m✓[0m wasi-cli/wit/deps/clocks/wall-clock.wit                       [ 96/199] [93m⚠[0m wasi-filesystem/wit/deps/io/world.wit                       
+[ 97/199] [93m⚠[0m wasi-filesystem/wit/deps/clocks/world.wit                     [ 98/199] [91m✗[0m variants-unioning-types.wit                                   [ 99/199] [91m✗[0m wasi-cli/wit/deps/sockets/instance-network.wit              
+[100/199] [92m✓[0m wasi-cli/wit/deps/random/insecure.wit                         [101/199] [93m⚠[0m wasi-filesystem/wit/world.wit                                 [102/199] [93m⚠[0m wasi-http/wit/deps/cli/command.wit                          
+[103/199] [91m✗[0m wasi-cli/wit/deps/sockets/udp-create-socket.wit               [104/199] [93m⚠[0m wasi-http/wit/deps/cli/imports.wit                            [105/199] [92m✓[0m wasi-cli/wit/environment.wit                                
+[106/199] [91m✗[0m variants.wit                                                  [107/199] [91m✗[0m wasi-cli/wit/deps/sockets/tcp-create-socket.wit               [108/199] [92m✓[0m wasi-cli/wit/exit.wit                                       
+[109/199] [91m✗[0m wasi-cli/wit/deps/sockets/ip-name-lookup.wit                  [110/199] [93m⚠[0m wasi-http/wit/deps/clocks/world.wit                           [111/199] [93m⚠[0m wasi-http/wit/deps/filesystem/world.wit                     
+[112/199] [92m✓[0m wasi-cli/wit/run.wit                                          [113/199] [91m✗[0m wasi-cli/wit/deps/io/streams.wit                              [114/199] [91m✗[0m wasi-cli/wit/stdio.wit                                      
+[115/199] [92m✓[0m wasi-clocks/wit/deps/io/error.wit                             [116/199] [92m✓[0m wasi-cli/wit/deps/sockets/network.wit                         [117/199] [93m⚠[0m wasi-http/wit/deps/io/world.wit                             
+[118/199] [91m✗[0m wasi-cli/wit/deps/sockets/udp.wit                             [119/199] [92m✓[0m streams.wit                                                   [120/199] [92m✓[0m wasi-clocks/wit/deps/io/poll.wit                            
+[121/199] [92m✓[0m wasi-cli/wit/terminal.wit                                     [122/199] [93m⚠[0m wasi-http/wit/deps/random/world.wit                           [123/199] [91m✗[0m wasi-cli/wit/deps/sockets/tcp.wit                           
+[124/199] [92m✓[0m wasi-filesystem/wit/deps/io/error.wit                         [125/199] [92m✓[0m wasi-clocks/wit/wall-clock.wit                                [126/199] [92m✓[0m wasi-http/wit/deps/cli/exit.wit                             
+[127/199] [91m✗[0m wasi-clocks/wit/monotonic-clock.wit                           [128/199] [91m✗[0m wasi-filesystem/wit/preopens.wit                              [129/199] [92m✓[0m wasi-http/wit/deps/cli/run.wit                              
+[130/199] [92m✓[0m wasi-filesystem/wit/deps/io/poll.wit                          [131/199] [91m✗[0m wasi-filesystem/wit/deps/clocks/monotonic-clock.wit           [132/199] [92m✓[0m wasi-filesystem/wit/deps/clocks/wall-clock.wit              
+[133/199] [92m✓[0m wasi-http/wit/deps/cli/environment.wit                        [134/199] [93m⚠[0m wasi-http/wit-0.3.0-draft/deps/cli/command.wit                [135/199] [93m⚠[0m wasi-http/wit/deps/sockets/world.wit                        
+[136/199] [93m⚠[0m wasi-http/wit/proxy.wit                                       [137/199] [91m✗[0m wasi-cli/wit/deps/filesystem/types.wit                        [138/199] [91m✗[0m wasi-http/wit/deps/cli/stdio.wit                            
+[139/199] [93m⚠[0m wasi-http/wit-0.3.0-draft/deps/cli/imports.wit                [140/199] [91m✗[0m wasi-clocks/wit/deps/io/streams.wit                           [141/199] [92m✓[0m wasi-http/wit/deps/clocks/wall-clock.wit                    
+[142/199] [93m⚠[0m wasi-http/wit-0.3.0-draft/deps/clocks/world.wit               [143/199] [93m⚠[0m wasi-http/wit-0.3.0-draft/deps/filesystem/world.wit           [144/199] [91m✗[0m wasi-http/wit/deps/clocks/monotonic-clock.wit               
+[145/199] [92m✓[0m wasi-http/wit/deps/cli/terminal.wit                           [146/199] [91m✗[0m wasi-http/wit/deps/filesystem/preopens.wit                    [147/199] [92m✓[0m wasi-http/wit/deps/io/error.wit                             
+[148/199] [93m⚠[0m wasi-http/wit-0.3.0-draft/deps/io/world.wit                   [149/199] [92m✓[0m wasi-http/wit/deps/io/poll.wit                                [150/199] [91m✗[0m wasi-filesystem/wit/deps/io/streams.wit                     
+[151/199] [93m⚠[0m wasi-http/wit-0.3.0-draft/deps/random/world.wit               [152/199] [92m✓[0m wasi-http/wit/deps/random/random.wit                          [153/199] [91m✗[0m wasi-http/wit/deps/sockets/instance-network.wit             
+[154/199] [92m✓[0m wasi-http/wit/deps/random/insecure-seed.wit                   [155/199] [92m✓[0m wasi-http/wit-0.3.0-draft/deps/cli/run.wit                    [156/199] [92m✓[0m wasi-http/wit/deps/random/insecure.wit                      
+[157/199] [91m✗[0m wasi-http/wit/deps/sockets/tcp-create-socket.wit              [158/199] [92m✓[0m wasi-http/wit-0.3.0-draft/deps/cli/exit.wit                   [159/199] [91m✗[0m wasi-http/wit/deps/sockets/udp-create-socket.wit            
+[160/199] [92m✓[0m wasi-http/wit-0.3.0-draft/deps/cli/environment.wit            [161/199] [91m✗[0m wasi-http/wit/deps/sockets/ip-name-lookup.wit                 [162/199] [91m✗[0m wasi-http/wit/deps/io/streams.wit                           
+[163/199] [93m⚠[0m wasi-http/wit-0.3.0-draft/proxy.wit                           [164/199] [92m✓[0m wasi-http/wit-0.3.0-draft/deps/clocks/wall-clock.wit          [165/199] [91m✗[0m wasi-http/wit/handler.wit                                   
+[166/199] [93m⚠[0m wasi-io/wit/world.wit                                         [167/199] [91m✗[0m wasi-filesystem/wit/types.wit                                 [168/199] [93m⚠[0m wasi-http/wit-0.3.0-draft/deps/sockets/world.wit            
+[169/199] [91m✗[0m wasi-http/wit-0.3.0-draft/deps/cli/stdio.wit                  [170/199] [92m✓[0m wasi-http/wit-0.3.0-draft/deps/cli/terminal.wit               [171/199] [92m✓[0m wasi-http/wit-0.3.0-draft/deps/io/poll.wit                  
+[172/199] [91m✗[0m wasi-http/wit-0.3.0-draft/deps/filesystem/preopens.wit        [173/199] [92m✓[0m wasi-http/wit-0.3.0-draft/deps/random/insecure-seed.wit       [174/199] [91m✗[0m wasi-http/wit-0.3.0-draft/deps/clocks/monotonic-clock.wit   
+[175/199] [92m✓[0m wasi-http/wit-0.3.0-draft/deps/io/error.wit                   [176/199] [92m✓[0m wasi-http/wit/deps/sockets/network.wit                        [177/199] [92m✓[0m wasi-http/wit-0.3.0-draft/deps/random/random.wit            
+[178/199] [91m✗[0m wasi-http/wit-0.3.0-draft/deps/sockets/instance-network.wit   [179/199] [92m✓[0m wasi-http/wit-0.3.0-draft/deps/random/insecure.wit            [180/199] [91m✗[0m wasi-http/wit/deps/sockets/udp.wit                          
+[181/199] [91m✗[0m wasi-http/wit/deps/filesystem/types.wit                       [182/199] [91m✗[0m wasi-http/wit/deps/sockets/tcp.wit                            [183/199] [91m✗[0m wasi-http/wit-0.3.0-draft/deps/sockets/ip-name-lookup.wit   
+[184/199] [91m✗[0m wasi-http/wit-0.3.0-draft/deps/sockets/tcp-create-socket.wit  [185/199] [91m✗[0m wasi-http/wit-0.3.0-draft/deps/io/streams.wit                 [186/199] [91m✗[0m wasi-http/wit-0.3.0-draft/handler.wit                       
+[187/199] [91m✗[0m wasi-http/wit-0.3.0-draft/deps/sockets/udp-create-socket.wit  [188/199] [92m✓[0m wasi-io/wit/poll.wit                                          [189/199] [92m✓[0m wasi-io/wit/error.wit                                       
+[190/199] [92m✓[0m world-has-go-keyword.wit                                      [191/199] [91m✗[0m worlds-with-types.wit                                         [192/199] [92m✓[0m zero-size-tuple.wit                                         
+[193/199] [92m✓[0m wasi-http/wit-0.3.0-draft/deps/sockets/network.wit            [194/199] [91m✗[0m wasi-http/wit-0.3.0-draft/deps/sockets/udp.wit                [195/199] [91m✗[0m wasi-http/wit-0.3.0-draft/deps/filesystem/types.wit         
+[196/199] [91m✗[0m wasi-http/wit-0.3.0-draft/deps/sockets/tcp.wit                [197/199] [91m✗[0m wasi-io/wit/streams.wit                                       [198/199] [91m✗[0m wasi-http/wit/types.wit                                     
+[199/199] [91m✗[0m wasi-http/wit-0.3.0-draft/types.wit                           
+
+============================================================
+Summary:
+  Total WIT files:        199
+  Generation successful:  164 (82.4%)
+  Generation failed:      35
+  Compilation successful: 108 (54.3%)
+  Compilation failed:     56
+
+[93mFailed generation (35 files):[0m
+  - empty.wit
+    Generation failed: Warning: No interfaces found in /home/gordon/component-model-cpp/ref/wit-bindgen/tests/codegen/empty.wit
+
+  - issue569/wit/issue569.wit
+    Generation failed: Warning: No interfaces found in /home/gordon/component-model-cpp/ref/wit-bindgen/tests/codegen/issue569/wit/issue569.wit
+
+  - keywords-in-interfaces-and-worlds.wit
+    Generation failed: Warning: No interfaces found in /home/gordon/component-model-cpp/ref/wit-bindgen/tests/codegen/keywords-in-interfaces-and-worlds.wit
+
+  - multiversion/wit/root.wit
+    Generation failed: Warning: No interfaces found in /home/gordon/component-model-cpp/ref/wit-bindgen/tests/codegen/multiversion/wit/root.wit
+
+  - smoke-export.wit
+    Generation failed: Warning: No interfaces found in /home/gordon/component-model-cpp/ref/wit-bindgen/tests/codegen/smoke-export.wit
+
+  - smoke.wit
+    Generation failed: Warning: No interfaces found in /home/gordon/component-model-cpp/ref/wit-bindgen/tests/codegen/smoke.wit
+
+  - wasi-cli/wit/command.wit
+    Generation failed: Warning: No interfaces found in /home/gordon/component-model-cpp/ref/wit-bindgen/tests/codegen/wasi-cli/wit/command.wit
+
+  - wasi-cli/wit/deps/filesystem/world.wit
+    Generation failed: Warning: No interfaces found in /home/gordon/component-model-cpp/ref/wit-bindgen/tests/codegen/wasi-cli/wit/deps/filesystem/world.wit
+
+  - wasi-cli/wit/deps/clocks/world.wit
+    Generation failed: Warning: No interfaces found in /home/gordon/component-model-cpp/ref/wit-bindgen/tests/codegen/wasi-cli/wit/deps/clocks/world.wit
+
+  - wasi-cli/wit/deps/io/world.wit
+    Generation failed: Warning: No interfaces found in /home/gordon/component-model-cpp/ref/wit-bindgen/tests/codegen/wasi-cli/wit/deps/io/world.wit
+
+  ... and 25 more
+
+[91mFailed compilation (56 files):[0m
+  - just-export.wit
+    /home/gordon/component-model-cpp/build/test/generated_wit_bindgen/just-export.hpp:23:98: error: ‘u8__’ was not declared in this scope
+  - error-context.wit
+    /home/gordon/component-model-cpp/build/test/generated_wit_bindgen/error-context.hpp:19:13: error: ‘error_context’ does not name a type
+  - issue569/wit/deps/io/streams.wit
+    /home/gordon/component-model-cpp/build/test/generated_wit_bindgen/issue569_wit_deps_io_streams.hpp:29:18: error: ‘poll_poll’ does not name a type
+  - issue573.wit
+    /home/gordon/component-model-cpp/build/test/generated_wit_bindgen/issue573.hpp:136:20: error: expected type-specifier before ‘t2_renamed’
+  - resource-alias.wit
+    /home/gordon/component-model-cpp/build/test/generated_wit_bindgen/resource-alias.hpp:34:7: error: ‘host’ in namespace ‘::’ does not name a type
+  - multiversion/wit/deps/v2/root.wit
+    /home/gordon/component-model-cpp/build/test/generated_wit_bindgen/multiversion_wit_deps_v2_root.hpp:27:13: error: ‘dep_a_0_1_0’ does not name a type
+  - resource-borrow-in-record.wit
+    /home/gordon/component-model-cpp/build/test/generated_wit_bindgen/resource-borrow-in-record.hpp:19:5: error: ‘y’ does not name a type
+  - resources-in-aggregates.wit
+    /home/gordon/component-model-cpp/build/test/generated_wit_bindgen/resources-in-aggregates.hpp:113:49: error: template argument 2 is invalid
+  - lift-lower-foreign.wit
+    /home/gordon/component-model-cpp/build/test/generated_wit_bindgen/lift-lower-foreign.hpp:89:14: error: expected type-specifier before ‘u1’
+  - wasi-cli/wit/deps/filesystem/preopens.wit
+    /home/gordon/component-model-cpp/build/test/generated_wit_bindgen/wasi-cli_wit_deps_filesystem_preopens.hpp:27:20: error: ‘types’ does not name a type
+  ... and 46 more
+
+[93mOverall success rate: 54.3%[0m

@@ -16,3 +16,7 @@ antlr-*.jar
 # Python cache files
 __pycache__/
 *.pyc
+
+# Generated test stubs
+/test/generated_stubs/
+/test/test_stubs_sample/

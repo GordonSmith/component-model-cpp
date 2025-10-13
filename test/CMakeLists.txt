@@ -37,6 +37,31 @@ add_test(
   COMMAND $<TARGET_FILE:${PROJECT_NAME}>
 )
 
+# ===== WAMR Sample Test =====
+# Run the WAMR sample as a test to ensure it executes successfully
+# This test is only added if the wamr sample target exists
+
+if(TARGET wamr)
+    message(STATUS "Adding WAMR sample test...")
+    add_test(
+        NAME wamr-sample-test
+        COMMAND $<TARGET_FILE:wamr>
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/samples/wamr
+    )
+    
+    # Set test properties
+    set_tests_properties(wamr-sample-test PROPERTIES
+        LABELS "sample"
+        TIMEOUT 30
+    )
+    
+    message(STATUS "WAMR sample test configuration:")
+    message(STATUS "  Test executable: wamr")
+    message(STATUS "  Working directory: ${CMAKE_BINARY_DIR}/samples/wamr")
+else()
+    message(STATUS "WAMR sample not built, skipping wamr-sample-test")
+endif()
+
 # ===== Grammar Test Suite =====
 # Build the test executable that validates the WIT grammar against wit-bindgen test files
 # This test is only built if BUILD_GRAMMAR is enabled and generate-grammar target exists
@@ -127,3 +152,8 @@ else()
     message(STATUS "Grammar library not built, skipping grammar tests")
     message(STATUS "  Enable with: cmake -DBUILD_GRAMMAR=ON")
 endif()
+
+# ===== WIT Stub Generation and Validation Tests =====
+# Include the stub generation test module which generates and compiles stubs
+# to validate the complete code generation pipeline
+include(StubGenerationTests.cmake)

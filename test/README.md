@@ -27,6 +27,8 @@ cd build && ctest -R component-model-test
 
 Validates the ANTLR4-based WIT parser against official test files from the [wit-bindgen](https://github.com/bytecodealliance/wit-bindgen) project.
 
+**📖 See [TESTING_GRAMMAR.md](TESTING_GRAMMAR.md) for complete grammar testing documentation.**
+
 #### Requirements
 - Java Runtime Environment (for ANTLR)
 - CMake flag: `-DBUILD_GRAMMAR=ON`
@@ -56,6 +58,66 @@ cmake --build build --target test-wit-grammar --config Release
 # 3. Run the tests (must specify -C configuration on Windows)
 cd build && ctest -C Release -R wit-grammar-test --verbose
 ```
+
+### 3. WIT Stub Generation
+
+Generate C++ host function stubs from all WIT test files. Useful for testing the code generator and creating reference implementations.
+
+**📖 See [STUB_GENERATION.md](STUB_GENERATION.md) for stub generation scripts.**  
+**📖 See [CODEGEN_VALIDATION.md](CODEGEN_VALIDATION.md) for the validation framework.**
+
+#### Quick Start
+
+```bash
+# Prerequisites: build wit-codegen tool
+cmake --build build --target wit-codegen
+
+# Generate stubs for all test files (Python - recommended)
+cd test && ./generate_test_stubs.py
+
+# Or use the bash script
+cd test && ./generate_test_stubs.sh
+
+# Verbose output (see what files are generated)
+./generate_test_stubs.py -v
+
+# Filter specific files
+./generate_test_stubs.py -f "streams"
+```
+
+#### Code Generation Validation
+
+The framework also validates generated code by attempting to compile it:
+
+```bash
+# Generate AND compile stubs (validation test)
+cmake --build build --target test-stubs-full
+```
+
+**⚠️ IMPORTANT**: Compilation failures are **expected and useful**! They indicate bugs in `wit-codegen` that need fixing. See [CODEGEN_VALIDATION.md](CODEGEN_VALIDATION.md) for details on interpreting failures.
+
+#### Generated Files
+
+For each `.wit` file in the test suite:
+- `<name>.hpp` - Host/guest function declarations
+- `<name>_wamr.hpp` - WAMR host wrappers with automatic marshaling
+- `<name>_wamr.cpp` - WAMR native symbol registration
+
+**Example output:**
+```
+generated_stubs/
+├── floats.hpp
+├── floats_wamr.hpp
+├── floats_wamr.cpp
+├── streams.hpp
+├── streams_wamr.hpp
+└── streams_wamr.cpp
+```
+
+#### Use Cases
+- **Testing**: Verify the full toolchain (grammar → parser → codegen) works end-to-end
+- **Reference**: See how WIT features map to C++ types and WAMR integration
+- **Development**: Quick starting point for implementing Component Model features
 
 #### What Gets Tested
 
@@ -270,16 +332,54 @@ genhtml coverage_filtered.info --output-directory coverage_html
 
 ```
 test/
-├── main.cpp              # Main test runner (doctest)
-├── scratchpad.cpp        # Component model ABI tests
-├── host-util.hpp         # Test utilities
-├── host-util.cpp         # Host function helpers
-├── test_grammar.cpp      # WIT grammar parser tests
-├── CMakeLists.txt        # Test build configuration
-└── README.md             # This file
+├── main.cpp                      # Main test runner (doctest)
+├── scratchpad.cpp                # Component model ABI tests
+├── host-util.hpp                 # Test utilities
+├── host-util.cpp                 # Host function helpers
+├── test_grammar.cpp              # WIT grammar parser tests
+├── generate_test_stubs.py        # Python stub generator (recommended)
+├── generate_test_stubs.sh        # Bash stub generator
+├── CMakeLists.txt                # Test build configuration
+├── README.md                     # This file (overview)
+├── TESTING_GRAMMAR.md            # Detailed grammar testing guide
+├── STUB_GENERATION.md            # Detailed stub generation guide
+└── STUB_GENERATION_QUICKREF.md  # Quick reference for stub generation
 ```
 
 VS Code launch configurations are available in `.vscode/launch.json` for running and debugging all tests.
+
+## Complete Workflow Example
+
+Here's a complete example of the test workflow from WIT file to generated stubs:
+
+```bash
+# 1. Initialize the project
+git clone <repo> && cd component-model-cpp
+git submodule update --init --recursive
+
+# 2. Build with grammar support
+cmake -B build -DBUILD_GRAMMAR=ON
+cmake --build build
+
+# 3. Run grammar tests to validate WIT parsing
+cd build && ctest -R wit-grammar-test --verbose
+
+# 4. Generate stubs from all test WIT files
+cd ../test
+./generate_test_stubs.py -v
+
+# 5. Check the generated stubs
+ls generated_stubs/
+cat generated_stubs/floats.hpp
+
+# 6. (Optional) Use generated stubs in your project
+cp generated_stubs/floats* ../my_project/
+```
+
+**Result:** You now have:
+- ✅ Validated WIT parser working on 95+ test files
+- ✅ Generated C++ host function stubs with WAMR integration
+- ✅ Ready-to-use code for Component Model development
 
 ## Dependencies
 
