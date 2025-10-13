@@ -55,7 +55,8 @@ inline std::string sanitize_identifier(const std::string &name)
         "this", "new", "delete", "operator", "sizeof", "alignof", "decltype",
         "auto", "template", "typename", "try", "catch", "throw", "friend",
         "goto", "asm", "register", "signed", "unsigned", "short", "long",
-        "errno"}; // errno is a system macro from <errno.h>
+        "errno",                      // system macro from <errno.h>
+        "stdin", "stdout", "stderr"}; // standard stream macros from <cstdio>
 
     if (keywords.find(result) != keywords.end())
     {

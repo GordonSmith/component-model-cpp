@@ -545,6 +545,8 @@ namespace cmcpp
         {
             return 0;
         }
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, state.queue.size() > std::numeric_limits<uint32_t>::max(), "stream queue size overflow");
         uint32_t available = std::min<uint32_t>(max_count, static_cast<uint32_t>(state.queue.size()));
         if (available == 0)
         {
@@ -552,7 +554,6 @@ namespace cmcpp
         }
         ensure_memory_range(*cx, ptr, offset + available, state.descriptor.alignment, state.descriptor.element_size);
         auto *dest = cx->opts.memory.data() + ptr + offset * state.descriptor.element_size;
-        auto trap_cx = make_trap_context(trap);
         for (uint32_t i = 0; i < available; ++i)
         {
             const auto &bytes = state.queue.front();

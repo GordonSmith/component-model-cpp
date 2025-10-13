@@ -238,6 +238,7 @@ antlrcpp::Any WitInterfaceVisitor::visitFuncItem(WitParser::FuncItemContext *ctx
 
     FunctionSignature func;
     func.interface_name = currentInterface->name;
+    func.resource_name = currentResource; // Set resource name if we're in a resource
 
     // Get function name (id before ':')
     if (ctx->id())
@@ -414,16 +415,30 @@ void WitInterfaceVisitor::parseFlagsFields(WitParser::FlagsFieldsContext *ctx, F
 // Visit resource type definitions
 antlrcpp::Any WitInterfaceVisitor::visitResourceItem(WitParser::ResourceItemContext *ctx)
 {
-    if (!currentInterface || !ctx->id())
+    if (!ctx->id())
     {
         return visitChildren(ctx);
+    }
+
+    // If not in an interface, create/use world-level types interface
+    InterfaceInfo *targetInterface = currentInterface;
+    if (!targetInterface)
+    {
+        targetInterface = getWorldLevelTypes();
     }
 
     ResourceDef resourceDef;
     resourceDef.name = extract_identifier(ctx->id());
 
-    currentInterface->resources.push_back(resourceDef);
-    return visitChildren(ctx);
+    targetInterface->resources.push_back(resourceDef);
+
+    // Track current resource and visit children (methods)
+    std::string previousResource = currentResource;
+    currentResource = resourceDef.name;
+    visitChildren(ctx);
+    currentResource = previousResource;
+
+    return nullptr;
 }
 
 // Visit record type definitions
@@ -527,22 +542,27 @@ antlrcpp::Any WitInterfaceVisitor::visitUseItem(WitParser::UseItemContext *ctx)
     size_t colonPos = pathText.find(':');
     if (colonPos != std::string::npos)
     {
-        // Cross-package: "wasi:poll/poll" or "wasi:io/poll@0.2.0" -> package="wasi:poll" or "wasi:io", interface="poll"
+        // Cross-package: "wasi:poll/poll" or "my:dep/a@0.1.0" -> extract package with version
         size_t slashPos = pathText.find('/', colonPos);
         if (slashPos != std::string::npos)
         {
-            useStmt.source_package = pathText.substr(0, slashPos);
+            // Format: "namespace:package/interface@version"
             std::string interfacePart = pathText.substr(slashPos + 1);
 
-            // Strip version if present (e.g., "poll@0.2.0" -> "poll")
+            // Check if version is present after interface name
             size_t atPos = interfacePart.find('@');
             if (atPos != std::string::npos)
             {
+                // Version present: "a@0.1.0"
                 useStmt.source_interface = interfacePart.substr(0, atPos);
+                std::string version = interfacePart.substr(atPos);               // "@0.1.0"
+                useStmt.source_package = pathText.substr(0, slashPos) + version; // "my:dep@0.1.0"
             }
             else
             {
+                // No version: "a"
                 useStmt.source_interface = interfacePart;
+                useStmt.source_package = pathText.substr(0, slashPos); // "my:dep"
             }
         }
         else
@@ -556,6 +576,8 @@ antlrcpp::Any WitInterfaceVisitor::visitUseItem(WitParser::UseItemContext *ctx)
             if (atPos != std::string::npos)
             {
                 useStmt.source_interface = interfacePart.substr(0, atPos);
+                // Add version to package
+                useStmt.source_package += interfacePart.substr(atPos);
             }
             else
             {

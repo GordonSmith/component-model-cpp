@@ -3,6 +3,10 @@
 
 #include "context.hpp"
 
+#include <limits>
+#include <stdexcept>
+#include <type_traits>
+
 namespace cmcpp
 {
     const bool DETERMINISTIC_PROFILE = false;
@@ -36,6 +40,43 @@ namespace cmcpp
         return static_cast<int32_t>(x);
     }
 
+    template <typename T>
+    inline uint32_t checked_uint32(T value, const char *message = "value does not fit in uint32_t")
+    {
+        static_assert(std::is_integral_v<std::decay_t<T>> || std::is_enum_v<std::decay_t<T>>, "checked_uint32 expects an integral or enum type");
+
+        using ValueType = std::decay_t<T>;
+        if constexpr (std::is_signed_v<ValueType>)
+        {
+            if (value < 0)
+            {
+                throw std::overflow_error(message);
+            }
+        }
+
+        auto wide = static_cast<uint64_t>(value);
+        if (wide > std::numeric_limits<uint32_t>::max())
+        {
+            throw std::overflow_error(message);
+        }
+        return static_cast<uint32_t>(wide);
+    }
+
+    template <typename T>
+    inline uint32_t checked_uint32(const LiftLowerContext &cx, T value, const char *message = "value does not fit in uint32_t")
+    {
+        static_assert(std::is_integral_v<std::decay_t<T>> || std::is_enum_v<std::decay_t<T>>, "checked_uint32 expects an integral or enum type");
+
+        using ValueType = std::decay_t<T>;
+        if constexpr (std::is_signed_v<ValueType>)
+        {
+            trap_if(cx, value < 0, message);
+        }
+
+        trap_if(cx, static_cast<uint64_t>(value) > std::numeric_limits<uint32_t>::max(), message);
+        return static_cast<uint32_t>(value);
+    }
+
     inline float32_t decode_i32_as_float(int32_t i)
     {
         return *reinterpret_cast<float32_t *>(&i);
@@ -44,6 +85,80 @@ namespace cmcpp
     inline float64_t decode_i64_as_float(int64_t i)
     {
         return *reinterpret_cast<float64_t *>(&i);
+    }
+
+    template <typename T>
+    inline int32_t checked_int32(T value, const char *message = "value does not fit in int32_t")
+    {
+        static_assert(std::is_integral_v<std::decay_t<T>> || std::is_enum_v<std::decay_t<T>>, "checked_int32 expects an integral or enum type");
+
+        using ValueType = std::decay_t<T>;
+        constexpr auto min = static_cast<int64_t>(std::numeric_limits<int32_t>::min());
+        constexpr auto max = static_cast<int64_t>(std::numeric_limits<int32_t>::max());
+
+        int64_t wide;
+        if constexpr (std::is_enum_v<ValueType>)
+        {
+            using Underlying = std::underlying_type_t<ValueType>;
+            if constexpr (std::is_signed_v<Underlying>)
+            {
+                wide = static_cast<int64_t>(static_cast<Underlying>(value));
+            }
+            else
+            {
+                wide = static_cast<int64_t>(static_cast<uint64_t>(static_cast<Underlying>(value)));
+            }
+        }
+        else if constexpr (std::is_signed_v<ValueType>)
+        {
+            wide = static_cast<int64_t>(value);
+        }
+        else
+        {
+            wide = static_cast<int64_t>(static_cast<uint64_t>(value));
+        }
+
+        if (wide < min || wide > max)
+        {
+            throw std::overflow_error(message);
+        }
+
+        return static_cast<int32_t>(wide);
+    }
+
+    template <typename T>
+    inline int32_t checked_int32(const LiftLowerContext &cx, T value, const char *message = "value does not fit in int32_t")
+    {
+        static_assert(std::is_integral_v<std::decay_t<T>> || std::is_enum_v<std::decay_t<T>>, "checked_int32 expects an integral or enum type");
+
+        using ValueType = std::decay_t<T>;
+        constexpr auto min = static_cast<int64_t>(std::numeric_limits<int32_t>::min());
+        constexpr auto max = static_cast<int64_t>(std::numeric_limits<int32_t>::max());
+
+        int64_t wide;
+        if constexpr (std::is_enum_v<ValueType>)
+        {
+            using Underlying = std::underlying_type_t<ValueType>;
+            if constexpr (std::is_signed_v<Underlying>)
+            {
+                wide = static_cast<int64_t>(static_cast<Underlying>(value));
+            }
+            else
+            {
+                wide = static_cast<int64_t>(static_cast<uint64_t>(static_cast<Underlying>(value)));
+            }
+        }
+        else if constexpr (std::is_signed_v<ValueType>)
+        {
+            wide = static_cast<int64_t>(value);
+        }
+        else
+        {
+            wide = static_cast<int64_t>(static_cast<uint64_t>(value));
+        }
+
+        trap_if(cx, wide < min || wide > max, message);
+        return static_cast<int32_t>(wide);
     }
 
     class CoreValueIter

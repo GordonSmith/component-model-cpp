@@ -119,13 +119,7 @@ jobs:
       - name: Run Tests
         working-directory: build
         run: |
-          ctest ${{ matrix.cpack-config || '' }} -VV -E "wit-stub-generation-test"
-
-      - name: Upload test summary
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.os }}-test-summary
-          path: build/test_summary.md
+          ctest ${{ matrix.cpack-config || '' }} -VV
 
       - name: Create Packages
         working-directory: build

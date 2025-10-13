@@ -17,6 +17,7 @@ private:
     std::vector<InterfaceInfo> &interfaces;
     InterfaceInfo *currentInterface = nullptr;
     std::string currentPackage;
+    std::string currentResource;                        // Track the current resource being parsed
     std::set<std::string> importedInterfaces;           // Track which interfaces are imported in the world
     std::set<std::string> exportedInterfaces;           // Track which interfaces are exported in the world
     std::vector<FunctionSignature> standaloneFunctions; // Standalone functions from world (not in interfaces)

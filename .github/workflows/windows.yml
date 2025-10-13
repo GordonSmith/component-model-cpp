@@ -73,7 +73,7 @@ jobs:
       - name: test
         working-directory: build
         run: |
-          ctest -C Debug -VV -E "wit-stub-generation-test"
+          ctest -C Debug -VV
 
       - name: test-stubs-full (allowed to fail)
         working-directory: build

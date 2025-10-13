@@ -5,7 +5,7 @@
 
 // Generated WAMR bindings for package: example:sample
 // These symbol arrays can be used with wasm_runtime_register_natives_raw()
-// NOTE: You must implement the functions declared in the imports namespace
+// NOTE: You must implement the functions declared in the host namespace
 // (See sample.hpp for declarations, provide implementations in your host code)
 
 using namespace cmcpp;
@@ -96,8 +96,5 @@ namespace wasm_utils {
 
 const uint32_t DEFAULT_STACK_SIZE = 8192;
 const uint32_t DEFAULT_HEAP_SIZE = 8192;
-
-// Note: create_guest_realloc() and create_lift_lower_context() have been
-// moved to <wamr.hpp> in the cmcpp namespace and are available for use directly
 
 } // namespace wasm_utils

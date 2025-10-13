@@ -1,11 +1,123 @@
 #include "type_mapper.hpp"
+#include "package_registry.hpp"
 
-// Define static member
+#include <cctype>
+#include <optional>
+
+namespace
+{
+    enum class InterfaceTypeKind
+    {
+        Enum,
+        Variant,
+        Record,
+        Flags,
+        Resource,
+        Alias
+    };
+
+    std::optional<InterfaceTypeKind> find_interface_type_kind(const InterfaceInfo &iface, const std::string &type_name)
+    {
+        auto matches = [&](const std::string &candidate)
+        {
+            return candidate == type_name;
+        };
+
+        for (const auto &variant : iface.variants)
+        {
+            if (matches(variant.name))
+                return InterfaceTypeKind::Variant;
+        }
+
+        for (const auto &enumDef : iface.enums)
+        {
+            if (matches(enumDef.name))
+                return InterfaceTypeKind::Enum;
+        }
+
+        for (const auto &record : iface.records)
+        {
+            if (matches(record.name))
+                return InterfaceTypeKind::Record;
+        }
+
+        for (const auto &flagsDef : iface.flags)
+        {
+            if (matches(flagsDef.name))
+                return InterfaceTypeKind::Flags;
+        }
+
+        for (const auto &resourceDef : iface.resources)
+        {
+            if (matches(resourceDef.name))
+                return InterfaceTypeKind::Resource;
+        }
+
+        for (const auto &typeAlias : iface.type_aliases)
+        {
+            if (matches(typeAlias.name))
+                return InterfaceTypeKind::Alias;
+        }
+
+        return std::nullopt;
+    }
+
+    std::string qualify_identifier(const std::string &text,
+                                   const std::string &identifier,
+                                   const std::string &qualification)
+    {
+        if (text.find(qualification) != std::string::npos)
+            return text;
+
+        auto is_identifier_char = [](char ch)
+        {
+            return std::isalnum(static_cast<unsigned char>(ch)) || ch == '_' || ch == ':';
+        };
+
+        std::string result;
+        size_t pos = 0;
+        while (pos < text.size())
+        {
+            size_t found = text.find(identifier, pos);
+            if (found == std::string::npos)
+            {
+                result.append(text.substr(pos));
+                break;
+            }
+
+            bool valid_start = (found == 0) || !is_identifier_char(text[found - 1]);
+            bool valid_end = (found + identifier.size() >= text.size()) ||
+                             !is_identifier_char(text[found + identifier.size()]);
+
+            if (valid_start && valid_end)
+            {
+                result.append(text.substr(pos, found - pos));
+                result.append(qualification);
+            }
+            else
+            {
+                result.append(text.substr(pos, found - pos + identifier.size()));
+            }
+
+            pos = found + identifier.size();
+        }
+
+        return result;
+    }
+} // namespace
+
+// Define static members
 const std::vector<InterfaceInfo> *TypeMapper::all_interfaces = nullptr;
+PackageRegistry *TypeMapper::package_registry = nullptr;
 
 void TypeMapper::setInterfaces(const std::vector<InterfaceInfo> *interfaces)
 {
     all_interfaces = interfaces;
+}
+
+void TypeMapper::setPackageRegistry(PackageRegistry *registry)
+{
+    package_registry = registry;
 }
 
 std::string TypeMapper::mapType(const std::string &witType, const InterfaceInfo *iface)
@@ -148,12 +260,26 @@ std::string TypeMapper::mapType(const std::string &witType, const InterfaceInfo 
                 const InterfaceInfo *sourceIface = nullptr;
                 if (all_interfaces)
                 {
+                    // First, try to find an interface with the same kind as current interface (prefer same namespace)
                     for (const auto &other : *all_interfaces)
                     {
-                        if (other.name == useStmt.source_interface)
+                        if (other.name == useStmt.source_interface && other.kind == iface->kind)
                         {
                             sourceIface = &other;
                             break;
+                        }
+                    }
+
+                    // If not found, fall back to any interface with matching name
+                    if (!sourceIface)
+                    {
+                        for (const auto &other : *all_interfaces)
+                        {
+                            if (other.name == useStmt.source_interface)
+                            {
+                                sourceIface = &other;
+                                break;
+                            }
                         }
                     }
                 }
@@ -171,8 +297,27 @@ std::string TypeMapper::mapType(const std::string &witType, const InterfaceInfo 
                         if (isMatch)
                         {
                             std::string sourceType = importedType; // Original name in source interface
+
                             std::string prefix = (sourceIface->kind == InterfaceKind::Import) ? "::host::" : "::guest::";
-                            return prefix + sanitize_identifier(useStmt.source_interface) + "::" + sanitize_identifier(sourceType);
+                            auto type_kind = find_interface_type_kind(*sourceIface, sourceType);
+
+                            if (type_kind)
+                            {
+                                if (*type_kind == InterfaceTypeKind::Alias)
+                                {
+                                    return prefix + sanitize_identifier(useStmt.source_interface) + "::" + sanitize_identifier(sourceType);
+                                }
+
+                                std::string resolvedType = mapType(sourceType, sourceIface);
+                                std::string sourceIdent = sanitize_identifier(sourceType);
+                                std::string qualified = prefix + sanitize_identifier(useStmt.source_interface) + "::" + sourceIdent;
+                                return qualify_identifier(resolvedType, sourceIdent, qualified);
+                            }
+
+                            // Recursively resolve the type in the source interface context
+                            // This handles chained imports like: world uses e2.{x}, e2 uses e1.{x}
+                            std::string resolvedType = mapType(sourceType, sourceIface);
+                            return resolvedType;
                         }
                     }
                 }
@@ -225,12 +370,26 @@ std::string TypeMapper::mapType(const std::string &witType, const InterfaceInfo 
                     const InterfaceInfo *sourceIface = nullptr;
                     if (all_interfaces)
                     {
+                        // First, try to find an interface with the same kind as current interface (prefer same namespace)
                         for (const auto &other : *all_interfaces)
                         {
-                            if (other.name == useStmt.source_interface)
+                            if (other.name == useStmt.source_interface && other.kind == iface->kind)
                             {
                                 sourceIface = &other;
                                 break;
+                            }
+                        }
+
+                        // If not found, fall back to any interface with matching name
+                        if (!sourceIface)
+                        {
+                            for (const auto &other : *all_interfaces)
+                            {
+                                if (other.name == useStmt.source_interface)
+                                {
+                                    sourceIface = &other;
+                                    break;
+                                }
                             }
                         }
                     }
@@ -239,12 +398,51 @@ std::string TypeMapper::mapType(const std::string &witType, const InterfaceInfo 
                     if (sourceIface && sourceIface->kind != iface->kind)
                     {
                         std::string prefix = (sourceIface->kind == InterfaceKind::Import) ? "::host::" : "::guest::";
-                        return prefix + sanitize_identifier(useStmt.source_interface) + "::" + sanitize_identifier(lookupName);
+                        auto type_kind = find_interface_type_kind(*sourceIface, lookupName);
+
+                        if (type_kind)
+                        {
+                            if (*type_kind == InterfaceTypeKind::Alias)
+                            {
+                                return prefix + sanitize_identifier(useStmt.source_interface) + "::" + sanitize_identifier(lookupName);
+                            }
+
+                            std::string resolvedType = mapType(lookupName, sourceIface);
+                            std::string sourceIdent = sanitize_identifier(lookupName);
+                            std::string qualified = prefix + sanitize_identifier(useStmt.source_interface) + "::" + sourceIdent;
+                            return qualify_identifier(resolvedType, sourceIdent, qualified);
+                        }
+
+                        // Recursively resolve the type in the source interface context
+                        // This handles chained imports like: world uses e2.{x}, e2 uses e1.{x}
+                        std::string resolvedType = mapType(lookupName, sourceIface);
+                        return resolvedType;
+                    }
+                    else if (sourceIface)
+                    {
+                        auto type_kind = find_interface_type_kind(*sourceIface, lookupName);
+
+                        if (type_kind)
+                        {
+                            if (*type_kind == InterfaceTypeKind::Alias)
+                            {
+                                return sanitize_identifier(useStmt.source_interface) + "::" + sanitize_identifier(lookupName);
+                            }
+
+                            std::string resolvedType = mapType(lookupName, sourceIface);
+                            std::string sourceIdent = sanitize_identifier(lookupName);
+                            std::string qualified = sanitize_identifier(useStmt.source_interface) + "::" + sourceIdent;
+                            return qualify_identifier(resolvedType, sourceIdent, qualified);
+                        }
+
+                        // Same namespace - recursively resolve in source interface
+                        std::string resolvedType = mapType(lookupName, sourceIface);
+                        return resolvedType;
                     }
                     else
                     {
-                        // Same namespace, just use the interface name
-                        return sanitize_identifier(useStmt.source_interface) + "::" + sanitize_identifier(lookupName);
+                        // Source interface not found, return unqualified
+                        return sanitize_identifier(lookupName);
                     }
                 }
             }
@@ -274,12 +472,26 @@ std::string TypeMapper::mapType(const std::string &witType, const InterfaceInfo 
                         {
                             // Find the source interface to determine its namespace
                             const InterfaceInfo *sourceIface = nullptr;
+                            // First, try to find an interface with Export kind for world-level types
                             for (const auto &srcIface : *all_interfaces)
                             {
-                                if (srcIface.name == useStmt.source_interface)
+                                if (srcIface.name == useStmt.source_interface && srcIface.kind == InterfaceKind::Export)
                                 {
                                     sourceIface = &srcIface;
                                     break;
+                                }
+                            }
+
+                            // If not found, fall back to any interface with matching name
+                            if (!sourceIface)
+                            {
+                                for (const auto &srcIface : *all_interfaces)
+                                {
+                                    if (srcIface.name == useStmt.source_interface)
+                                    {
+                                        sourceIface = &srcIface;
+                                        break;
+                                    }
                                 }
                             }
 
@@ -287,8 +499,23 @@ std::string TypeMapper::mapType(const std::string &witType, const InterfaceInfo 
                             if (sourceIface)
                             {
                                 std::string prefix = (sourceIface->kind == InterfaceKind::Import) ? "::host::" : "::guest::";
-                                std::string result = prefix + sanitize_identifier(useStmt.source_interface) + "::" + sanitize_identifier(rename.first);
-                                return result;
+                                auto type_kind = find_interface_type_kind(*sourceIface, rename.first);
+
+                                if (type_kind)
+                                {
+                                    if (*type_kind == InterfaceTypeKind::Alias)
+                                    {
+                                        return prefix + sanitize_identifier(useStmt.source_interface) + "::" + sanitize_identifier(rename.first);
+                                    }
+
+                                    std::string resolvedType = mapType(rename.first, sourceIface);
+                                    std::string sourceIdent = sanitize_identifier(rename.first);
+                                    std::string qualified = prefix + sanitize_identifier(useStmt.source_interface) + "::" + sourceIdent;
+                                    return qualify_identifier(resolvedType, sourceIdent, qualified);
+                                }
+
+                                std::string resolvedType = mapType(rename.first, sourceIface);
+                                return resolvedType;
                             }
                         }
                     }
@@ -300,12 +527,26 @@ std::string TypeMapper::mapType(const std::string &witType, const InterfaceInfo 
                         {
                             // Find the source interface to determine its namespace
                             const InterfaceInfo *sourceIface = nullptr;
+                            // First, try to find an interface with Export kind for world-level types
                             for (const auto &srcIface : *all_interfaces)
                             {
-                                if (srcIface.name == useStmt.source_interface)
+                                if (srcIface.name == useStmt.source_interface && srcIface.kind == InterfaceKind::Export)
                                 {
                                     sourceIface = &srcIface;
                                     break;
+                                }
+                            }
+
+                            // If not found, fall back to any interface with matching name
+                            if (!sourceIface)
+                            {
+                                for (const auto &srcIface : *all_interfaces)
+                                {
+                                    if (srcIface.name == useStmt.source_interface)
+                                    {
+                                        sourceIface = &srcIface;
+                                        break;
+                                    }
                                 }
                             }
 
@@ -314,7 +555,23 @@ std::string TypeMapper::mapType(const std::string &witType, const InterfaceInfo 
                             {
                                 // Source interface is in a specific namespace, fully qualify it
                                 std::string prefix = (sourceIface->kind == InterfaceKind::Import) ? "::host::" : "::guest::";
-                                return prefix + sanitize_identifier(useStmt.source_interface) + "::" + sanitize_identifier(importedType);
+                                auto type_kind = find_interface_type_kind(*sourceIface, importedType);
+
+                                if (type_kind)
+                                {
+                                    if (*type_kind == InterfaceTypeKind::Alias)
+                                    {
+                                        return prefix + sanitize_identifier(useStmt.source_interface) + "::" + sanitize_identifier(importedType);
+                                    }
+
+                                    std::string resolvedType = mapType(importedType, sourceIface);
+                                    std::string sourceIdent = sanitize_identifier(importedType);
+                                    std::string qualified = prefix + sanitize_identifier(useStmt.source_interface) + "::" + sourceIdent;
+                                    return qualify_identifier(resolvedType, sourceIdent, qualified);
+                                }
+
+                                std::string resolvedType = mapType(importedType, sourceIface);
+                                return resolvedType;
                             }
                         }
                     }
@@ -482,4 +739,37 @@ std::string TypeMapper::mapType(const std::string &witType, const InterfaceInfo 
 
     // Unknown type - return as-is (but sanitize the identifier)
     return sanitize_identifier(type);
+}
+
+std::string TypeMapper::resolveExternalType(const std::string &package_spec,
+                                            const std::string &interface_name,
+                                            const std::string &type_name)
+{
+    if (!package_registry)
+    {
+        // No registry available - generate a placeholder
+        return "uint32_t /* external: " + package_spec + "/" + interface_name + "::" + type_name + " */";
+    }
+
+    // Parse package ID from spec
+    auto package_id = PackageId::parse(package_spec);
+    if (!package_id)
+    {
+        return "uint32_t /* invalid package spec: " + package_spec + " */";
+    }
+
+    // Look up the package
+    auto package = package_registry->get_package(*package_id);
+    if (!package)
+    {
+        // Package not found - generate a placeholder
+        return "uint32_t /* missing package: " + package_spec + " */";
+    }
+
+    // Get the C++ namespace for this package
+    std::string cpp_namespace = package_id->to_cpp_namespace();
+
+    // Build the fully qualified type reference
+    // e.g., "::ext_my_dep_v0_1_0::a::foo"
+    return "::" + cpp_namespace + "::" + interface_name + "::" + type_name;
 }

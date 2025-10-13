@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef GENERATED_SAMPLE_HPP_HPP
-#define GENERATED_SAMPLE_HPP_HPP
+#ifndef GENERATED_SAMPLE_HPP
+#define GENERATED_SAMPLE_HPP
 
 #include <cmcpp.hpp>
 
@@ -167,7 +167,7 @@ using enum_func_t = cmcpp::enum_t<e>(cmcpp::enum_t<e>);
 // Standalone function: void-func
 // Package: example:sample
 // Guest function signature for use with guest_function<void_func_t>()
-using void_func_t = void();
+using void_func_t = void(void);
 
 
 // Standalone function: ok-func
@@ -246,4 +246,4 @@ void void_func();
 
 } // namespace host
 
-#endif // GENERATED_SAMPLE_HPP_HPP
+#endif // GENERATED_SAMPLE_HPP
