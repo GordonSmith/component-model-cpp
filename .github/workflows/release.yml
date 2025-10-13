@@ -141,6 +141,9 @@ jobs:
         with:
           files: ${{ matrix.package-patterns }}
           fail_on_unmatched_files: false
+          generate_release_notes: true
+          draft: false
+          prerelease: false
 
       - name: Upload error logs
         if: ${{ failure() || cancelled() }}
