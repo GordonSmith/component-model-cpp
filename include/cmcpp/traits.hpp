@@ -228,6 +228,22 @@ namespace cmcpp
     struct result_ok_monostate;
     struct result_err_monostate;
 
+    // Helper to detect result wrapper types (must be declared before concepts that use it)
+    template <typename T>
+    struct is_result_wrapper : std::false_type
+    {
+    };
+
+    template <typename T>
+    struct is_result_wrapper<result_ok_wrapper<T>> : std::true_type
+    {
+    };
+
+    template <typename T>
+    struct is_result_wrapper<result_err_wrapper<T>> : std::true_type
+    {
+    };
+
     template <>
     struct ValTrait<result_ok_monostate>
     {
@@ -281,7 +297,7 @@ namespace cmcpp
         static constexpr std::array<WasmValType, 1> flat_types = {WasmValType::i32};
     };
     template <typename T>
-    concept Boolean = ValTrait<T>::type == ValType::Bool;
+    concept Boolean = !is_result_wrapper<T>::value && ValTrait<T>::type == ValType::Bool;
     //  Char  --------------------------------------------------------------------
     using char_t = char32_t;
 
@@ -404,14 +420,14 @@ namespace cmcpp
     };
 
     template <typename T>
-    concept Integer = ValTrait<T>::type == ValType::S8 || ValTrait<T>::type == ValType::S16 || ValTrait<T>::type == ValType::S32 || ValTrait<T>::type == ValType::S64 ||
-                      ValTrait<T>::type == ValType::U8 || ValTrait<T>::type == ValType::U16 || ValTrait<T>::type == ValType::U32 || ValTrait<T>::type == ValType::U64;
+    concept Integer = !is_result_wrapper<T>::value && (ValTrait<T>::type == ValType::S8 || ValTrait<T>::type == ValType::S16 || ValTrait<T>::type == ValType::S32 || ValTrait<T>::type == ValType::S64 ||
+                                                       ValTrait<T>::type == ValType::U8 || ValTrait<T>::type == ValType::U16 || ValTrait<T>::type == ValType::U32 || ValTrait<T>::type == ValType::U64);
 
     template <typename T>
-    concept SignedInteger = std::is_signed_v<T> && Integer<T>;
+    concept SignedInteger = !is_result_wrapper<T>::value && std::is_signed_v<T> && Integer<T>;
 
     template <typename T>
-    concept UnsignedInteger = !std::is_signed_v<T> && Integer<T>;
+    concept UnsignedInteger = !is_result_wrapper<T>::value && !std::is_signed_v<T> && Integer<T>;
 
     template <>
     struct ValTrait<float32_t>
@@ -440,7 +456,7 @@ namespace cmcpp
     };
 
     template <typename T>
-    concept Float = ValTrait<T>::type == ValType::F32 || ValTrait<T>::type == ValType::F64;
+    concept Float = !is_result_wrapper<T>::value && (ValTrait<T>::type == ValType::F32 || ValTrait<T>::type == ValType::F64);
 
     template <typename T>
     concept Numeric = Integer<T> || Float<T>;
@@ -734,7 +750,7 @@ namespace cmcpp
         static constexpr std::array<WasmValType, flat_types_len> flat_types = compute_tuple_flat_types<flat_types_len, Ts...>();
     };
     template <typename T>
-    concept Tuple = ValTrait<T>::type == ValType::Tuple;
+    concept Tuple = !is_result_wrapper<T>::value && ValTrait<T>::type == ValType::Tuple;
 
     //  Record  ------------------------------------------------------------------
     template <typename S>
@@ -755,22 +771,6 @@ namespace cmcpp
         static constexpr uint32_t size = ValTrait<tuple_type>::size;
         static constexpr size_t flat_types_len = ValTrait<tuple_type>::flat_types_len;
         static constexpr std::array<WasmValType, flat_types_len> flat_types = ValTrait<tuple_type>::flat_types;
-    };
-
-    // Helper to detect wrapper types
-    template <typename T>
-    struct is_result_wrapper : std::false_type
-    {
-    };
-
-    template <typename T>
-    struct is_result_wrapper<result_ok_wrapper<T>> : std::true_type
-    {
-    };
-
-    template <typename T>
-    struct is_result_wrapper<result_err_wrapper<T>> : std::true_type
-    {
     };
 
     template <typename T>
@@ -912,7 +912,7 @@ namespace cmcpp
         static constexpr auto flat_types = ValTrait<variant_type>::flat_types;
     };
     template <typename T>
-    concept Option = ValTrait<T>::type == ValType::Option;
+    concept Option = !is_result_wrapper<T>::value && ValTrait<T>::type == ValType::Option;
 
     //  Result  --------------------------------------------------------------------
     // When Ok and Err are the same type, we need wrappers to distinguish them
@@ -965,10 +965,17 @@ namespace cmcpp
     template <typename>
     struct func_t_impl;
 
-    template <Field R, Field... Args>
+    template <typename R, Field... Args>
     struct func_t_impl<R(Args...)>
     {
         using type = std::function<R(Args...)>;
+    };
+
+    // Specialization for explicit void parameter (converts R(void) to R())
+    template <typename R>
+    struct func_t_impl<R(void)>
+    {
+        using type = std::function<R()>;
     };
 
     template <typename F>
@@ -1005,7 +1012,7 @@ namespace cmcpp
         return arr;
     }
 
-    template <Field R, Field... Args>
+    template <typename R, Field... Args>
     struct ValTrait<std::function<R(Args...)>>
     {
         static constexpr ValType type = ValType::Func;

@@ -167,7 +167,7 @@ using enum_func_t = cmcpp::enum_t<e>(cmcpp::enum_t<e>);
 // Standalone function: void-func
 // Package: example:sample
 // Guest function signature for use with guest_function<void_func_t>()
-using void_func_t = void();
+using void_func_t = void(void);
 
 
 // Standalone function: ok-func

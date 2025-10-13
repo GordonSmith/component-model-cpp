@@ -27,7 +27,7 @@
 - **Maintain Python equivalence**: When implementing new canonical operations or type handling, ensure the C++ behavior matches the corresponding Python code in `definitions.py`. Type names, state transitions, and error conditions should align with the reference implementation.
 
 ## Testing
-- Default build enables coverage flags on GCC/Clang; run `cmake --preset linux-ninja-Debug` followed by `cmake --build --preset linux-ninja-Debug` and then `ctest --output-on-failure` from the build tree.
+- Default build enables coverage flags on GCC/Clang; run `cmake --preset linux-ninja-Debug` followed by `cmake --build --preset linux-ninja-Debug` and then `ctest --output-on-failure` from the build tree. When launching tests from the repository root, add `--test-dir build` (for example `ctest --test-dir build --output-on-failure`) because calling `ctest` without a build directory just reports "No tests were found!!!".
 - C++ tests live in `test/main.cpp` using doctest and ICU for encoding checks; keep new tests near related sections for quick discovery.
 - Test coverage workflow: run tests, then `lcov --capture --directory . --output-file coverage.info`, filter with `lcov --remove`, and optionally generate HTML with `genhtml`. See README for full workflow.
 - **Python reference tests**: The canonical ABI test suite in `ref/component-model/design/mvp/canonical-abi/run_tests.py` exercises the same ABI rules—use it to cross-check tricky canonical ABI edge cases when changing flattening behavior. Run with `python3 run_tests.py` (requires Python 3.10+).

@@ -11,6 +11,16 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     add_link_options(-fprofile-instr-generate)
 endif()
 
+# Suppress narrowing conversion warnings on MSVC for WebAssembly 32-bit ABI
+if(MSVC)
+    add_compile_options(
+        /wd4244  # conversion from 'type1' to 'type2', possible loss of data
+        /wd4267  # conversion from 'size_t' to 'type', possible loss of data
+        /wd4305  # truncation from 'type1' to 'type2'
+        /wd4309  # truncation of constant value
+    )
+endif()
+
 find_package(doctest CONFIG REQUIRED)
 find_package(ICU REQUIRED COMPONENTS uc dt in io)
 

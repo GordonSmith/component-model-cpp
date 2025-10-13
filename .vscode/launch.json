@@ -120,6 +120,22 @@
             "cwd": "${workspaceFolder}",
             "environment": [],
             "preLaunchTask": "CMake: build"
+        },
+        {
+            "name": "Generate & Compile WIT Test Stubs",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "/usr/bin/cmake",
+            "args": [
+                "--build",
+                "${workspaceFolder}/build",
+                "--target",
+                "test-stubs-compiled"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false
         }
     ]
 }

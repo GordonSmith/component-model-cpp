@@ -32,7 +32,7 @@ public:
         }
 
         uint32_t ret = align_to(last_alloc, alignment);
-        last_alloc = ret + new_size;
+        last_alloc = static_cast<uint32_t>(ret + new_size);
         if (last_alloc > memory.size())
         {
             trap("oom");

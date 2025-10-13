@@ -67,6 +67,23 @@ def generate_stub(wit_path, stub_name):
     except Exception as e:
         return False, str(e)
 
+def check_if_empty_stub(stub_name):
+    """Check if generated stub only contains empty namespaces"""
+    stub_file = GENERATED_DIR / f"{stub_name}.hpp"
+    
+    try:
+        with open(stub_file, 'r') as f:
+            content = f.read()
+            # Check for the marker comment that indicates empty interfaces
+            if "This WIT file contains no concrete interface definitions" in content:
+                # Also verify it only has empty namespaces
+                if "namespace host {}" in content and "namespace guest {}" in content:
+                    return True
+    except Exception:
+        pass
+    
+    return False
+
 def compile_stub(stub_name):
     """Compile a generated stub"""
     stub_file = GENERATED_DIR / f"{stub_name}.hpp"
@@ -107,6 +124,10 @@ def process_wit_file(wit_path):
     gen_ok, gen_error = generate_stub(wit_path, stub_name)
     
     if gen_ok:
+        # Check if this generated an empty stub (references external packages only)
+        if check_if_empty_stub(stub_name):
+            return rel_path, 'empty_stub', 'Generated empty stub (references external packages only)'
+        
         # Compile stub
         compile_ok, compile_error = compile_stub(stub_name)
         
@@ -142,11 +163,13 @@ def main():
         'gen_success': 0,
         'gen_failed': 0,
         'compile_success': 0,
-        'compile_failed': 0
+        'compile_failed': 0,
+        'empty_stubs': 0
     }
     
     failed_generation = []
     failed_compilation = []
+    empty_stub_files = []
     
     # Process files in parallel
     with ThreadPoolExecutor(max_workers=num_workers) as executor:
@@ -163,6 +186,11 @@ def main():
                     stats['gen_success'] += 1
                     stats['compile_success'] += 1
                     status = f"{GREEN}✓{RESET}"
+                elif result == 'empty_stub':
+                    stats['gen_success'] += 1
+                    stats['empty_stubs'] += 1
+                    status = f"{YELLOW}⊘{RESET}"
+                    empty_stub_files.append((rel_path, error))
                 elif result == 'compile_failed':
                     stats['gen_success'] += 1
                     stats['compile_failed'] += 1
@@ -191,8 +219,17 @@ def main():
     print(f"  Total WIT files:        {stats['total']}")
     print(f"  Generation successful:  {stats['gen_success']} ({stats['gen_success']/stats['total']*100:.1f}%)")
     print(f"  Generation failed:      {stats['gen_failed']}")
+    print(f"  Empty stubs (no types): {stats['empty_stubs']}")
     print(f"  Compilation successful: {stats['compile_success']} ({stats['compile_success']/stats['total']*100:.1f}%)")
     print(f"  Compilation failed:     {stats['compile_failed']}")
+    
+    if empty_stub_files:
+        print(f"\n{YELLOW}Empty stubs ({len(empty_stub_files)} files):{RESET}")
+        print(f"These files only reference external packages and contain no concrete definitions:")
+        for rel_path, reason in empty_stub_files[:10]:
+            print(f"  - {rel_path}")
+        if len(empty_stub_files) > 10:
+            print(f"  ... and {len(empty_stub_files) - 10} more")
     
     if failed_generation:
         print(f"\n{YELLOW}Failed generation ({len(failed_generation)} files):{RESET}")

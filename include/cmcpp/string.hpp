@@ -34,10 +34,10 @@ namespace cmcpp
             auto encoded = cx.convert(&cx.opts.memory[ptr], worst_case_size, src, src_byte_len, src_encoding, Encoding::Utf8);
             if (worst_case_size > encoded.second)
             {
-                ptr = cx.opts.realloc(ptr, worst_case_size, 1, encoded.second);
+                ptr = cx.opts.realloc(ptr, worst_case_size, 1, static_cast<uint32_t>(encoded.second));
                 assert(ptr + encoded.second <= cx.opts.memory.size());
             }
-            return std::make_pair(ptr, encoded.second);
+            return std::make_pair(ptr, static_cast<uint32_t>(encoded.second));
         }
 
         inline std::pair<uint32_t, uint32_t> store_utf16_to_utf8(LiftLowerContext &cx, const void *src, uint32_t src_code_units)
@@ -62,7 +62,7 @@ namespace cmcpp
             auto encoded = cx.convert(&cx.opts.memory[ptr], worst_case_size, src, src_code_units, Encoding::Utf8, Encoding::Utf16);
             if (encoded.second < worst_case_size)
             {
-                ptr = cx.opts.realloc(ptr, worst_case_size, 2, encoded.second);
+                ptr = cx.opts.realloc(ptr, worst_case_size, 2, static_cast<uint32_t>(encoded.second));
                 assert(ptr == align_to(ptr, 2));
                 assert(ptr + encoded.second <= cx.opts.memory.size());
             }
@@ -103,7 +103,7 @@ namespace cmcpp
             const size_t src_byte_length = src_code_units * ValTrait<T>::char_size;
 
             assert(src_code_units <= MAX_STRING_BYTE_LENGTH);
-            uint32_t ptr = cx.opts.realloc(0, 0, 2, src_byte_length);
+            uint32_t ptr = cx.opts.realloc(0, 0, 2, static_cast<uint32_t>(src_byte_length));
             trap_if(cx, ptr != align_to(ptr, 2));
             trap_if(cx, ptr + src_code_units > cx.opts.memory.size());
             uint32_t dst_byte_length = 0;
@@ -118,9 +118,9 @@ namespace cmcpp
                 else
                 {
                     // If it doesn't, convert it to a UTF-16 sequence
-                    uint32_t worst_case_size = 2 * src_code_units;
+                    uint32_t worst_case_size = static_cast<uint32_t>(2 * src_code_units);
                     trap_if(cx, worst_case_size > MAX_STRING_BYTE_LENGTH, "Worst case size exceeds maximum string byte length");
-                    ptr = cx.opts.realloc(ptr, src_byte_length, 2, worst_case_size);
+                    ptr = cx.opts.realloc(ptr, static_cast<uint32_t>(src_byte_length), 2, worst_case_size);
                     trap_if(cx, ptr != align_to(ptr, 2), "Pointer misaligned");
                     trap_if(cx, ptr + worst_case_size > cx.opts.memory.size(), "Out of bounds access");
 
@@ -147,7 +147,7 @@ namespace cmcpp
                     uint32_t destPtr = ptr + (2 * dst_byte_length);
                     uint32_t destLen = worst_case_size - (2 * dst_byte_length);
                     void *srcPtr = (char *)src + dst_byte_length * ValTrait<T>::char_size;
-                    uint32_t srcLen = (src_code_units - dst_byte_length) * ValTrait<T>::char_size;
+                    uint32_t srcLen = static_cast<uint32_t>((src_code_units - dst_byte_length) * ValTrait<T>::char_size);
                     auto encoded = cx.convert(&cx.opts.memory[destPtr], destLen, srcPtr, srcLen, src_encoding, Encoding::Utf16);
 
                     // Add special tag to indicate the string is a UTF-16 string  ---
@@ -158,7 +158,7 @@ namespace cmcpp
             }
             if (dst_byte_length < src_code_units)
             {
-                ptr = cx.opts.realloc(ptr, src_code_units, 2, dst_byte_length);
+                ptr = cx.opts.realloc(ptr, static_cast<uint32_t>(src_code_units), 2, dst_byte_length);
                 trap_if(cx, ptr != align_to(ptr, 2), "Pointer misaligned");
                 trap_if(cx, ptr + dst_byte_length > cx.opts.memory.size(), "Out of bounds access");
             }
@@ -179,18 +179,18 @@ namespace cmcpp
                 if (src_tagged_code_units & UTF16_TAG)
                 {
                     src_simple_encoding = Encoding::Utf16;
-                    src_code_units = src_tagged_code_units ^ UTF16_TAG;
+                    src_code_units = static_cast<uint32_t>(src_tagged_code_units ^ UTF16_TAG);
                 }
                 else
                 {
                     src_simple_encoding = Encoding::Latin1;
-                    src_code_units = src_tagged_code_units;
+                    src_code_units = static_cast<uint32_t>(src_tagged_code_units);
                 }
             }
             else
             {
                 src_simple_encoding = src_encoding;
-                src_code_units = src_tagged_code_units;
+                src_code_units = static_cast<uint32_t>(src_tagged_code_units);
             }
 
             switch (cx.opts.string_encoding)
@@ -300,7 +300,7 @@ namespace cmcpp
                 retVal.encoding = encoding;
             }
             retVal.resize(host_byte_length);
-            auto decoded = cx.convert(retVal.data(), host_byte_length, (void *)&cx.opts.memory[ptr], byte_length, encoding, ValTrait<T>::encoding == Encoding::Latin1_Utf16 ? encoding : ValTrait<T>::encoding);
+            auto decoded = cx.convert(retVal.data(), host_byte_length, (void *)&cx.opts.memory[ptr], static_cast<uint32_t>(byte_length), encoding, ValTrait<T>::encoding == Encoding::Latin1_Utf16 ? encoding : ValTrait<T>::encoding);
             if ((decoded.second / char_size) < host_byte_length)
             {
                 retVal.resize(decoded.second / char_size);
