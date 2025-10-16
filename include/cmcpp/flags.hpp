@@ -51,7 +51,7 @@ namespace cmcpp
         T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi)
         {
             auto i = vi.next<int32_t>();
-            return unpack_flags_from_int<T>(static_cast<uint32_t>(i));
+            return unpack_flags_from_int<T>(checked_int32(cx, i, "flag value exceeds 32-bit range"));
         }
     }
 

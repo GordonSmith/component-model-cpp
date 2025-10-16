@@ -15,6 +15,7 @@ struct Parameter
 struct FunctionSignature
 {
     std::string interface_name;
+    std::string resource_name; // Empty if not a resource method
     std::string name;
     std::vector<Parameter> parameters;
     std::vector<std::string> results;

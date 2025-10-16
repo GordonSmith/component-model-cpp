@@ -83,7 +83,55 @@ cd test && ./generate_test_stubs.sh
 
 # Filter specific files
 ./generate_test_stubs.py -f "streams"
+
+# Skip CMakeLists.txt generation (if you don't need them)
+./generate_test_stubs.py --no-cmake
 ```
+
+#### Individual Stub Compilation
+
+Each generated stub includes its own `CMakeLists.txt` in a dedicated subdirectory for standalone compilation testing:
+
+```bash
+# Generate stubs with CMakeLists.txt (default, parallelized)
+cmake --build build --target generate-test-stubs
+
+# Navigate to a specific stub directory
+cd build/test/generated_stubs/simple-functions
+
+# Build the individual stub
+cmake -S . -B build
+cmake --build build
+```
+
+**Performance:** Generation is parallelized using all available CPU cores by default. For 199 WIT files:
+- Sequential: ~20 seconds
+- Parallel (32 cores): ~4 seconds (5x faster)
+
+Control parallelization:
+```bash
+python test/generate_test_stubs.py -j 8        # Use 8 parallel jobs
+python test/generate_test_stubs.py -j 1        # Sequential (for debugging)
+python test/generate_test_stubs.py --no-cmake  # Skip CMakeLists.txt generation
+```
+
+**Structure:** Each stub gets its own directory with all files:
+```
+generated_stubs/
+├── simple-functions/
+│   ├── CMakeLists.txt
+│   ├── simple-functions.hpp
+│   ├── simple-functions_wamr.hpp
+│   └── simple-functions_wamr.cpp
+├── integers/
+│   ├── CMakeLists.txt
+│   ├── integers.hpp
+│   ├── integers_wamr.hpp
+│   └── integers_wamr.cpp
+...
+```
+
+**Note:** Stubs with `_wamr.cpp` files require WAMR (WebAssembly Micro Runtime) headers. The generated CMakeLists.txt includes helpful comments about dependencies and will automatically find the local cmcpp headers.
 
 #### Code Generation Validation
 

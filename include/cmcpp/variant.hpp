@@ -12,6 +12,66 @@
 
 namespace cmcpp
 {
+    // Empty type templates for unique variant cases
+    // Used when a variant has multiple empty (unit) cases to make them distinct types
+    // Example: empty_case<0> and empty_case<1> are distinct types
+    template <size_t Index>
+    struct empty_case
+    {
+    };
+
+    // Helper trait to detect empty_case types
+    template <typename T>
+    struct is_empty_case : std::false_type
+    {
+    };
+
+    template <size_t Index>
+    struct is_empty_case<empty_case<Index>> : std::true_type
+    {
+    };
+
+    // Concept for empty_case types
+    template <typename T>
+    concept EmptyCase = is_empty_case<T>::value;
+
+    // ValTrait specialization for empty_case - behaves like monostate (0 size, no flat types)
+    template <size_t Index>
+    struct ValTrait<empty_case<Index>>
+    {
+        static constexpr ValType type = ValType::Void; // empty_case behaves like void/monostate
+        using inner_type = empty_case<Index>;
+        static constexpr uint32_t size = 0;
+        static constexpr uint32_t alignment = 1;
+        static constexpr std::array<WasmValType, 0> flat_types = {};
+    };
+
+    // Lift/lower/load/store functions for empty_case - same semantics as monostate
+    // Constrained with EmptyCase concept for clear overload resolution
+    template <EmptyCase T>
+    inline T load(const LiftLowerContext &, uint32_t)
+    {
+        return T{};
+    }
+
+    template <EmptyCase T>
+    inline void store(LiftLowerContext &, const T &, uint32_t)
+    {
+        // No-op: empty types have no data to store
+    }
+
+    template <EmptyCase T>
+    inline T lift_flat(const LiftLowerContext &, const CoreValueIter &)
+    {
+        return T{};
+    }
+
+    template <EmptyCase T>
+    inline WasmValVector lower_flat(LiftLowerContext &, const T &)
+    {
+        return {};
+    }
+
     namespace variant
     {
         template <size_t N, Variant T>
@@ -29,7 +89,7 @@ namespace cmcpp
 
             auto setter = [&]<size_t... Indices>(std::index_sequence<Indices...>)
             {
-                ((case_index == Indices ? (var = load<variantT<Indices, T>>(cx, ptr), true) : false) || ...);
+                ((case_index == Indices ? (var.template emplace<Indices>(load<variantT<Indices, T>>(cx, ptr)), true) : false) || ...);
             };
 
             setter(std::make_index_sequence<variantSize>{});

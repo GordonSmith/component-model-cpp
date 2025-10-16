@@ -246,7 +246,6 @@ namespace cmcpp
     inline LiftLowerContext create_lift_lower_context(
         wasm_module_inst_t module_inst,
         wasm_exec_env_t exec_env,
-        wasm_function_inst_t cabi_realloc,
         Encoding encoding = Encoding::Utf8)
     {
         wasm_memory_inst_t memory = wasm_runtime_lookup_memory(module_inst, "memory");
@@ -254,11 +253,15 @@ namespace cmcpp
         {
             throw std::runtime_error("Failed to lookup memory instance");
         }
-
         uint8_t *mem_start_addr = static_cast<uint8_t *>(wasm_memory_get_base_address(memory));
         uint8_t *mem_end_addr = nullptr;
         wasm_runtime_get_native_addr_range(module_inst, mem_start_addr, nullptr, &mem_end_addr);
 
+        wasm_function_inst_t cabi_realloc = wasm_runtime_lookup_function(module_inst, "cabi_realloc");
+        if (!cabi_realloc)
+        {
+            throw std::runtime_error("Failed to lookup cabi_realloc function");
+        }
         GuestRealloc realloc = create_guest_realloc(exec_env, cabi_realloc);
         LiftLowerOptions opts(encoding, std::span<uint8_t>(mem_start_addr, mem_end_addr - mem_start_addr), realloc);
 
@@ -280,7 +283,7 @@ namespace cmcpp
         wasm_function_inst_t cabi_realloc = wasm_runtime_lookup_function(module_inst, "cabi_realloc");
 
         // Use the helper function to create LiftLowerContext
-        LiftLowerContext liftLowerContext = create_lift_lower_context(module_inst, exec_env, cabi_realloc);
+        LiftLowerContext liftLowerContext = create_lift_lower_context(module_inst, exec_env);
         auto params = lift_flat_values<params_t>(liftLowerContext, MAX_FLAT_PARAMS, lower_params);
 
         if constexpr (ValTrait<result_t>::flat_types.size() > 0)

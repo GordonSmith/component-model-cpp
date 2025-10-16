@@ -40,6 +40,8 @@ add_executable(wit-codegen
     wit_parser.cpp
     code_generator.cpp
     type_mapper.cpp
+    package_registry.cpp
+    dependency_resolver.cpp
     ${ANTLR_GENERATED_SOURCES}
 )
 

@@ -3,6 +3,7 @@
 
 #include <utility>
 #include <iostream>
+#include <limits>
 
 using namespace cmcpp;
 
@@ -32,7 +33,12 @@ public:
         }
 
         uint32_t ret = align_to(last_alloc, alignment);
-        last_alloc = ret + new_size;
+        size_t next_alloc = static_cast<size_t>(ret) + new_size;
+        if (next_alloc > std::numeric_limits<uint32_t>::max())
+        {
+            trap("allocation exceeds 32-bit range");
+        }
+        last_alloc = static_cast<uint32_t>(next_alloc);
         if (last_alloc > memory.size())
         {
             trap("oom");

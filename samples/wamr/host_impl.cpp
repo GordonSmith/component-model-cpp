@@ -1,6 +1,8 @@
 #include "generated/sample.hpp"
 #include <algorithm>
 #include <iostream>
+#include <limits>
+#include <stdexcept>
 
 // Host implementations of the generated interface functions
 // These are the actual implementations that the host provides for guest functions
@@ -52,6 +54,10 @@ namespace host
                                   p11.length() + p12.length() + p13.length() + p14.length() + p15.length() +
                                   p16.length() + p17.length();
             std::cout << "[HOST] lots(...17 strings...) = " << total_length << std::endl;
+            if (total_length > std::numeric_limits<uint32_t>::max())
+            {
+                throw std::overflow_error("lots string length exceeds 32-bit range");
+            }
             return static_cast<uint32_t>(total_length);
         }
 
