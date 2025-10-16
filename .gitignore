@@ -1,4 +1,5 @@
 /.vitepress/cache
+/.vitepress/dist
 /.vscode/settings.json
 /build
 /node_modules
