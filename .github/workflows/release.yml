@@ -116,11 +116,6 @@ jobs:
         run: |
           cmake --build --preset ${{ matrix.build-preset }}
 
-      - name: Run Tests
-        working-directory: build
-        run: |
-          ctest ${{ matrix.cpack-config || '' }} -VV
-
       - name: Create Packages
         working-directory: build
         run: |

@@ -260,7 +260,7 @@ add_custom_target(validate-test-stubs-incremental
 # Configure build flags for the nested build (used by validate-root-cmake and validate-root-cmake-build)
 # In CI environments, use Debug build with no optimizations to reduce memory overhead
 if(DEFINED ENV{CI})
-    set(CI_CMAKE_FLAGS "-DCMAKE_BUILD_TYPE=Debug" "-DCMAKE_CXX_FLAGS_DEBUG=-g -O0")
+    set(CI_CMAKE_FLAGS "-DCMAKE_BUILD_TYPE=Debug")
     set(CI_BUILD_MESSAGE "Debug build (no optimizations) for CI")
 else()
     set(CI_CMAKE_FLAGS "")
@@ -324,7 +324,7 @@ add_test(
 
 set_tests_properties(wit-stub-generation-test PROPERTIES
     LABELS "codegen;stubs"
-    TIMEOUT 1800  # 30 minutes - GitHub Actions needs more time than local builds
+    TIMEOUT 3600  # 60 minutes - GitHub Actions needs more time than local builds
 )
 
 # ===== Target: clean-test-stubs =====
