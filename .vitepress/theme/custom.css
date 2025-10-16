@@ -4,14 +4,14 @@
  */
 
 /**
- * Colors - VS Code Modern Theme
+ * Colors - Orange Brand Theme
  * -------------------------------------------------------------------------- */
 
 :root {
-    /* Brand colors inspired by VS Code Modern */
-    --vp-c-brand-1: #005fb8;
-    --vp-c-brand-2: #0078d4;
-    --vp-c-brand-3: #106ebe;
+    /* Brand colors - Orange accent */
+    --vp-c-brand-1: #c26518;
+    --vp-c-brand-2: #d97616;
+    --vp-c-brand-3: #a54f12;
 
     /* Background colors - Light Modern */
     --vp-c-bg: #ffffff;
@@ -25,10 +25,10 @@
 }
 
 .dark {
-    /* Brand colors for dark mode */
-    --vp-c-brand-1: #4fc3f7;
-    --vp-c-brand-2: #29b6f6;
-    --vp-c-brand-3: #0288d1;
+    /* Brand colors for dark mode - Orange accent */
+    --vp-c-brand-1: #d97616;
+    --vp-c-brand-2: #f39c12;
+    --vp-c-brand-3: #e67e22;
 
     /* Background colors - Dark Modern */
     --vp-c-bg: #1e1e1e;
@@ -40,4 +40,89 @@
     --vp-c-text-1: #cccccc;
     --vp-c-text-2: #b0b0b0;
     --vp-c-text-3: #808080;
+}
+
+/**
+ * Code Block Enhancements
+ * -------------------------------------------------------------------------- */
+
+/* Professional styling for all code blocks */
+div[class*='language-'] {
+    border-radius: 8px;
+    margin: 1.5rem 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.dark div[class*='language-'] {
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* Enhanced WIT syntax blocks */
+div[class*='language-wit'] {
+    border-left: 2px solid rgba(194, 101, 24, 0.33);
+    background: linear-gradient(to right, rgba(194, 101, 24, 0.01), transparent 50%);
+}
+
+.dark div[class*='language-wit'] {
+    border-left: 2px solid rgba(217, 118, 22, 0.33);
+    background: linear-gradient(to right, rgba(217, 118, 22, 0.02), transparent 50%);
+}
+
+/* Code block padding and font improvements */
+div[class*='language-'] pre {
+    padding: 1.25rem 1.5rem;
+    line-height: 1.6;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+    font-size: 0.95em;
+}
+
+/* Smooth scrollbar for code blocks */
+div[class*='language-'] pre code {
+    scrollbar-width: thin;
+    scrollbar-color: var(--vp-c-brand-1) transparent;
+}
+
+div[class*='language-'] pre code::-webkit-scrollbar {
+    height: 8px;
+}
+
+div[class*='language-'] pre code::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+div[class*='language-'] pre code::-webkit-scrollbar-thumb {
+    background: var(--vp-c-brand-1);
+    border-radius: 4px;
+}
+
+div[class*='language-'] pre code::-webkit-scrollbar-thumb:hover {
+    background: var(--vp-c-brand-2);
+}
+
+.dark div[class*='language-'] pre code {
+    scrollbar-color: var(--vp-c-brand-2) transparent;
+}
+
+.dark div[class*='language-'] pre code::-webkit-scrollbar-thumb {
+    background: var(--vp-c-brand-2);
+}
+
+.dark div[class*='language-'] pre code::-webkit-scrollbar-thumb:hover {
+    background: var(--vp-c-brand-1);
+}
+
+/* Copy button styling */
+div[class*='language-']:hover>button.copy {
+    opacity: 1;
+}
+
+div[class*='language-']>button.copy {
+    border-radius: 4px;
+    background: var(--vp-c-brand-1);
+    opacity: 0;
+    transition: opacity 0.3s, background 0.2s;
+}
+
+div[class*='language-']>button.copy:hover {
+    background: var(--vp-c-brand-2);
 }

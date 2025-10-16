@@ -28,7 +28,7 @@ features:
     details: ⚠️ 🚧 UNDER CONSTRUCTION 🚧 ⚠️
 
 ---
-::: warning ⚠️ UNDER CONSTRUCTION ⚠️
-**This site is under active development.** Content is evolving quickly; expect placeholders, incomplete sections, and frequent updates.
+::: warning ⚠️ DOCUMENTATION UNDER CONSTRUCTION ⚠️
+**This documentation is being written from scratch.** What you see here is essentially placeholder content and should not be trusted as accurate. Expect significant changes and updates.
 :::
 

@@ -13,8 +13,8 @@ export default defineConfig({
             witLang()
         ],
         theme: {
-            light: 'github-light',
-            dark: 'github-dark'
+            light: 'light-plus',
+            dark: 'dark-plus'
         }
     },
 
