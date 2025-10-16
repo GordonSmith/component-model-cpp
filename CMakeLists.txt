@@ -14,7 +14,7 @@ if (WIN32)
 endif()
 option(BUILD_SAMPLES "Build samples" ${_BUILD_SAMPLES_DEFAULT})
 option(BUILD_TESTING "Build tests" ON)
-option(BUILD_GRAMMAR "Generate code from ANTLR grammar" ON)
+option(WIT_CODEGEN "Generate code from ANTLR grammar" ON)
 
 add_library(cmcpp INTERFACE)
 
@@ -47,7 +47,7 @@ if (BUILD_SAMPLES AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/samples/CMakeLists.txt
 endif()
 
 # Grammar must be added before tools/test so the generate-grammar target is available
-if (BUILD_GRAMMAR AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/grammar/CMakeLists.txt")
+if (WIT_CODEGEN AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/grammar/CMakeLists.txt")
     add_subdirectory(grammar)
     # Add tools that use the grammar
     if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/wit-codegen/CMakeLists.txt")
@@ -102,7 +102,7 @@ install(FILES
 )
 
 # Install wit-codegen tool if it was built
-if(BUILD_GRAMMAR AND TARGET wit-codegen)
+if(WIT_CODEGEN AND TARGET wit-codegen)
     install(TARGETS wit-codegen
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
         COMPONENT tools

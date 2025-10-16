@@ -47,25 +47,25 @@ namespace cmcpp
         {
             result.emplace_back(std::visit([](auto &&arg) -> wasm_val_t
                                            {
-            wasm_val_t w_val{}; // Value-initialize
-            using T = std::decay_t<decltype(arg)>;
+                wasm_val_t w_val{}; // Value-initialize
+                using T = std::decay_t<decltype(arg)>;
 
-            if constexpr (std::is_same_v<T, int32_t>) {
-                w_val.kind = WASM_I32;
-                w_val.of.i32 = arg;
-            } else if constexpr (std::is_same_v<T, int64_t>) {
-                w_val.kind = WASM_I64;
-                w_val.of.i64 = arg;
-            } else if constexpr (std::is_same_v<T, float32_t>) {
-                w_val.kind = WASM_F32;
-                w_val.of.f32 = arg;
-            } else if constexpr (std::is_same_v<T, float64_t>) {
-                w_val.kind = WASM_F64;
-                w_val.of.f64 = arg;
-            } else {
-                assert(false && "Unsupported type in WasmVal variant");
-            }
-            return w_val; }, val_variant));
+                if constexpr (std::is_same_v<T, int32_t>) {
+                    w_val.kind = WASM_I32;
+                    w_val.of.i32 = arg;
+                } else if constexpr (std::is_same_v<T, int64_t>) {
+                    w_val.kind = WASM_I64;
+                    w_val.of.i64 = arg;
+                } else if constexpr (std::is_same_v<T, float32_t>) {
+                    w_val.kind = WASM_F32;
+                    w_val.of.f32 = arg;
+                } else if constexpr (std::is_same_v<T, float64_t>) {
+                    w_val.kind = WASM_F64;
+                    w_val.of.f64 = arg;
+                } else {
+                    assert(false && "Unsupported type in WasmVal variant");
+                }
+                return w_val; }, val_variant));
         }
         return result;
     }

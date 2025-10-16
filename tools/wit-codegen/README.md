@@ -27,17 +27,29 @@ The `wit-codegen` tool now uses the ANTLR4 grammar parser to accurately parse WI
 
 ## Type Mappings
 
-| WIT Type | cmcpp Type |
-|----------|------------|
-| `bool` | `cmcpp::bool_t` |
-| `u8`, `u16`, `u32`, `u64` | `cmcpp::u8_t`, `cmcpp::u16_t`, etc. |
-| `s8`, `s16`, `s32`, `s64` | `cmcpp::s8_t`, `cmcpp::s16_t`, etc. |
-| `f32`, `f64` | `cmcpp::f32_t`, `cmcpp::f64_t` |
-| `string` | `cmcpp::string_t` |
-| `list<T>` | `cmcpp::list_t<T>` |
-| `option<T>` | `cmcpp::option_t<T>` |
-| `result<T, E>` | `cmcpp::result_t<T, E>` |
-| `tuple<T1, T2, ...>` | `cmcpp::tuple_t<T1, T2, ...>` |
+| WIT Type | cmcpp Type | Notes |
+|----------|------------|-------|
+| `bool` | `cmcpp::bool_t` | Alias for `bool` |
+| `u8` | `uint8_t` | Standard C++ type |
+| `u16` | `uint16_t` | Standard C++ type |
+| `u32` | `uint32_t` | Standard C++ type |
+| `u64` | `uint64_t` | Standard C++ type |
+| `s8` | `int8_t` | Standard C++ type |
+| `s16` | `int16_t` | Standard C++ type |
+| `s32` | `int32_t` | Standard C++ type |
+| `s64` | `int64_t` | Standard C++ type |
+| `f32` | `cmcpp::float32_t` | Alias for `float` |
+| `f64` | `cmcpp::float64_t` | Alias for `double` |
+| `char` | `cmcpp::char_t` | Alias for `char32_t` |
+| `string` | `cmcpp::string_t` | Alias for `std::string` (UTF-8) |
+| `list<T>` | `cmcpp::list_t<T>` | Alias for `std::vector<T>` |
+| `tuple<T1, T2, ...>` | `cmcpp::tuple_t<T1, T2, ...>` | Alias for `std::tuple<T1, T2, ...>` |
+| `option<T>` | `cmcpp::option_t<T>` | Alias for `std::optional<T>` |
+| `result<T, E>` | `cmcpp::result_t<T, E>` | Alias for `cmcpp::variant_t<T, E>` |
+| `variant<T1, T2, ...>` | `cmcpp::variant_t<T1, T2, ...>` | Alias for `std::variant<T1, T2, ...>` |
+| `enum { ... }` | `cmcpp::enum_t` | Alias for `uint32_t` |
+| `flags { ... }` | `cmcpp::flags_t<...>` | Uses `std::bitset` internally |
+| `record { ... }` | `cmcpp::record_t<Struct>` | Wraps aggregate struct types |
 
 ## Usage
 

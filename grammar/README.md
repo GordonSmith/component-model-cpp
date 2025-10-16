@@ -16,11 +16,11 @@ The grammar is based on the official [WebAssembly Component Model WIT specificat
 
 ### Enable Grammar Generation
 
-The grammar generation is controlled by the `BUILD_GRAMMAR` CMake option (enabled by default):
+The grammar generation is controlled by the `WIT_CODEGEN` CMake option (enabled by default):
 
 ```bash
 cd build
-cmake -DBUILD_GRAMMAR=ON ..
+cmake -DWIT_CODEGEN=ON ..
 ```
 
 This will:
@@ -74,7 +74,7 @@ For detailed testing documentation, see [test/README.md](../test/README.md#2-wit
 
 ```bash
 # Build and run tests
-cmake -B build -DBUILD_GRAMMAR=ON
+cmake -B build -DWIT_CODEGEN=ON
 cmake --build build --target test-wit-grammar
 ctest -R wit-grammar-test --verbose
 
@@ -186,7 +186,7 @@ The following CMake variables can be customized:
 Example:
 
 ```bash
-cmake -DBUILD_GRAMMAR=ON \
+cmake -DWIT_CODEGEN=ON \
       -DANTLR_VERSION=4.13.2 \
       -DANTLR_OUTPUT_DIR=/custom/path \
       ..

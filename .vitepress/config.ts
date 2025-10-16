@@ -3,9 +3,9 @@ import { defineConfig } from 'vitepress'
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
     title: "Component Model C++",
-    description: " C++ ABI implementation of the WebAssembly Component Model",
-    base: '/component-model-cpp/',
-    srcExclude: ["build/**", "node_modules/**", "ref/**", "vcpkg/**", "vcpkg_overlays/**"],
+    description: "C++ ABI implementation of the WebAssembly Component Model",
+    base: '/component-model-cpp',
+    srcExclude: ["./build/**", "./grammar/**", "./node_modules/**", "./ref/**", "./vcpkg/**", "./vcpkg_overlays/**"],
 
     themeConfig: {
         editLink: {

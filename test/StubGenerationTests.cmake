@@ -3,7 +3,7 @@
 # the code generation pipeline (grammar -> parser -> codegen -> compilation)
 #
 # Requirements:
-# - BUILD_GRAMMAR=ON (for wit-codegen tool)
+# - WIT_CODEGEN=ON (for wit-codegen tool)
 # - wit-codegen target must exist
 #
 # Provides:
@@ -12,9 +12,9 @@
 # - test-stubs-full: Combined generation + validation
 
 # Only proceed if grammar/codegen tools are available
-if(NOT BUILD_GRAMMAR OR NOT TARGET wit-codegen)
+if(NOT WIT_CODEGEN OR NOT TARGET wit-codegen)
     message(STATUS "wit-codegen not available, skipping stub generation tests")
-    message(STATUS "  Enable with: cmake -DBUILD_GRAMMAR=ON")
+    message(STATUS "  Enable with: cmake -DWIT_CODEGEN=ON")
     return()
 endif()
 
