@@ -21,12 +21,14 @@ features:
   - title: WAMR Support
     details: Convenience functions and generated stubs for seamless WebAssembly Micro Runtime integration
   - title: WasmTime Support
-    details: 🚧 Under construction 🚧
+    details: ⚠️ 🚧 UNDER CONSTRUCTION 🚧 ⚠️
   - title: Wasmer Support
-    details: 🚧 Under construction 🚧  
+    details: ⚠️ 🚧 UNDER CONSTRUCTION 🚧 ⚠️
   - title: WasmEdge Support
-    details: 🚧 Under construction 🚧
+    details: ⚠️ 🚧 UNDER CONSTRUCTION 🚧 ⚠️
 
 ---
-> **Under Construction:** Content on this site is evolving quickly; expect placeholders and frequent updates.
+::: warning ⚠️ UNDER CONSTRUCTION ⚠️
+**This site is under active development.** Content is evolving quickly; expect placeholders, incomplete sections, and frequent updates.
+:::
 

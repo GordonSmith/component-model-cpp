@@ -3,14 +3,17 @@
 [![Ubuntu](https://github.com/GordonSmith/component-model-cpp/actions/workflows/ubuntu.yml/badge.svg)](https://github.com/GordonSmith/component-model-cpp/actions/workflows/ubuntu.yml)
 [![codecov](https://codecov.io/gh/GordonSmith/component-model-cpp/graph/badge.svg?token=CORP310T92)](https://codecov.io/gh/GordonSmith/component-model-cpp)
 
+> [!WARNING]
+> **⚠️ 🚧 DOCUMENTATION UNDER CONSTRUCTION 🚧 ⚠️**
+> 
+> **The documentation is being reorganized and expanded.** Expect incomplete sections, placeholders, and frequent updates as we improve coverage and organization.
+
 <p align="center">
   <img src="https://github.com/WebAssembly/WASI/blob/main/WASI.png?raw=true" height="160" width="auto" />
   <img src="https://repository-images.githubusercontent.com/254842585/4dfa7580-7ffb-11ea-99d0-46b8fe2f4170" height="160" width="auto" />
 </p>
 
 # Component Model C++ (Developer Reference)
-
-> **Under Construction:** The documentation is being reorganized and some sections may change without notice.
 
 This repository provides a header-only C++20 implementation of the WebAssembly Component Model canonical ABI. The code mirrors the official [Python Reference](https://github.com/GordonSmith/component-model-cpp/blob/main/ref/component-model/design/mvp/canonical-abi/definitions.py) and the [Specification](https://github.com/GordonSmith/component-model-cpp/blob/main/ref/component-model/design/mvp/CanonicalABI.md). All behavior (naming, state transitions, error conditions) should remain aligned with the reference.
 
