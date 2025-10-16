@@ -19,6 +19,7 @@ This repository provides a header-only C++20 implementation of the WebAssembly C
 
 ## Official Documentation, Issues, and Discussions
 
+⚠️ 🚧 DOCUMENTATION UNDER CONSTRUCTION 🚧 ⚠️
 * [Official Documentation](https://GordonSmith.github.io/component-model-cpp/)
 * [GitHub Issues](https://github.com/GordonSmith/component-model-cpp/issues)
 * [GitHub Discussions](https://github.com/GordonSmith/component-model-cpp/discussions)

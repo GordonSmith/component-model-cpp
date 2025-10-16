@@ -3,9 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "clean": "rimraf .vitepress/cache .vitepress/dist grammar/dist",
-    "grammar:build": "tsup grammar/index.ts --format esm --dts --clean --out-dir grammar/dist",
-    "grammar:dev": "tsup grammar/index.ts --format esm --dts --watch --out-dir grammar/dist",
+    "clean": "rimraf .vitepress/cache .vitepress/dist build/grammar",
+    "grammar:build": "tsup grammar/index.ts --format esm --dts --clean --out-dir build/grammar",
+    "grammar:dev": "tsup grammar/index.ts --format esm --dts --watch --out-dir build/grammar",
     "dev": "npm run grammar:build && vitepress dev",
     "build": "npm run grammar:build && vitepress build",
     "preview": "vitepress preview",

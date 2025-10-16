@@ -1,5 +1,5 @@
 import { defineConfig } from 'vitepress'
-import { witLang } from '../grammar/dist/index.js'
+import { witLang } from '../build/grammar/index.js'
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
@@ -11,7 +11,11 @@ export default defineConfig({
     markdown: {
         languages: [
             witLang()
-        ]
+        ],
+        theme: {
+            light: 'github-light',
+            dark: 'github-dark'
+        }
     },
 
     themeConfig: {
