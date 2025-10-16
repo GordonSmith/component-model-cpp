@@ -1,6 +1,7 @@
-/build
+/.vitepress/cache
 /.vscode/settings.json
-/cpm_modules
+/build
+/node_modules
 /vcpkg_installed
 /test/wasm/build*
 .DS_Store

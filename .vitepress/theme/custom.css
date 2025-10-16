@@ -1,0 +1,20 @@
+/**
+ * Customize default theme styling by overriding CSS variables:
+ * https://github.com/vuejs/vitepress/blob/main/src/client/theme-default/styles/vars.css
+ */
+
+/**
+ * Colors - Orange Brand
+ * -------------------------------------------------------------------------- */
+
+:root {
+    --vp-c-brand-1: #c26518;
+    --vp-c-brand-2: #d97616;
+    --vp-c-brand-3: #a54f12;
+}
+
+.dark {
+    --vp-c-brand-1: #d97616;
+    --vp-c-brand-2: #c26518;
+    --vp-c-brand-3: #a54f12;
+}

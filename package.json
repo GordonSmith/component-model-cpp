@@ -1,0 +1,30 @@
+{
+  "name": "component-model-cpp",
+  "version": "0.1.2",
+  "description": "[![MacOS](https://github.com/GordonSmith/component-model-cpp/actions/workflows/macos.yml/badge.svg)](https://github.com/GordonSmith/component-model-cpp/actions/workflows/macos.yml)\r [![Windows](https://github.com/GordonSmith/component-model-cpp/actions/workflows/windows.yml/badge.svg)](https://github.com/GordonSmith/component-model-cpp/actions/workflows/windows.yml)\r [![Ubuntu](https://github.com/GordonSmith/component-model-cpp/actions/workflows/ubuntu.yml/badge.svg)](https://github.com/GordonSmith/component-model-cpp/actions/workflows/ubuntu.yml)\r [![codecov](https://codecov.io/gh/GordonSmith/component-model-cpp/graph/badge.svg?token=CORP310T92)](https://codecov.io/gh/GordonSmith/component-model-cpp)",
+  "homepage": "https://github.com/GordonSmith/component-model-cpp#readme",
+  "bugs": {
+    "url": "https://github.com/GordonSmith/component-model-cpp/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GordonSmith/component-model-cpp.git"
+  },
+  "license": "MIT",
+  "author": "",
+  "type": "module",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview"
+  },
+  "devDependencies": {
+    "vitepress": "1.6.4"
+  }
+}
