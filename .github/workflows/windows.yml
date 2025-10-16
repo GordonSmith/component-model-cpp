@@ -31,6 +31,12 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Create short workspace mapping
+        run: |
+          $winPath = (Get-Location).Path
+          cmd /c ("subst T: ""{0}""" -f $winPath)
+          Add-Content -Path $env:GITHUB_ENV -Value "SHORT_WORKSPACE=T:/"
+
       - name: Cache Cargo registry
         uses: actions/cache@v4
         with:
@@ -60,30 +66,33 @@ jobs:
 
       - name: Install rust dependencies
         run: |
-          cargo install wasm-tools wit-bindgen-cli || true
+          Set-Location "$env:SHORT_WORKSPACE"
+          & cargo install wasm-tools wit-bindgen-cli
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "cargo install exited with code $LASTEXITCODE (ignored)."
+            $global:LASTEXITCODE = 0
+          }
 
       - name: configure
         run: |
-          cmake --preset ${{ matrix.config }}
+          Set-Location "$env:SHORT_WORKSPACE"
+          & cmake --preset ${{ matrix.config }}
 
       - name: build
         run: |
-          cmake --build --preset ${{ matrix.build }}
+          Set-Location "$env:SHORT_WORKSPACE"
+          & cmake --build --preset ${{ matrix.build }}
 
       - name: test
         working-directory: build
         run: |
-          ctest -C Debug -VV
+          Set-Location "$env:SHORT_WORKSPACE/build"
+          & ctest -C Debug -VV
 
-      - name: test-stubs-full (allowed to fail)
-        working-directory: build
-        continue-on-error: true
-        shell: bash
+      - name: Remove short workspace mapping
+        if: always()
         run: |
-          echo "Running wit-stub-generation-test (failures expected and will be reported)..."
-          ctest -C Debug -VV -R "wit-stub-generation-test" > test_output.txt 2>&1 || true
-          cat test_output.txt
-          ../.github/scripts/summarize-test-failures.sh test_output.txt test_summary.md
+          cmd /c "subst T: /D" 2>$null
 
       - name: Upload error logs
         if: ${{ failure() || cancelled() }}
