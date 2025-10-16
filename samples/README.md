@@ -60,7 +60,7 @@ cd build/samples/wamr
 ./wamr
 ```
 
-See [`wamr/README.md`](wamr/README.md) for detailed documentation, including:
+See [Generated WAMR Helpers](../docs/generated-wamr-helpers.md) for detailed documentation, including:
 - Complete API reference
 - Type system examples
 - Building and running instructions
@@ -313,7 +313,7 @@ To add a new sample:
 6. Add comprehensive README with usage instructions
 7. Add tests demonstrating key functionality
 
-See [`CONTRIBUTING.md`](../CONTRIBUTING.md) (if exists) for general contribution guidelines.
+Contribution guidelines will be published alongside the main repository documentation.
 
 ## References
 
@@ -324,4 +324,4 @@ See [`CONTRIBUTING.md`](../CONTRIBUTING.md) (if exists) for general contribution
 
 ## License
 
-See [LICENSE](../LICENSE) in the root directory.
+See the project [LICENSE](https://github.com/GordonSmith/component-model-cpp/blob/main/LICENSE) in the root directory.

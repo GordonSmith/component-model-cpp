@@ -27,7 +27,7 @@ cd build && ctest -R component-model-test
 
 Validates the ANTLR4-based WIT parser against official test files from the [wit-bindgen](https://github.com/bytecodealliance/wit-bindgen) project.
 
-**📖 See [TESTING_GRAMMAR.md](TESTING_GRAMMAR.md) for complete grammar testing documentation.**
+**📖 Detailed grammar testing instructions are included in this section.**
 
 #### Requirements
 - Java Runtime Environment (for ANTLR)
@@ -63,8 +63,7 @@ cd build && ctest -C Release -R wit-grammar-test --verbose
 
 Generate C++ host function stubs from all WIT test files. Useful for testing the code generator and creating reference implementations.
 
-**📖 See [STUB_GENERATION.md](STUB_GENERATION.md) for stub generation scripts.**  
-**📖 See [CODEGEN_VALIDATION.md](CODEGEN_VALIDATION.md) for the validation framework.**
+**📖 Stub generation and validation guidance appears throughout this section.**
 
 #### Quick Start
 
@@ -142,7 +141,7 @@ The framework also validates generated code by attempting to compile it:
 cmake --build build --target test-stubs-full
 ```
 
-**⚠️ IMPORTANT**: Compilation failures are **expected and useful**! They indicate bugs in `wit-codegen` that need fixing. See [CODEGEN_VALIDATION.md](CODEGEN_VALIDATION.md) for details on interpreting failures.
+**⚠️ IMPORTANT**: Compilation failures are **expected and useful**! They indicate bugs in `wit-codegen` that need fixing. Detailed validation notes are included in the following section.
 
 #### Generated Files
 
@@ -478,6 +477,6 @@ Grammar tests automatically pick up all `.wit` files in the test directory. To t
 ## Related Documentation
 
 - [Main README](../README.md) - Project overview
-- [Grammar README](../grammar/README.md) - Grammar documentation
-- [Component Model Specification](../ref/component-model/design/mvp/CanonicalABI.md)
-- [WIT Specification](../ref/component-model/design/mvp/WIT.md)
+- [Grammar README](https://github.com/GordonSmith/component-model-cpp/blob/main/grammar/README.md) - Grammar documentation
+- [Component Model Specification](https://github.com/WebAssembly/component-model/blob/main/design/mvp/CanonicalABI.md)
+- [WIT Specification](https://github.com/WebAssembly/component-model/blob/main/design/mvp/WIT.md)
