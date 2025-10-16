@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitepress'
+import { witLang } from '../grammar/dist/index.js'
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
@@ -6,6 +7,12 @@ export default defineConfig({
     description: "C++ ABI implementation of the WebAssembly Component Model",
     base: '/component-model-cpp',
     srcExclude: ["./build/**", "./grammar/**", "./node_modules/**", "./ref/**", "./vcpkg/**", "./vcpkg_overlays/**"],
+
+    markdown: {
+        languages: [
+            witLang()
+        ]
+    },
 
     themeConfig: {
         editLink: {
@@ -27,7 +34,8 @@ export default defineConfig({
                 items: [
                     { text: 'Generated Files Structure', link: '/docs/generated-files-structure' },
                     { text: 'Generated WAMR Helpers', link: '/docs/generated-wamr-helpers' },
-                    { text: 'Packaging', link: '/docs/PACKAGING' }
+                    { text: 'Packaging', link: '/docs/PACKAGING' },
+                    { text: 'WIT Syntax Examples', link: '/docs/wit-syntax-example' }
                 ]
             },
             {

@@ -10,3 +10,6 @@
 [submodule "ref/wit-bindgen"]
 	path = ref/wit-bindgen
 	url = https://github.com/bytecodealliance/wit-bindgen.git
+[submodule "ref/vscode-wit"]
+	path = ref/vscode-wit
+	url = https://github.com/bytecodealliance/vscode-wit.git

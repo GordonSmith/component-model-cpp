@@ -26,5 +26,7 @@ features:
     details: 🚧 Under construction 🚧  
   - title: WasmEdge Support
     details: 🚧 Under construction 🚧
+
 ---
+> **Under Construction:** Content on this site is evolving quickly; expect placeholders and frequent updates.
 

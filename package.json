@@ -1,30 +1,22 @@
 {
-  "name": "component-model-cpp",
-  "version": "0.1.2",
-  "description": "[![MacOS](https://github.com/GordonSmith/component-model-cpp/actions/workflows/macos.yml/badge.svg)](https://github.com/GordonSmith/component-model-cpp/actions/workflows/macos.yml)\r [![Windows](https://github.com/GordonSmith/component-model-cpp/actions/workflows/windows.yml/badge.svg)](https://github.com/GordonSmith/component-model-cpp/actions/workflows/windows.yml)\r [![Ubuntu](https://github.com/GordonSmith/component-model-cpp/actions/workflows/ubuntu.yml/badge.svg)](https://github.com/GordonSmith/component-model-cpp/actions/workflows/ubuntu.yml)\r [![codecov](https://codecov.io/gh/GordonSmith/component-model-cpp/graph/badge.svg?token=CORP310T92)](https://codecov.io/gh/GordonSmith/component-model-cpp)",
-  "homepage": "https://github.com/GordonSmith/component-model-cpp#readme",
-  "bugs": {
-    "url": "https://github.com/GordonSmith/component-model-cpp/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/GordonSmith/component-model-cpp.git"
-  },
-  "license": "MIT",
-  "author": "",
+  "name": "component-model-cpp-docs",
+  "private": true,
   "type": "module",
-  "main": "index.js",
-  "directories": {
-    "doc": "docs",
-    "test": "test"
-  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "vitepress dev",
-    "build": "vitepress build",
-    "preview": "vitepress preview"
+    "clean": "rimraf .vitepress/cache .vitepress/dist grammar/dist",
+    "grammar:build": "tsup grammar/index.ts --format esm --dts --clean --out-dir grammar/dist",
+    "grammar:dev": "tsup grammar/index.ts --format esm --dts --watch --out-dir grammar/dist",
+    "dev": "npm run grammar:build && vitepress dev",
+    "build": "npm run grammar:build && vitepress build",
+    "preview": "vitepress preview",
+    "update": "npx --yes npm-check-updates -u -t minor",
+    "update-major": "npx --yes npm-check-updates -u"
   },
   "devDependencies": {
+    "shiki": "3.13.0",
+    "rimraf": "6.0.1",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
     "vitepress": "2.0.0-alpha.12"
   }
 }

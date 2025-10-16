@@ -10,6 +10,8 @@
 
 # Component Model C++ (Developer Reference)
 
+> **Under Construction:** The documentation is being reorganized and some sections may change without notice.
+
 This repository provides a header-only C++20 implementation of the WebAssembly Component Model canonical ABI. The code mirrors the official [Python Reference](https://github.com/GordonSmith/component-model-cpp/blob/main/ref/component-model/design/mvp/canonical-abi/definitions.py) and the [Specification](https://github.com/GordonSmith/component-model-cpp/blob/main/ref/component-model/design/mvp/CanonicalABI.md). All behavior (naming, state transitions, error conditions) should remain aligned with the reference.
 
 ## Official Documentation, Issues, and Discussions
@@ -37,7 +39,7 @@ include/                -> Header-only implementation (public surface via cmcpp.
   cmcpp.hpp             -> Aggregate public include (pulls in full cmcpp namespace)
   wamr.hpp              -> WAMR host integration helpers
   pfr.hpp               -> Boost.PFR lightweight reflection shim used internally
-grammar/                -> ANTLR WIT grammar and generation targets
+grammar/                -> ANTLR WIT grammar and Shiki syntax highlighting for docs
 tools/wit-codegen/      -> Binding generation utilities (WIT -> C++ host stubs)
 test/                   -> doctest suites + ICU-backed string conversion helpers
 samples/                -> Optional WAMR host sample (ENABLE via BUILD_SAMPLES)
