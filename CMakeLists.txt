@@ -25,6 +25,11 @@ target_include_directories(cmcpp INTERFACE
 
 target_compile_features(cmcpp INTERFACE cxx_std_20)
 
+# Enable testing early so subdirectories (including samples) can register tests
+if (BUILD_TESTING)
+    enable_testing()
+endif()
+
 if (BUILD_SAMPLES AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/samples/CMakeLists.txt")
     if (NOT DEFINED WASI_SDK_PREFIX OR WASI_SDK_PREFIX STREQUAL "")
         set(_wasi_sdk_candidates)
@@ -56,7 +61,6 @@ if (WIT_CODEGEN AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/grammar/CMakeLists.txt")
 endif()
 
 if (BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test/CMakeLists.txt")
-    enable_testing()
     add_subdirectory(test)
 endif()
 

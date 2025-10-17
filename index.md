@@ -8,8 +8,8 @@ hero:
   tagline: Header-only C++20 implementation of the WebAssembly Component Model Canonical ABI
   actions:
     - theme: brand
-      text: Read me
-      link: /README
+      text: Quick Start
+      link: /docs/quick-start
     - theme: alt
       text: WIT Code Generator
       link: /tools/wit-codegen/README

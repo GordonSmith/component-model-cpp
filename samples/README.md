@@ -16,30 +16,44 @@ The samples showcase real-world integration between C++ host applications and We
 
 ```
 samples/
-├── README.md           # This file
-├── CMakeLists.txt      # Build configuration
-├── wamr/               # WAMR runtime sample (fully implemented)
-│   ├── main.cpp        # Sample entry point and implementation
-│   ├── host_impl.cpp   # Host function implementations
-│   └── generated/      # WIT-generated bindings (tracked in git)
-│       ├── sample.hpp
-│       ├── sample_wamr.hpp
-│       └── sample_wamr.cpp
-└── wasm/               # Guest WebAssembly modules
-    ├── sample.wit      # WIT interface definition
-    ├── main.cpp        # Guest implementation
-    └── CMakeLists.txt  # Guest build configuration
+├── README.md                 # This file
+├── CMakeLists.txt            # Top-level build orchestration
+├── CMAKE_REFACTORING.md      # CMake refactoring documentation
+├── wasm/                     # WebAssembly guest modules
+│   ├── CMakeLists.txt        # Guest build configuration
+│   └── sample-one/           # Individual guest sample
+│       ├── CMakeLists.txt    # Sample-specific build
+│       ├── sample.wit        # WIT interface definition
+│       └── main.cpp          # Guest implementation
+└── wamr/                     # WAMR host applications
+    ├── CMakeLists.txt        # Host build configuration  
+    └── sample-one/           # Individual host sample
+        ├── CMakeLists.txt    # Sample-specific build
+        ├── main.cpp          # Host application entry
+        ├── host_impl.cpp     # Host function implementations
+        └── generated/        # WIT-generated bindings (tracked in git)
+            ├── sample.hpp
+            ├── sample_wamr.hpp
+            └── sample_wamr.cpp
 ```
+
+**Key Organization Principles:**
+- Each sample has matching directories under both `wasm/` and `wamr/`
+- Guest modules build with WASI SDK toolchain (isolated via ExternalProject)
+- Host applications link against WAMR runtime and cmcpp library
+- Generated bindings are sample-specific and committed to git for convenience
 
 ## Samples
 
-### WAMR Sample (Fully Implemented)
+### Sample One (WAMR)
+
+**Location**: `wasm/sample-one/` and `wamr/sample-one/`
 
 **Runtime**: [WAMR (WebAssembly Micro Runtime)](https://github.com/bytecodealliance/wasm-micro-runtime)
 
 **Status**: ✅ Complete
 
-The WAMR sample is a comprehensive demonstration using WIT-generated bindings for type-safe host integration.
+A comprehensive demonstration using WIT-generated bindings for type-safe host integration.
 
 **Features Demonstrated**:
 - All Component Model primitive types (bool, integers, floats, char, strings)
@@ -51,20 +65,23 @@ The WAMR sample is a comprehensive demonstration using WIT-generated bindings fo
 
 **Quick Start**:
 ```bash
-# Build the samples
+# Build the samples (both guest and host)
 cmake --preset linux-ninja-Debug -DBUILD_SAMPLES=ON
 cmake --build --preset linux-ninja-Debug
 
-# Run the sample
-cd build/samples/wamr
-./wamr
+# Run the WAMR host executable
+./build/samples/wamr/sample-one/sample-one
+
+# Or use the target name
+cmake --build --preset linux-ninja-Debug --target sample-one
+./build/samples/wamr/sample-one/sample-one
 ```
 
-See [Generated WAMR Helpers](../docs/generated-wamr-helpers.md) for detailed documentation, including:
-- Complete API reference
-- Type system examples
-- Building and running instructions
-- Troubleshooting guide
+**Output**: The guest WebAssembly component is built at:
+- Core module: `build/samples/wasm/sample-one/sample.wasm`
+- Component: `build/samples/wasm/sample-one/sample-component.wasm`
+
+See [Generated WAMR Helpers](../docs/generated-wamr-helpers.md) for detailed API documentation.
 
 ### WasmTime Sample (Planned)
 
@@ -138,21 +155,88 @@ cmake --preset windows-ninja-Debug -DBUILD_SAMPLES=ON
 cmake --build --preset windows-ninja-Debug
 
 # Run WAMR sample
-.\build\samples\wamr\wamr.exe
+.\build\samples\wamr\sample-one\sample-one.exe
 ```
+
+## Build System Architecture
+
+The samples use a modular CMake architecture optimized for Component Model development:
+
+### Three-Layer Structure
+
+1. **Top Level** (`samples/CMakeLists.txt`)
+   - Tool discovery (Ninja, wit-bindgen, wasm-tools)
+   - ExternalProject setup for guest builds
+   - Target orchestration (`samples`, `wasm-guests`, `wamr-samples`)
+
+2. **Runtime Level** (`wamr/CMakeLists.txt`, potentially `wasmtime/`, etc.)
+   - Runtime-specific discovery (WAMR libraries, headers)
+   - Shared configuration via INTERFACE libraries (`wamr-common`)
+   - Platform-specific compiler options
+
+3. **Sample Level** (e.g., `wamr/sample-one/CMakeLists.txt`)
+   - WIT file and binding generation
+   - Sample-specific source files
+   - Links against runtime and cmcpp libraries
+
+### Key Design Decisions
+
+**ExternalProject for Guests**: WebAssembly guest modules are built as external projects to isolate the WASI SDK toolchain from the host build environment.
+
+**INTERFACE Libraries**: The `wamr-common` library provides shared WAMR configuration (headers, libraries, compiler flags) that all WAMR samples can link against.
+
+**Pre-Generated Bindings**: Generated C++ host bindings are committed to git for convenience and faster builds when wit-codegen is unavailable.
+
+**Graceful Degradation**: Missing tools (wasm-tools, wit-bindgen) cause warnings but don't fail the build completely.
+
+See [CMAKE_REFACTORING.md](CMAKE_REFACTORING.md) for complete architectural documentation and rationale.
 
 ### Build Options
 
-- `-DBUILD_SAMPLES=ON`: Enable sample builds (default: OFF)
+- `-DBUILD_SAMPLES=ON`: Enable sample builds (default: ON on Linux/macOS, ON on Windows)
 - `-DWASI_SDK_PREFIX=/path`: Override WASI SDK location
-- `-DBUILD_TESTS=ON`: Also build unit tests
+- `-DBUILD_TESTING=ON`: Also build unit tests (default: ON)
+- `-DWIT_CODEGEN=ON`: Enable wit-codegen tool build (default: ON)
+
+### Build Targets
+
+The refactored build system provides multiple targets for flexibility:
+
+**All Samples**:
+```bash
+cmake --build build --target samples
+# Builds: wasm-guests + wamr-samples
+```
+
+**Guest Modules Only**:
+```bash
+cmake --build build --target wasm-guests
+# Builds: build/samples/wasm/sample-one/sample-component.wasm
+```
+
+**Host Applications Only**:
+```bash
+cmake --build build --target wamr-samples
+# Builds: build/samples/wamr/sample-one/sample-one
+```
+
+**Individual Sample**:
+```bash
+cmake --build build --target sample-one
+# Builds specific WAMR host executable
+```
+
+See [CMAKE_REFACTORING.md](CMAKE_REFACTORING.md) for detailed build system documentation.
 
 ## Guest WebAssembly Modules
 
-The `wasm/` directory contains the guest-side WebAssembly component implementations:
+The `wasm/` directory contains guest-side WebAssembly component implementations. Each sample has its own subdirectory.
 
-### `sample.wit`
-WIT interface definition that describes the host-guest contract:
+### Sample Structure
+
+For each sample (e.g., `sample-one`):
+
+**`sample.wit`** - WIT interface definition describing the host-guest contract:
 ```wit
 package example:sample;
 
@@ -167,38 +251,86 @@ interface floats {
 // ... more interfaces
 ```
 
-### `main.cpp`
-C++ implementation of the guest module that exports functions defined in the WIT file and imports host functions.
+**`main.cpp`** - C++ implementation that:
+- Imports host functions (defined in WIT)
+- Exports guest functions (defined in WIT)
+- Uses generated C bindings from `wit-bindgen`
+
+**`CMakeLists.txt`** - Build configuration that:
+- Generates C bindings using `wit-bindgen`
+- Compiles to core WebAssembly module (`.wasm`)
+- Converts to component using `wasm-tools`
 
 ### Building Guest Modules
 
-Guest modules are built automatically as part of the sample build process. To rebuild manually:
+Guest modules are built automatically as part of the sample build via CMake's ExternalProject:
 
 ```bash
-cd wasm
-mkdir -p build && cd build
-cmake .. -DCMAKE_TOOLCHAIN_FILE=$WASI_SDK_PREFIX/share/cmake/wasi-sdk.cmake
-cmake --build .
+# Automatic build (recommended)
+cmake --build build --target wasm-guests
+
+# Manual build (for debugging)
+cd build/samples/wasm-prefix/src/wasm-build/sample-one
+ninja
 ```
 
-This produces `sample.wasm` which is then used by the host samples.
+This produces:
+- `sample.wasm` - Core WebAssembly module
+- `sample-component.wasm` - Component Model wrapper (if wasm-tools is available)
+
+### Guest Build Environment
+
+Guest builds use an isolated WASI SDK environment:
+- **Toolchain**: WASI SDK (via `CMAKE_TOOLCHAIN_FILE`)
+- **Generator**: Ninja (for fast, parallel builds)
+- **Sysroot**: WASI sysroot from SDK
+- **Linker flags**: `--no-entry` (no main function), `--export-dynamic`
 
 ## Code Generation
 
-The WAMR sample includes generated bindings in `wamr/generated/` that are **tracked in git** for convenience:
+Each sample includes generated bindings in its `generated/` directory, **tracked in git** for convenience.
 
-- `sample.hpp`: Type definitions and interfaces from WIT
-- `sample_wamr.hpp`: WAMR-specific host function wrappers
-- `sample_wamr.cpp`: Implementation of WAMR integration
+### Host Bindings (C++)
 
-These files are auto-generated from `wasm/sample.wit` using the `wit-codegen` tool:
+Generated from WIT using the `wit-codegen` tool:
 
+**Location**: `wamr/sample-one/generated/`
+
+**Files**:
+- `sample.hpp`: Type definitions, interfaces, and function declarations
+- `sample_wamr.hpp`: WAMR-specific integration helpers
+- `sample_wamr.cpp`: WAMR native symbol registration arrays
+
+### Guest Bindings (C)
+
+Generated from WIT using `wit-bindgen`:
+
+**Location**: `build/samples/wasm-prefix/src/wasm-build/sample-one/sample/` (build-time)
+
+**Files**:
+- `sample.h`: C header with type definitions and function declarations
+- `sample.c`: C implementation stubs and marshaling code
+- `sample_component_type.o`: Component type metadata
+
+### Regenerating Bindings
+
+If you modify a WIT file, regenerate bindings:
+
+**Host bindings** (requires `wit-codegen` tool):
 ```bash
-# Regenerate bindings (if WIT changes)
-cd build
-./tools/wit-parser/wit-codegen \
-  --wit ../../wasm/sample.wit \
-  --output ../samples/wamr/generated
+# Build wit-codegen first
+cmake --build build --target wit-codegen
+
+# Generate host bindings
+cd samples/wamr/sample-one/generated
+../../../../build/tools/wit-codegen/wit-codegen \
+  ../../../wasm/sample-one/sample.wit
+```
+
+**Guest bindings** (automatic on rebuild):
+```bash
+# Just rebuild - bindings regenerate automatically
+cmake --build build --target wasm-guests
 ```
 
 ## Usage Patterns
@@ -264,12 +396,12 @@ ctest --test-dir build --output-on-failure
 The guest modules require WASI SDK for compilation:
 
 ```bash
-# Install via vcpkg
+# Install via vcpkg (recommended)
 vcpkg install wasi-sdk
 
-# Or download manually from:
-# https://github.com/WebAssembly/wasi-sdk/releases
-export WASI_SDK_PREFIX=/path/to/wasi-sdk
+# WASI_SDK_PREFIX is auto-detected from vcpkg installation
+# Manual override (if needed):
+cmake --preset linux-ninja-Debug -DWASI_SDK_PREFIX=/path/to/wasi-sdk
 ```
 
 ### "Cannot find wasm-tools or wit-bindgen-cli"
@@ -278,9 +410,30 @@ Install the required Rust tools:
 
 ```bash
 cargo install wasm-tools wit-bindgen-cli
+
+# Verify installation
+which wasm-tools
+which wit-bindgen
 ```
 
-### Link Errors with WAMR
+### "Ninja build tool not found"
+
+```bash
+# Install via vcpkg
+./vcpkg/vcpkg fetch ninja
+
+# Or install system-wide
+# Ubuntu/Debian:
+sudo apt-get install ninja-build
+
+# macOS:
+brew install ninja
+
+# Windows:
+choco install ninja
+```
+
+### "WAMR runtime not found"
 
 Ensure WAMR is properly built by vcpkg:
 
@@ -289,31 +442,122 @@ Ensure WAMR is properly built by vcpkg:
 rm -rf build vcpkg_installed
 cmake --preset linux-ninja-Debug -DBUILD_SAMPLES=ON
 cmake --build --preset linux-ninja-Debug
+
+# Verify WAMR installation
+find build/vcpkg_installed -name "libiwasm*"
+```
+
+### Link Errors with WAMR
+
+Check that you're linking against `wamr-common`:
+
+```cmake
+# In your sample CMakeLists.txt
+target_link_libraries(my-sample PRIVATE
+    cmcpp::cmcpp
+    wamr-common    # Provides WAMR headers and libraries
+)
+```
+
+### Guest Build Fails
+
+Check the external project logs:
+
+```bash
+# View configuration log
+cat build/samples/wasm-prefix/src/wasm-stamp/wasm-configure-*.log
+
+# View build log
+cat build/samples/wasm-prefix/src/wasm-stamp/wasm-build-*.log
+
+# Rebuild with verbose output
+cmake --build build --target wasm-guests -- -v
 ```
 
 ### Runtime Errors
 
-Enable verbose logging:
+Enable WAMR logging in your host code:
+
 ```cpp
-// In your code
-#define WAMR_VERBOSE 1
+// Before wasm_runtime_full_init
+RuntimeInitArgs init_args;
+memset(&init_args, 0, sizeof(RuntimeInitArgs));
+init_args.mem_alloc_type = Alloc_With_System_Allocator;
+
+// Enable logging
+char global_heap_buf[512 * 1024];
+init_args.mem_alloc_option.pool.heap_buf = global_heap_buf;
+init_args.mem_alloc_option.pool.heap_size = sizeof(global_heap_buf);
+
+wasm_runtime_full_init(&init_args);
 ```
 
-See individual sample READMEs for runtime-specific troubleshooting.
+See individual sample READMEs for sample-specific troubleshooting.
 
 ## Contributing
 
 To add a new sample:
 
-1. Create a directory under `samples/` for your runtime
-2. Add CMake configuration in `samples/CMakeLists.txt`
-3. Define WIT interfaces for your sample
-4. Generate bindings using `wit-codegen`
-5. Implement host interface classes
-6. Add comprehensive README with usage instructions
-7. Add tests demonstrating key functionality
+### 1. Create Guest Sample
 
-Contribution guidelines will be published alongside the main repository documentation.
+```bash
+mkdir -p samples/wasm/my-sample
+cd samples/wasm/my-sample
+```
+
+Create `my-sample.wit`, `main.cpp`, and `CMakeLists.txt` following the pattern in `sample-one/`.
+
+Add to `samples/wasm/CMakeLists.txt`:
+```cmake
+add_subdirectory(my-sample)
+```
+
+### 2. Create Host Sample
+
+```bash
+mkdir -p samples/wamr/my-sample
+cd samples/wamr/my-sample
+```
+
+Create `main.cpp`, `host_impl.cpp`, and `CMakeLists.txt` following the pattern in `sample-one/`.
+
+Add to `samples/wamr/CMakeLists.txt`:
+```cmake
+add_subdirectory(my-sample)
+
+# Update wamr-samples target
+add_custom_target(wamr-samples)
+add_dependencies(wamr-samples sample-one my-sample)
+```
+
+### 3. Generate Bindings
+
+```bash
+# Build wit-codegen
+cmake --build build --target wit-codegen
+
+# Generate host bindings
+mkdir -p samples/wamr/my-sample/generated
+cd samples/wamr/my-sample/generated
+../../../../build/tools/wit-codegen/wit-codegen \
+  ../../../wasm/my-sample/my-sample.wit
+
+# Commit generated files
+git add .
+```
+
+### 4. Build and Test
+
+```bash
+cmake --build build --target my-sample
+./build/samples/wamr/my-sample/my-sample
+```
+
+### 5. Document
+
+Add a section to this README describing your sample.
+
+See [CMAKE_REFACTORING.md](CMAKE_REFACTORING.md) for detailed examples and best practices.
 
 ## References
 

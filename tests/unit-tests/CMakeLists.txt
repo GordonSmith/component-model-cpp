@@ -24,18 +24,16 @@ endif()
 find_package(doctest CONFIG REQUIRED)
 find_package(ICU REQUIRED COMPONENTS uc dt in io)
 
-set(TEST_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../tests/unit-tests")
-
 include_directories(
     ${CMAKE_CURRENT_LIST_DIR}/../include
     ${ICU_INCLUDE_DIR}
 )
 
 add_executable(${PROJECT_NAME} 
-  ${TEST_SOURCE_DIR}/main.cpp
-  ${TEST_SOURCE_DIR}/scratchpad.cpp
-  ${TEST_SOURCE_DIR}/host-util.hpp
-  ${TEST_SOURCE_DIR}/host-util.cpp
+  main.cpp
+  scratchpad.cpp
+  host-util.hpp
+  host-util.cpp
 )
 
 target_link_libraries(${PROJECT_NAME} 
@@ -92,7 +90,7 @@ if(WIT_CODEGEN AND TARGET generate-grammar)
     
     # Create the grammar test executable
     add_executable(test-wit-grammar
-        ${TEST_SOURCE_DIR}/test_grammar.cpp
+        test_grammar.cpp
         ${ANTLR_GENERATED_SOURCES}
     )
     
@@ -139,3 +137,8 @@ else()
     message(STATUS "Grammar library not built, skipping grammar tests")
     message(STATUS "  Enable with: cmake -DWIT_CODEGEN=ON")
 endif()
+
+# ===== WIT Stub Generation and Validation Tests =====
+# Include the stub generation test module which generates and compiles stubs
+# to validate the complete code generation pipeline
+include(StubGenerationTests.cmake)

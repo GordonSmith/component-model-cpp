@@ -24,18 +24,16 @@ endif()
 find_package(doctest CONFIG REQUIRED)
 find_package(ICU REQUIRED COMPONENTS uc dt in io)
 
-set(TEST_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../tests/unit-tests")
-
 include_directories(
     ${CMAKE_CURRENT_LIST_DIR}/../include
     ${ICU_INCLUDE_DIR}
 )
 
 add_executable(${PROJECT_NAME} 
-  ${TEST_SOURCE_DIR}/main.cpp
-  ${TEST_SOURCE_DIR}/scratchpad.cpp
-  ${TEST_SOURCE_DIR}/host-util.hpp
-  ${TEST_SOURCE_DIR}/host-util.cpp
+  main.cpp
+  scratchpad.cpp
+  host-util.hpp
+  host-util.cpp
 )
 
 target_link_libraries(${PROJECT_NAME} 
@@ -48,6 +46,31 @@ add_test(
   NAME ${PROJECT_NAME}
   COMMAND $<TARGET_FILE:${PROJECT_NAME}>
 )
+
+# ===== WAMR Sample Test =====
+# Run the WAMR sample as a test to ensure it executes successfully
+# This test is only added if the sample-one target exists
+
+if(TARGET sample-one)
+    message(STATUS "Adding WAMR sample test...")
+    add_test(
+        NAME wamr-sample-test
+        COMMAND $<TARGET_FILE:sample-one>
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/samples/wamr-hosts/sample-one
+    )
+    
+    # Set test properties
+    set_tests_properties(wamr-sample-test PROPERTIES
+        LABELS "sample"
+        TIMEOUT 30
+    )
+    
+    message(STATUS "WAMR sample test configuration:")
+    message(STATUS "  Test executable: sample-one")
+    message(STATUS "  Working directory: ${CMAKE_BINARY_DIR}/samples/wamr-hosts/sample-one")
+else()
+    message(STATUS "WAMR sample not built, skipping wamr-sample-test")
+endif()
 
 # ===== Grammar Test Suite =====
 # Build the test executable that validates the WIT grammar against wit-bindgen test files
@@ -92,7 +115,7 @@ if(WIT_CODEGEN AND TARGET generate-grammar)
     
     # Create the grammar test executable
     add_executable(test-wit-grammar
-        ${TEST_SOURCE_DIR}/test_grammar.cpp
+        test_grammar.cpp
         ${ANTLR_GENERATED_SOURCES}
     )
     
@@ -139,3 +162,8 @@ else()
     message(STATUS "Grammar library not built, skipping grammar tests")
     message(STATUS "  Enable with: cmake -DWIT_CODEGEN=ON")
 endif()
+
+# ===== WIT Stub Generation and Validation Tests =====
+# Include the stub generation test module which generates and compiles stubs
+# to validate the complete code generation pipeline
+include(StubGenerationTests.cmake)
