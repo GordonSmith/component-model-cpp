@@ -85,14 +85,14 @@ ctest --test-dir build -C Debug --output-on-failure
 ```
 Header-only packaging (no tests/samples/wit-codegen):
 ```bash
-cmake -DBUILD_TESTING=OFF -DBUILD_SAMPLES=OFF -DWIT_CODEGEN=OFF -S . -B build
+cmake -DBUILD_TESTING=OFF -DBUILD_SAMPLES=OFF -DBUILD_WIT_CODEGEN=OFF -S . -B build
 cmake --build build
 ```
 
 #### Default Options
 - `BUILD_TESTING` (ON)
 - `BUILD_SAMPLES` (ON)
-- `WIT_CODEGEN` (ON)
+- `BUILD_WIT_CODEGEN` (ON)
 
 #### Preset Build (recommended)
 

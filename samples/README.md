@@ -196,7 +196,7 @@ See [CMAKE_REFACTORING.md](CMAKE_REFACTORING.md) for complete architectural docu
 - `-DBUILD_SAMPLES=ON`: Enable sample builds (default: ON on Linux/macOS, ON on Windows)
 - `-DWASI_SDK_PREFIX=/path`: Override WASI SDK location
 - `-DBUILD_TESTING=ON`: Also build unit tests (default: ON)
-- `-DWIT_CODEGEN=ON`: Enable wit-codegen tool build (default: ON)
+- `-DBUILD_WIT_CODEGEN=ON`: Enable wit-codegen tool build (default: ON)
 
 ### Build Targets
 

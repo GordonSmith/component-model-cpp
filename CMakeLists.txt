@@ -7,15 +7,22 @@ project(cmcpp
     LANGUAGES CXX
 )
 
-# Determine default for BUILD_SAMPLES: OFF on Windows, ON elsewhere
-set(_BUILD_SAMPLES_DEFAULT ON)
-if (WIN32)
-    set(_BUILD_SAMPLES_DEFAULT ON)
-endif()
-option(BUILD_SAMPLES "Build samples" ${_BUILD_SAMPLES_DEFAULT})
-option(BUILD_TESTING "Build tests" ON)
-option(WIT_CODEGEN "Generate code from ANTLR grammar" ON)
+# ============================================================================
+# CMake Module Path
+# ============================================================================
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
+# ============================================================================
+# Build Options
+# ============================================================================
+# Determine default for BUILD_SAMPLES: OFF on Windows, ON elsewhere
+option(BUILD_SAMPLES "Build samples" ON)
+option(BUILD_TESTING "Build tests" ON)
+option(BUILD_WIT_CODEGEN "Generate code from ANTLR grammar" ON)
+
+# ============================================================================
+# Core Library Target
+# ============================================================================
 add_library(cmcpp INTERFACE)
 
 target_include_directories(cmcpp INTERFACE
@@ -25,45 +32,37 @@ target_include_directories(cmcpp INTERFACE
 
 target_compile_features(cmcpp INTERFACE cxx_std_20)
 
+# ============================================================================
+# Testing Setup
+# ============================================================================
 # Enable testing early so subdirectories (including samples) can register tests
-if (BUILD_TESTING)
+if(BUILD_TESTING)
     enable_testing()
 endif()
 
-if (BUILD_SAMPLES AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/samples/CMakeLists.txt")
-    if (NOT DEFINED WASI_SDK_PREFIX OR WASI_SDK_PREFIX STREQUAL "")
-        set(_wasi_sdk_candidates)
-        if (DEFINED VCPKG_TARGET_TRIPLET)
-            list(APPEND _wasi_sdk_candidates "${CMAKE_CURRENT_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/wasi-sdk")
-        endif()
-        file(GLOB _wasi_sdk_glob "${CMAKE_CURRENT_BINARY_DIR}/vcpkg_installed/*/wasi-sdk")
-        list(APPEND _wasi_sdk_candidates ${_wasi_sdk_glob})
-        list(FILTER _wasi_sdk_candidates EXCLUDE REGEX "^$")
-        list(REMOVE_DUPLICATES _wasi_sdk_candidates)
-        if (_wasi_sdk_candidates)
-            list(GET _wasi_sdk_candidates 0 _wasi_sdk_default)
-            set(WASI_SDK_PREFIX "${_wasi_sdk_default}" CACHE PATH "Path to the WASI SDK used by the samples" FORCE)
-        else()
-            set(WASI_SDK_PREFIX "" CACHE PATH "Path to the WASI SDK used by the samples" FORCE)
-        endif()
-    endif()
-    message ("WASI_SDK_PREFIX: ${WASI_SDK_PREFIX}")
+# ============================================================================
+# Subdirectories
+# ============================================================================
+# Samples
+if(BUILD_SAMPLES)
     add_subdirectory(samples)
 endif()
 
+# Grammar and code generation tools
 # Grammar must be added before tools/test so the generate-grammar target is available
-if (WIT_CODEGEN AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/grammar/CMakeLists.txt")
+if(BUILD_WIT_CODEGEN)
     add_subdirectory(grammar)
-    # Add tools that use the grammar
-    if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/wit-codegen/CMakeLists.txt")
-        add_subdirectory(tools/wit-codegen)
-    endif()
+    add_subdirectory(tools/wit-codegen)
 endif()
 
-if (BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test/CMakeLists.txt")
+# Tests
+if(BUILD_TESTING)
     add_subdirectory(test)
 endif()
 
+# ============================================================================
+# Installation
+# ============================================================================
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
@@ -104,44 +103,6 @@ install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/cmcppConfigVersion.cmake"
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/cmcpp
 )
-
-# Install wit-codegen tool if it was built
-if(WIT_CODEGEN AND TARGET wit-codegen)
-    install(TARGETS wit-codegen
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-        COMPONENT tools
-    )
-    
-    # Install ANTLR4 runtime DLL on Windows
-    if(WIN32)
-        # Find and install the ANTLR4 runtime DLL
-        set(ANTLR4_DLL_PATH "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/bin/antlr4-runtime.dll")
-        if(EXISTS "${ANTLR4_DLL_PATH}")
-            install(FILES "${ANTLR4_DLL_PATH}"
-                DESTINATION ${CMAKE_INSTALL_BINDIR}
-                COMPONENT tools
-            )
-            message(STATUS "Will install ANTLR4 runtime DLL: ${ANTLR4_DLL_PATH}")
-        else()
-            message(WARNING "ANTLR4 runtime DLL not found at: ${ANTLR4_DLL_PATH}")
-        endif()
-    elseif(UNIX AND TARGET antlr4_shared)
-        # On Linux/macOS, try to find and install the shared library
-        if(APPLE)
-            set(ANTLR4_LIB_PATTERN "libantlr4-runtime*.dylib")
-        else()
-            set(ANTLR4_LIB_PATTERN "libantlr4-runtime.so*")
-        endif()
-        
-        file(GLOB ANTLR4_LIBS "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib/${ANTLR4_LIB_PATTERN}")
-        if(ANTLR4_LIBS)
-            install(FILES ${ANTLR4_LIBS}
-                DESTINATION ${CMAKE_INSTALL_LIBDIR}
-                COMPONENT tools
-            )
-        endif()
-    endif()
-endif()
 
 # CPack configuration for package generation
 set(CPACK_PACKAGE_NAME "cmcpp")

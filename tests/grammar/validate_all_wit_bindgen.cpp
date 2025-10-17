@@ -42,7 +42,7 @@ struct Paths
     fs::path wit_bindgen_dir;
     fs::path build_dir;
     fs::path generated_dir;
-    fs::path wit_codegen;
+    fs::path BUILD_WIT_CODEGEN;
     fs::path include_dir;
 };
 
@@ -136,7 +136,7 @@ std::pair<bool, std::string> generate_stub(const fs::path &wit_path,
     fs::path output_base = paths.generated_dir / stub_name;
 
     std::ostringstream cmd;
-    cmd << "\"" << paths.wit_codegen.string() << "\" "
+    cmd << "\"" << paths.BUILD_WIT_CODEGEN.string() << "\" "
         << "\"" << wit_path.string() << "\" "
         << "\"" << output_base.string() << "\"";
 
@@ -266,18 +266,18 @@ int main()
     paths.wit_bindgen_dir = paths.repo_root / "ref" / "wit-bindgen" / "tests" / "codegen";
     paths.build_dir = paths.repo_root / "build";
     paths.generated_dir = paths.build_dir / "test" / "generated_wit_bindgen";
-    paths.wit_codegen = paths.build_dir / "tools" / "wit-codegen" / "wit-codegen";
+    paths.BUILD_WIT_CODEGEN = paths.build_dir / "tools" / "wit-codegen" / "wit-codegen";
     paths.include_dir = paths.repo_root / "include";
 
 #ifdef _WIN32
-    paths.wit_codegen.replace_extension(".exe");
+    paths.BUILD_WIT_CODEGEN.replace_extension(".exe");
 #endif
 
     // Ensure build directory exists
-    if (!fs::exists(paths.wit_codegen))
+    if (!fs::exists(paths.BUILD_WIT_CODEGEN))
     {
         std::cerr << Colors::RED << "Error: wit-codegen not found at "
-                  << paths.wit_codegen << Colors::RESET << std::endl;
+                  << paths.BUILD_WIT_CODEGEN << Colors::RESET << std::endl;
         std::cerr << "Please build the project first" << std::endl;
         return 1;
     }

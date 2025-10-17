@@ -31,7 +31,7 @@ cmake --build build --target install
 The installation includes:
 - **Headers**: All C++20 header files in `include/`
 - **CMake Config**: Package config files for `find_package(cmcpp)`
-- **Tools**: `wit-codegen` executable (if `WIT_CODEGEN=ON`)
+- **Tools**: `wit-codegen` executable (if `BUILD_WIT_CODEGEN=ON`)
 
 ### Custom Installation Prefix
 
@@ -67,8 +67,8 @@ add_executable(my_app main.cpp)
 target_link_libraries(my_app PRIVATE cmcpp::cmcpp)
 
 # Optional: Use wit-codegen tool if available
-if(DEFINED CMCPP_WIT_CODEGEN_EXECUTABLE)
-    message(STATUS "wit-codegen found: ${CMCPP_WIT_CODEGEN_EXECUTABLE}")
+if(DEFINED CMCPP_BUILD_WIT_CODEGEN_EXECUTABLE)
+    message(STATUS "wit-codegen found: ${CMCPP_BUILD_WIT_CODEGEN_EXECUTABLE}")
 endif()
 ```
 
@@ -171,7 +171,7 @@ All packages include:
    - `lib/cmake/cmcpp/cmcppConfigVersion.cmake` - Version compatibility
    - `lib/cmake/cmcpp/cmcppTargets.cmake` - Target exports
 
-3. **Tools** (if `WIT_CODEGEN=ON`):
+3. **Tools** (if `BUILD_WIT_CODEGEN=ON`):
    - `bin/wit-codegen` - WIT code generator (or `wit-codegen.exe` on Windows)
    - Runtime dependencies (automatically included):
      - Windows: `antlr4-runtime.dll`
@@ -288,10 +288,10 @@ cmake . -Dcmcpp_DIR=/path/to/cmcpp/install/lib/cmake/cmcpp
 
 ### Tools Not Included in Package
 
-Make sure `WIT_CODEGEN=ON` when configuring:
+Make sure `BUILD_WIT_CODEGEN=ON` when configuring:
 
 ```bash
-cmake --preset linux-ninja-Debug -DWIT_CODEGEN=ON
+cmake --preset linux-ninja-Debug -DBUILD_WIT_CODEGEN=ON
 ```
 
 ### Package Generation Fails

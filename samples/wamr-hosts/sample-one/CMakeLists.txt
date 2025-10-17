@@ -22,7 +22,7 @@ set(GENERATED_WAMR_CPP "${GENERATED_DIR}/${PACKAGE_BASENAME}_wamr.cpp")
 # Generate Host Bindings from WIT
 # ============================================================================
 
-if (WIT_CODEGEN_EXECUTABLE)
+if (BUILD_WIT_CODEGEN_EXECUTABLE)
     add_custom_command(
         OUTPUT 
             ${GENERATED_HEADER} 
@@ -30,7 +30,7 @@ if (WIT_CODEGEN_EXECUTABLE)
             ${GENERATED_WAMR_CPP}
         COMMAND ${CMAKE_COMMAND} -E make_directory ${GENERATED_DIR}
         COMMAND ${CMAKE_COMMAND} -E chdir ${GENERATED_DIR} 
-            ${WIT_CODEGEN_EXECUTABLE} ${WIT_FILE}
+            ${BUILD_WIT_CODEGEN_EXECUTABLE} ${WIT_FILE}
         DEPENDS wit-codegen ${WIT_FILE}
         COMMENT "Generating host bindings for ${SAMPLE_NAME} from ${WIT_FILE}"
         VERBATIM
@@ -103,45 +103,32 @@ if (TARGET wasm-guests)
     add_dependencies(${SAMPLE_NAME} ${SAMPLE_NAME}-prepare-wasm)
 endif()
 
-set(_wamr_link_libs ${IWASM_LIB})
-if (_wamr_has_vmlib)
-    list(APPEND _wamr_link_libs ${VMLIB_LIB})
-elseif (NOT _wamr_require_vmlib)
-    message(STATUS "Skipping optional VMLIB; wasm-micro-runtime on Windows does not provide it.")
-endif()
-if (NOT WIN32)
-    list(APPEND _wamr_link_libs m)
-endif()
-
-target_link_libraries(${SAMPLE_NAME} PRIVATE ${_wamr_link_libs})
-
-# ===== WAMR Sample Test =====
+# ============================================================================
+# WAMR Sample Test
+# ============================================================================
 # Register the host sample with CTest so we can exercise it automatically.
-if (BUILD_TESTING)
-    if (TARGET ${SAMPLE_NAME})
-        message(STATUS "Adding WAMR sample test...")
-        add_test(
-            NAME wamr-sample-test
-            COMMAND $<TARGET_FILE:${SAMPLE_NAME}>
-            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/samples/wamr-hosts/sample-one
-        )
+if(BUILD_TESTING AND TARGET ${SAMPLE_NAME})
+    add_test(
+        NAME wamr-sample-test
+        COMMAND $<TARGET_FILE:${SAMPLE_NAME}>
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    )
 
-        set_tests_properties(wamr-sample-test PROPERTIES
-            LABELS "sample"
-            TIMEOUT 30
-        )
-
-        message(STATUS "WAMR sample test configuration:")
-        message(STATUS "  Test executable: ${SAMPLE_NAME}")
-        message(STATUS "  Working directory: ${CMAKE_BINARY_DIR}/samples/wamr-hosts/sample-one")
-    else()
-        message(STATUS "WAMR sample not built, skipping wamr-sample-test")
-    endif()
+    set_tests_properties(wamr-sample-test PROPERTIES
+        LABELS "sample"
+        TIMEOUT 30
+    )
+    
+    message(STATUS "WAMR sample test registered")
 endif()
 
+# ============================================================================
+# Export Sample Availability
+# ============================================================================
 # Only propagate TRUE to parent if guest tooling is available
-if (WIT_BINDGEN_EXECUTABLE AND TARGET wasm-guests)
+if(WIT_BINDGEN_EXECUTABLE AND TARGET wasm-guests)
     set(WAMR_SAMPLE_AVAILABLE TRUE PARENT_SCOPE)
 else()
     set(WAMR_SAMPLE_AVAILABLE FALSE PARENT_SCOPE)
 endif()
+

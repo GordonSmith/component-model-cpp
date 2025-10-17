@@ -74,10 +74,10 @@ endif()
 
 # ===== Grammar Test Suite =====
 # Build the test executable that validates the WIT grammar against wit-bindgen test files
-# This test is only built if WIT_CODEGEN is enabled and generate-grammar target exists
+# This test is only built if BUILD_WIT_CODEGEN is enabled and generate-grammar target exists
 
-# Check if grammar generation was configured (only if WIT_CODEGEN is ON)
-if(WIT_CODEGEN AND TARGET generate-grammar)
+# Check if grammar generation was configured (only if BUILD_WIT_CODEGEN is ON)
+if(BUILD_WIT_CODEGEN AND TARGET generate-grammar)
     message(STATUS "Building grammar test executable...")
     
     # Find ANTLR4 runtime (should have been found by grammar/CMakeLists.txt)
@@ -160,7 +160,7 @@ if(WIT_CODEGEN AND TARGET generate-grammar)
     message(STATUS "  Test directory: ref/wit-bindgen/tests/codegen")
 else()
     message(STATUS "Grammar library not built, skipping grammar tests")
-    message(STATUS "  Enable with: cmake -DWIT_CODEGEN=ON")
+    message(STATUS "  Enable with: cmake -DBUILD_WIT_CODEGEN=ON")
 endif()
 
 # ===== WIT Stub Generation and Validation Tests =====

@@ -31,14 +31,14 @@ Validates the ANTLR4-based WIT parser against official test files from the [wit-
 
 #### Requirements
 - Java Runtime Environment (for ANTLR)
-- CMake flag: `-DWIT_CODEGEN=ON`
+- CMake flag: `-DBUILD_WIT_CODEGEN=ON`
 
 #### Quick Start
 
 **Linux/macOS:**
 ```bash
 # 1. Configure CMake with grammar support
-cmake -B build -DWIT_CODEGEN=ON
+cmake -B build -DBUILD_WIT_CODEGEN=ON
 
 # 2. Build the grammar and test executable
 cmake --build build --target test-wit-grammar
@@ -50,7 +50,7 @@ cd build && ctest -R wit-grammar-test --verbose
 **Windows:**
 ```bash
 # 1. Configure CMake with grammar support
-cmake -B build -DWIT_CODEGEN=ON
+cmake -B build -DBUILD_WIT_CODEGEN=ON
 
 # 2. Build the grammar and test executable (specify configuration)
 cmake --build build --target test-wit-grammar --config Release
@@ -333,7 +333,7 @@ If the grammar library fails to build:
 ```bash
 # Clean build and regenerate
 rm -rf build
-cmake -B build -DWIT_CODEGEN=ON
+cmake -B build -DBUILD_WIT_CODEGEN=ON
 cmake --build build --target generate-grammar
 cmake --build build --target test-wit-grammar
 ```
@@ -405,7 +405,7 @@ git clone <repo> && cd component-model-cpp
 git submodule update --init --recursive
 
 # 2. Build with grammar support
-cmake -B build -DWIT_CODEGEN=ON
+cmake -B build -DBUILD_WIT_CODEGEN=ON
 cmake --build build
 
 # 3. Run grammar tests to validate WIT parsing
@@ -448,7 +448,7 @@ Tests are designed to run in CI/CD environments:
 
 - name: Run Grammar Tests (if enabled)
   run: |
-    cmake -B build -DWIT_CODEGEN=ON
+    cmake -B build -DBUILD_WIT_CODEGEN=ON
     cmake --build build --target test-wit-grammar
     cd build && ctest -R wit-grammar-test --output-on-failure
 ```

@@ -26,8 +26,8 @@ check_required_components(cmcpp)
 
 # Provide information about optional tools
 if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/../../../@CMAKE_INSTALL_BINDIR@/wit-codegen@CMAKE_EXECUTABLE_SUFFIX@")
-    set(CMCPP_WIT_CODEGEN_EXECUTABLE "${CMAKE_CURRENT_LIST_DIR}/../../../@CMAKE_INSTALL_BINDIR@/wit-codegen@CMAKE_EXECUTABLE_SUFFIX@")
-    message(STATUS "Found wit-codegen: ${CMCPP_WIT_CODEGEN_EXECUTABLE}")
+    set(CMCPP_BUILD_WIT_CODEGEN_EXECUTABLE "${CMAKE_CURRENT_LIST_DIR}/../../../@CMAKE_INSTALL_BINDIR@/wit-codegen@CMAKE_EXECUTABLE_SUFFIX@")
+    message(STATUS "Found wit-codegen: ${CMCPP_BUILD_WIT_CODEGEN_EXECUTABLE}")
 endif()
 
 message(STATUS "Found cmcpp: ${CMAKE_CURRENT_LIST_DIR}")
