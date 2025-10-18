@@ -89,7 +89,7 @@ struct InterfaceInfo
 {
     std::string package_name;
     std::string name;
-    InterfaceKind kind;
+    InterfaceKind kind = InterfaceKind::Export; // Default to Export (guest implements, host calls)
     std::vector<FunctionSignature> functions;
     std::vector<VariantDef> variants;
     std::vector<EnumDef> enums;

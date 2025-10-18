@@ -1,4 +1,4 @@
-project(component-model-test)
+project(grammar-tests LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -21,63 +21,12 @@ if(MSVC)
     )
 endif()
 
-find_package(doctest CONFIG REQUIRED)
-find_package(ICU REQUIRED COMPONENTS uc dt in io)
-
-include_directories(
-    ${CMAKE_CURRENT_LIST_DIR}/../include
-    ${ICU_INCLUDE_DIR}
-)
-
-add_executable(${PROJECT_NAME} 
-  main.cpp
-  scratchpad.cpp
-  host-util.hpp
-  host-util.cpp
-)
-
-target_link_libraries(${PROJECT_NAME} 
-  PRIVATE doctest::doctest
-  PRIVATE cmcpp
-  PRIVATE ${ICU_LIBRARIES}
-)
-
-add_test(
-  NAME ${PROJECT_NAME}
-  COMMAND $<TARGET_FILE:${PROJECT_NAME}>
-)
-
-# ===== WAMR Sample Test =====
-# Run the WAMR sample as a test to ensure it executes successfully
-# This test is only added if the wamr sample target exists
-
-if(TARGET wamr)
-    message(STATUS "Adding WAMR sample test...")
-    add_test(
-        NAME wamr-sample-test
-        COMMAND $<TARGET_FILE:wamr>
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/samples/wamr
-    )
-    
-    # Set test properties
-    set_tests_properties(wamr-sample-test PROPERTIES
-        LABELS "sample"
-        TIMEOUT 30
-    )
-    
-    message(STATUS "WAMR sample test configuration:")
-    message(STATUS "  Test executable: wamr")
-    message(STATUS "  Working directory: ${CMAKE_BINARY_DIR}/samples/wamr")
-else()
-    message(STATUS "WAMR sample not built, skipping wamr-sample-test")
-endif()
-
 # ===== Grammar Test Suite =====
 # Build the test executable that validates the WIT grammar against wit-bindgen test files
-# This test is only built if BUILD_GRAMMAR is enabled and generate-grammar target exists
+# This test is only built if BUILD_WIT_CODEGEN is enabled and generate-grammar target exists
 
-# Check if grammar generation was configured (only if BUILD_GRAMMAR is ON)
-if(BUILD_GRAMMAR AND TARGET generate-grammar)
+# Check if grammar generation was configured (only if BUILD_WIT_CODEGEN is ON)
+if(BUILD_WIT_CODEGEN AND TARGET generate-grammar)
     message(STATUS "Building grammar test executable...")
     
     # Find ANTLR4 runtime (should have been found by grammar/CMakeLists.txt)
@@ -160,10 +109,5 @@ if(BUILD_GRAMMAR AND TARGET generate-grammar)
     message(STATUS "  Test directory: ref/wit-bindgen/tests/codegen")
 else()
     message(STATUS "Grammar library not built, skipping grammar tests")
-    message(STATUS "  Enable with: cmake -DBUILD_GRAMMAR=ON")
+    message(STATUS "  Enable with: cmake -DBUILD_WIT_CODEGEN=ON")
 endif()
-
-# ===== WIT Stub Generation and Validation Tests =====
-# Include the stub generation test module which generates and compiles stubs
-# to validate the complete code generation pipeline
-include(StubGenerationTests.cmake)

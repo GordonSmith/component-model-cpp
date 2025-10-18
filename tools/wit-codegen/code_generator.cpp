@@ -153,9 +153,10 @@ void CodeGenerator::generateHeader(const std::vector<InterfaceInfo> &interfaces,
             out << "namespace guest {\n";
             for (const auto &export_name : *world_exports)
             {
-                // Parse the export: "my:dep/a@0.2.0" -> package="my:dep@0.2.0", interface="a"
+                // Check if this is a cross-package export (contains ':' and '/')
                 if (export_name.find(':') != std::string::npos && export_name.find('/') != std::string::npos)
                 {
+                    // Parse the export: "my:dep/a@0.2.0" -> package="my:dep@0.2.0", interface="a"
                     size_t slash_pos = export_name.find('/');
                     std::string before_slash = export_name.substr(0, slash_pos);
                     std::string after_slash = export_name.substr(slash_pos + 1);
@@ -205,6 +206,17 @@ void CodeGenerator::generateHeader(const std::vector<InterfaceInfo> &interfaces,
 
                         out << "    }\n";
                     }
+                }
+                else
+                {
+                    // Same-package export (e.g., "run" without package qualifier)
+                    // Re-export the interface namespace so the world header
+                    // exposes the guest-facing symbols defined in the
+                    // corresponding interface header.
+                    out << "    // Exported interface: " << export_name << "\n";
+                    out << "    namespace " << sanitize_identifier(export_name) << " {\n";
+                    out << "        using namespace ::guest::" << sanitize_identifier(export_name) << ";\n";
+                    out << "    }\n";
                 }
             }
             out << "} // namespace guest\n\n";

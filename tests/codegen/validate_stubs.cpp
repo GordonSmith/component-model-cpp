@@ -232,7 +232,7 @@ void print_usage(const char *program_name)
     std::cout << "                            composite, options, functions, resources, async)" << std::endl;
     std::cout << "  --exclude <group>         Exclude a group when using --group all" << std::endl;
     std::cout << "  -d, --stub-dir <path>     Directory containing generated stubs" << std::endl;
-    std::cout << "                            (default: build/test/generated_stubs)" << std::endl;
+    std::cout << "                            (default: build/generated_stubs)" << std::endl;
     std::cout << "  -i, --include-dir <path>  Directory containing cmcpp headers" << std::endl;
     std::cout << "                            (default: include)" << std::endl;
     std::cout << "  -v, --verbose             Show compilation errors" << std::endl;
@@ -257,7 +257,7 @@ void print_usage(const char *program_name)
 int main(int argc, char *argv[])
 {
     // Default paths
-    fs::path stub_dir = "build/test/generated_stubs";
+    fs::path stub_dir = "build/generated_stubs";
     fs::path include_dir = "include";
 
     // Options

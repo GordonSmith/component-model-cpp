@@ -27,18 +27,18 @@ cd build && ctest -R component-model-test
 
 Validates the ANTLR4-based WIT parser against official test files from the [wit-bindgen](https://github.com/bytecodealliance/wit-bindgen) project.
 
-**📖 See [TESTING_GRAMMAR.md](TESTING_GRAMMAR.md) for complete grammar testing documentation.**
+**📖 Detailed grammar testing instructions are included in this section.**
 
 #### Requirements
 - Java Runtime Environment (for ANTLR)
-- CMake flag: `-DBUILD_GRAMMAR=ON`
+- CMake flag: `-DBUILD_WIT_CODEGEN=ON`
 
 #### Quick Start
 
 **Linux/macOS:**
 ```bash
 # 1. Configure CMake with grammar support
-cmake -B build -DBUILD_GRAMMAR=ON
+cmake -B build -DBUILD_WIT_CODEGEN=ON
 
 # 2. Build the grammar and test executable
 cmake --build build --target test-wit-grammar
@@ -50,7 +50,7 @@ cd build && ctest -R wit-grammar-test --verbose
 **Windows:**
 ```bash
 # 1. Configure CMake with grammar support
-cmake -B build -DBUILD_GRAMMAR=ON
+cmake -B build -DBUILD_WIT_CODEGEN=ON
 
 # 2. Build the grammar and test executable (specify configuration)
 cmake --build build --target test-wit-grammar --config Release
@@ -63,8 +63,7 @@ cd build && ctest -C Release -R wit-grammar-test --verbose
 
 Generate C++ host function stubs from all WIT test files. Useful for testing the code generator and creating reference implementations.
 
-**📖 See [STUB_GENERATION.md](STUB_GENERATION.md) for stub generation scripts.**  
-**📖 See [CODEGEN_VALIDATION.md](CODEGEN_VALIDATION.md) for the validation framework.**
+**📖 Stub generation and validation guidance appears throughout this section.**
 
 #### Quick Start
 
@@ -97,7 +96,7 @@ Each generated stub includes its own `CMakeLists.txt` in a dedicated subdirector
 cmake --build build --target generate-test-stubs
 
 # Navigate to a specific stub directory
-cd build/test/generated_stubs/simple-functions
+cd build/generated_stubs/simple-functions
 
 # Build the individual stub
 cmake -S . -B build
@@ -142,7 +141,7 @@ The framework also validates generated code by attempting to compile it:
 cmake --build build --target test-stubs-full
 ```
 
-**⚠️ IMPORTANT**: Compilation failures are **expected and useful**! They indicate bugs in `wit-codegen` that need fixing. See [CODEGEN_VALIDATION.md](CODEGEN_VALIDATION.md) for details on interpreting failures.
+**⚠️ IMPORTANT**: Compilation failures are **expected and useful**! They indicate bugs in `wit-codegen` that need fixing. Detailed validation notes are included in the following section.
 
 #### Generated Files
 
@@ -334,7 +333,7 @@ If the grammar library fails to build:
 ```bash
 # Clean build and regenerate
 rm -rf build
-cmake -B build -DBUILD_GRAMMAR=ON
+cmake -B build -DBUILD_WIT_CODEGEN=ON
 cmake --build build --target generate-grammar
 cmake --build build --target test-wit-grammar
 ```
@@ -406,7 +405,7 @@ git clone <repo> && cd component-model-cpp
 git submodule update --init --recursive
 
 # 2. Build with grammar support
-cmake -B build -DBUILD_GRAMMAR=ON
+cmake -B build -DBUILD_WIT_CODEGEN=ON
 cmake --build build
 
 # 3. Run grammar tests to validate WIT parsing
@@ -449,7 +448,7 @@ Tests are designed to run in CI/CD environments:
 
 - name: Run Grammar Tests (if enabled)
   run: |
-    cmake -B build -DBUILD_GRAMMAR=ON
+    cmake -B build -DBUILD_WIT_CODEGEN=ON
     cmake --build build --target test-wit-grammar
     cd build && ctest -R wit-grammar-test --output-on-failure
 ```
@@ -478,6 +477,6 @@ Grammar tests automatically pick up all `.wit` files in the test directory. To t
 ## Related Documentation
 
 - [Main README](../README.md) - Project overview
-- [Grammar README](../grammar/README.md) - Grammar documentation
-- [Component Model Specification](../ref/component-model/design/mvp/CanonicalABI.md)
-- [WIT Specification](../ref/component-model/design/mvp/WIT.md)
+- [Grammar README](https://github.com/GordonSmith/component-model-cpp/blob/main/grammar/README.md) - Grammar documentation
+- [Component Model Specification](https://github.com/WebAssembly/component-model/blob/main/design/mvp/CanonicalABI.md)
+- [WIT Specification](https://github.com/WebAssembly/component-model/blob/main/design/mvp/WIT.md)

@@ -246,93 +246,56 @@ target_include_directories()"
     file << cmake_content.str();
 }
 
+// Read template file and replace placeholders
+std::string read_template_file(const fs::path &template_path)
+{
+    std::ifstream file(template_path);
+    if (!file.is_open())
+    {
+        throw std::runtime_error("Failed to open template file: " + template_path.string());
+    }
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
+}
+
+// Replace placeholders in template
+std::string replace_placeholder(const std::string &content,
+                                const std::string &placeholder,
+                                const std::string &value)
+{
+    std::string result = content;
+    size_t pos = result.find(placeholder);
+    if (pos != std::string::npos)
+    {
+        result.replace(pos, placeholder.length(), value);
+    }
+    return result;
+}
+
 // Generate root CMakeLists.txt
 void generate_root_cmake_file(const fs::path &output_dir,
-                              const std::vector<fs::path> &stub_dirs)
+                              const std::vector<fs::path> &stub_dirs,
+                              const fs::path &template_base_dir)
 {
     fs::path root_cmake_path = output_dir / "CMakeLists.txt";
 
-    std::ostringstream cmake_content;
-    cmake_content << R"(# Generated root CMakeLists.txt for all WIT test stubs
-# This file adds all individual stub subdirectories for compilation testing
+    // Find template file
+    fs::path template_path = template_base_dir / "cmake_templates" / "root_cmake_template.cmake.in";
 
-cmake_minimum_required(VERSION 3.10)
-project(wit-test-stubs)
+    if (!fs::exists(template_path))
+    {
+        std::cerr << Colors::color("Warning: Template file not found at " + template_path.string(),
+                                   Colors::YELLOW)
+                  << std::endl;
+        std::cerr << "Expected location: " << template_path << std::endl;
+        throw std::runtime_error("Template file not found");
+    }
 
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+    std::string cmake_content = read_template_file(template_path);
 
-# Try to find cmcpp package, fallback to local include
-find_package(cmcpp QUIET)
-if(NOT cmcpp_FOUND)
-    # Use local include directory (for testing without installation)
-    # From: build/test/generated_stubs/ -> ../../../include
-    set(CMCPP_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../include")
-    if(NOT EXISTS "${CMCPP_INCLUDE_DIR}/cmcpp.hpp")
-        message(FATAL_ERROR "cmcpp headers not found. Set CMCPP_INCLUDE_DIR or install cmcpp package.")
-    endif()
-    message(STATUS "Using local cmcpp from: ${CMCPP_INCLUDE_DIR}")
-    
-    # Set include directories for all subdirectories
-    include_directories(${CMCPP_INCLUDE_DIR})
-endif()
-
-# Find WAMR (required for _wamr.cpp files)
-set(_wamr_hint_candidates "")
-
-if(DEFINED VCPKG_TARGET_TRIPLET)
-    list(APPEND _wamr_hint_candidates "${CMAKE_CURRENT_SOURCE_DIR}/../../vcpkg_installed/${VCPKG_TARGET_TRIPLET}/include")
-endif()
-
-if(DEFINED VCPKG_HOST_TRIPLET)
-    list(APPEND _wamr_hint_candidates "${CMAKE_CURRENT_SOURCE_DIR}/../../vcpkg_installed/${VCPKG_HOST_TRIPLET}/include")
-endif()
-
-list(APPEND _wamr_hint_candidates
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../vcpkg_installed/x64-windows/include"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../vcpkg_installed/x64-windows-static/include"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../vcpkg_installed/x64-linux/include"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../vcpkg_installed/x64-osx/include"
-)
-
-list(REMOVE_DUPLICATES _wamr_hint_candidates)
-
-set(WAMR_INCLUDE_HINT "")
-foreach(_hint IN LISTS _wamr_hint_candidates)
-    if(NOT WAMR_INCLUDE_HINT AND EXISTS "${_hint}/wasm_export.h")
-        set(WAMR_INCLUDE_HINT "${_hint}")
-    endif()
-endforeach()
-
-if(WAMR_INCLUDE_HINT)
-    message(STATUS "Using WAMR from: ${WAMR_INCLUDE_HINT}")
-    include_directories(${WAMR_INCLUDE_HINT})
-else()
-    find_path(WAMR_INCLUDE_DIR wasm_export.h)
-    if(WAMR_INCLUDE_DIR)
-        message(STATUS "Found WAMR at: ${WAMR_INCLUDE_DIR}")
-        include_directories(${WAMR_INCLUDE_DIR})
-    else()
-        message(WARNING "WAMR headers not found. Stubs requiring wasm_export.h will fail to compile.")
-    endif()
-endif()
-
-# Suppress narrowing conversion warnings for WebAssembly 32-bit ABI
-if(MSVC)
-    add_compile_options(
-        /wd4244  # conversion from 'type1' to 'type2', possible loss of data
-        /wd4267  # conversion from 'size_t' to 'type', possible loss of data
-        /wd4305  # truncation from 'type1' to 'type2'
-        /wd4309  # truncation of constant value
-    )
-endif()
-
-# Add all stub subdirectories
-message(STATUS "Adding WIT test stub subdirectories...")
-
-)";
-
-    // Add each subdirectory
+    // Generate subdirectory list
+    std::ostringstream subdirs;
     auto sorted_dirs = stub_dirs;
     std::sort(sorted_dirs.begin(), sorted_dirs.end());
 
@@ -342,7 +305,7 @@ message(STATUS "Adding WIT test stub subdirectories...")
         {
             fs::path rel_path = fs::relative(stub_dir, output_dir);
             std::string rel_path_str = rel_path.generic_string();
-            cmake_content << "add_subdirectory(\"" << rel_path_str << "\")\n";
+            subdirs << "add_subdirectory(\"" << rel_path_str << "\")\n";
         }
         catch (...)
         {
@@ -350,11 +313,12 @@ message(STATUS "Adding WIT test stub subdirectories...")
         }
     }
 
-    cmake_content << "\n# Summary\nmessage(STATUS \"Added " << stub_dirs.size()
-                  << " WIT test stub directories\")\n";
+    // Replace placeholders
+    cmake_content = replace_placeholder(cmake_content, "@STUB_SUBDIRECTORIES@", subdirs.str());
+    cmake_content = replace_placeholder(cmake_content, "@STUB_COUNT@", std::to_string(stub_dirs.size()));
 
     std::ofstream file(root_cmake_path);
-    file << cmake_content.str();
+    file << cmake_content;
 }
 
 // Generate stub for a single WIT file
@@ -568,10 +532,14 @@ int main(int argc, char *argv[])
     }
 
     // Resolve paths
+    // Working directory is CMAKE_CURRENT_SOURCE_DIR (tests/codegen)
     fs::path script_dir = fs::current_path();
     test_dir = (script_dir / test_dir).lexically_normal();
     output_dir = (script_dir / output_dir).lexically_normal();
     codegen_tool = (script_dir / codegen_tool).lexically_normal();
+
+    // Template is in current source directory (tests/codegen/cmake_templates/)
+    fs::path template_base_dir = script_dir;
 
 #ifdef _WIN32
     if (!codegen_tool.has_extension())
@@ -738,11 +706,21 @@ int main(int argc, char *argv[])
     if (success_count > 0 && !no_cmake)
     {
         std::cout << "\nGenerating root CMakeLists.txt..." << std::endl;
-        generate_root_cmake_file(output_dir, generated_stub_dirs);
-        std::cout << Colors::color(std::string(CHECKMARK) + " Created " +
-                                       (output_dir / "CMakeLists.txt").string(),
-                                   Colors::GREEN)
-                  << std::endl;
+        try
+        {
+            generate_root_cmake_file(output_dir, generated_stub_dirs, template_base_dir);
+            std::cout << Colors::color(std::string(CHECKMARK) + " Created " +
+                                           (output_dir / "CMakeLists.txt").string(),
+                                       Colors::GREEN)
+                      << std::endl;
+        }
+        catch (const std::exception &e)
+        {
+            std::cerr << Colors::color("Error generating root CMakeLists.txt: " + std::string(e.what()),
+                                       Colors::RED)
+                      << std::endl;
+            return 1;
+        }
     }
 
     std::cout << "\n"

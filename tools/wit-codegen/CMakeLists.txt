@@ -63,3 +63,44 @@ add_dependencies(wit-codegen generate-grammar)
 # Set C++ standard
 target_compile_features(wit-codegen PRIVATE cxx_std_17)
 
+# ============================================================================
+# Installation
+# ============================================================================
+include(GNUInstallDirs)
+
+# Install wit-codegen executable
+install(TARGETS wit-codegen
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    COMPONENT tools
+)
+
+# Install ANTLR4 runtime dependencies
+if(WIN32)
+    # Find and install the ANTLR4 runtime DLL on Windows
+    set(ANTLR4_DLL_PATH "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/bin/antlr4-runtime.dll")
+    if(EXISTS "${ANTLR4_DLL_PATH}")
+        install(FILES "${ANTLR4_DLL_PATH}"
+            DESTINATION ${CMAKE_INSTALL_BINDIR}
+            COMPONENT tools
+        )
+        message(STATUS "Will install ANTLR4 runtime DLL: ${ANTLR4_DLL_PATH}")
+    else()
+        message(WARNING "ANTLR4 runtime DLL not found at: ${ANTLR4_DLL_PATH}")
+    endif()
+elseif(UNIX AND TARGET antlr4_shared)
+    # On Linux/macOS, install the shared library
+    if(APPLE)
+        set(ANTLR4_LIB_PATTERN "libantlr4-runtime*.dylib")
+    else()
+        set(ANTLR4_LIB_PATTERN "libantlr4-runtime.so*")
+    endif()
+    
+    file(GLOB ANTLR4_LIBS "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib/${ANTLR4_LIB_PATTERN}")
+    if(ANTLR4_LIBS)
+        install(FILES ${ANTLR4_LIBS}
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            COMPONENT tools
+        )
+        message(STATUS "Will install ANTLR4 runtime libraries: ${ANTLR4_LIBS}")
+    endif()
+endif()

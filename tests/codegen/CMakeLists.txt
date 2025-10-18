@@ -1,20 +1,30 @@
-# ===== WIT Stub Generation and Validation =====
-# This module generates C++ stubs from WIT test files and compiles them to validate
-# the code generation pipeline (grammar -> parser -> codegen -> compilation)
-#
-# Requirements:
-# - BUILD_GRAMMAR=ON (for wit-codegen tool)
-# - wit-codegen target must exist
-#
-# Provides:
-# - generate-test-stubs: Generate stubs from all WIT test files
-# - validate-test-stubs: Compile generated stubs to verify code generation
-# - test-stubs-full: Combined generation + validation
+project(codegen-tests LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+if(CMAKE_COMPILER_IS_GNUCXX)
+    add_compile_options(--coverage)
+    add_link_options(--coverage)
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
+    add_link_options(-fprofile-instr-generate)
+endif()
+
+# Suppress narrowing conversion warnings on MSVC for WebAssembly 32-bit ABI
+if(MSVC)
+    add_compile_options(
+        /wd4244  # conversion from 'type1' to 'type2', possible loss of data
+        /wd4267  # conversion from 'size_t' to 'type', possible loss of data
+        /wd4305  # truncation from 'type1' to 'type2'
+        /wd4309  # truncation of constant value
+    )
+endif()
 
 # Only proceed if grammar/codegen tools are available
-if(NOT BUILD_GRAMMAR OR NOT TARGET wit-codegen)
+if(NOT BUILD_WIT_CODEGEN OR NOT TARGET wit-codegen)
     message(STATUS "wit-codegen not available, skipping stub generation tests")
-    message(STATUS "  Enable with: cmake -DBUILD_GRAMMAR=ON")
+    message(STATUS "  Enable with: cmake -DBUILD_WIT_CODEGEN=ON")
     return()
 endif()
 
@@ -35,7 +45,7 @@ add_executable(validate_all_wit_bindgen_tool validate_all_wit_bindgen.cpp)
 target_compile_features(validate_all_wit_bindgen_tool PUBLIC cxx_std_20)
 
 # ===== Configuration =====
-set(STUB_OUTPUT_DIR "${CMAKE_BINARY_DIR}/test/generated_stubs")
+set(STUB_OUTPUT_DIR "${CMAKE_BINARY_DIR}/generated_stubs")
 set(WIT_TEST_DIR "${CMAKE_SOURCE_DIR}/ref/wit-bindgen/tests/codegen")
 
 # Check if test directory exists
@@ -257,14 +267,26 @@ add_custom_target(validate-test-stubs-incremental
 
 # ===== Target: validate-root-cmake =====
 # Validate that the root CMakeLists.txt can configure successfully
+# Find WAMR (optional - needed for compiling *_wamr.cpp stubs)
+include(FindWAMR)
+find_package(WAMR QUIET)
+
 # Configure build flags for the nested build (used by validate-root-cmake and validate-root-cmake-build)
 # In CI environments, use Debug build with no optimizations to reduce memory overhead
 if(DEFINED ENV{CI})
-    set(CI_CMAKE_FLAGS "-DCMAKE_BUILD_TYPE=Debug")
+    set(CI_CMAKE_FLAGS "-DCMAKE_BUILD_TYPE=Debug" "-DCMCPP_INCLUDE_DIR=${CMAKE_SOURCE_DIR}/include")
     set(CI_BUILD_MESSAGE "Debug build (no optimizations) for CI")
 else()
-    set(CI_CMAKE_FLAGS "")
+    set(CI_CMAKE_FLAGS "-DCMCPP_INCLUDE_DIR=${CMAKE_SOURCE_DIR}/include")
     set(CI_BUILD_MESSAGE "Default build configuration")
+endif()
+
+# Add WAMR include directory if available
+if(WAMR_FOUND AND WAMR_INCLUDE_DIRS)
+    list(APPEND CI_CMAKE_FLAGS "-DWAMR_INCLUDE_DIR=${WAMR_INCLUDE_DIRS}")
+    message(STATUS "WAMR found - stub builds will include WAMR support")
+else()
+    message(STATUS "WAMR not found - stub builds will skip WAMR files (expected in some environments)")
 endif()
 
 add_custom_target(validate-root-cmake
@@ -335,42 +357,3 @@ add_custom_target(clean-test-stubs
     COMMENT "Removing generated stub files"
     VERBATIM
 )
-
-# ===== Summary =====
-message(STATUS "Stub generation test targets configured:")
-message(STATUS "  generate-test-stubs            - Generate C++ stubs from WIT test files")
-message(STATUS "  validate-test-stubs            - Compile ALL stubs (full validation, parallel)")
-message(STATUS "  validate-test-stubs-basic      - Compile only basic types (should pass)")
-message(STATUS "  validate-test-stubs-composite  - Compile only composite types")
-message(STATUS "  validate-test-stubs-async      - Compile only async types (likely fails)")
-message(STATUS "  validate-test-stubs-incremental- Compile all except async")
-message(STATUS "  validate-root-cmake            - Test root CMakeLists.txt configures all stubs")
-message(STATUS "  validate-root-cmake-build      - Build ALL 199 stubs via root CMakeLists.txt")
-message(STATUS "  test-stubs-full                - Generate + validate + build all via root CMakeLists")
-message(STATUS "  clean-test-stubs               - Remove generated stubs")
-message(STATUS "")
-message(STATUS "Stub generation configuration:")
-message(STATUS "  WIT test directory: ${WIT_TEST_DIR}")
-message(STATUS "  Output directory:   ${STUB_OUTPUT_DIR}")
-message(STATUS "  Test samples:       ${CMAKE_CURRENT_LIST_LENGTH} test files")
-if(DEFINED ENV{CI})
-    message(STATUS "  CI Mode:            Enabled (Debug build, no optimizations, no parallel)")
-else()
-    message(STATUS "  Parallel build:     Enabled (use CMAKE_BUILD_PARALLEL_LEVEL or -j to control)")
-endif()
-message(STATUS "")
-message(STATUS "IMPORTANT: Compilation failures are EXPECTED and USEFUL!")
-message(STATUS "  They indicate bugs in wit-codegen that need to be fixed.")
-message(STATUS "  Check build output to see which WIT features cause issues.")
-message(STATUS "")
-message(STATUS "Incremental workflow:")
-message(STATUS "  1. cmake --build build --target validate-test-stubs-basic")
-message(STATUS "  2. cmake --build build --target validate-test-stubs-composite")
-message(STATUS "  3. Fix any issues found")
-message(STATUS "  4. cmake --build build --target validate-test-stubs-async")
-message(STATUS "  5. Fix async issues")
-message(STATUS "  6. cmake --build build --target validate-test-stubs (full test)")
-message(STATUS "")
-message(STATUS "To control parallelism:")
-message(STATUS "  CMAKE_BUILD_PARALLEL_LEVEL=8 cmake --build build --target validate-test-stubs")
-message(STATUS "  or: ninja -j8 validate-test-stubs")

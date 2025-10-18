@@ -1,0 +1,90 @@
+# Generated root CMakeLists.txt for all WIT test stubs
+# This file adds all individual stub subdirectories for compilation testing
+
+cmake_minimum_required(VERSION 3.10)
+project(wit-test-stubs)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Try to find cmcpp package, fallback to local include
+find_package(cmcpp QUIET)
+if(NOT cmcpp_FOUND)
+    # Use local include directory (for testing without installation)
+    # From: build/generated_stubs/ -> ../../../include
+    if(NOT DEFINED CMCPP_INCLUDE_DIR)
+        set(CMCPP_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../include")
+    endif()
+    if(NOT EXISTS "${CMCPP_INCLUDE_DIR}/cmcpp.hpp")
+        message(FATAL_ERROR "cmcpp headers not found. Set CMCPP_INCLUDE_DIR or install cmcpp package.")
+    endif()
+    message(STATUS "Using local cmcpp from: ${CMCPP_INCLUDE_DIR}")
+    
+    # Set include directories for all subdirectories
+    include_directories(${CMCPP_INCLUDE_DIR})
+endif()
+
+# Find WAMR (required for _wamr.cpp files)
+set(_wamr_hint_candidates "")
+
+if(DEFINED VCPKG_TARGET_TRIPLET)
+    list(APPEND _wamr_hint_candidates "${CMAKE_CURRENT_SOURCE_DIR}/../../vcpkg_installed/${VCPKG_TARGET_TRIPLET}/include")
+endif()
+
+if(DEFINED VCPKG_HOST_TRIPLET)
+    list(APPEND _wamr_hint_candidates "${CMAKE_CURRENT_SOURCE_DIR}/../../vcpkg_installed/${VCPKG_HOST_TRIPLET}/include")
+endif()
+
+list(APPEND _wamr_hint_candidates
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../vcpkg_installed/x64-windows/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../vcpkg_installed/x64-windows-static/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../vcpkg_installed/x64-linux/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../vcpkg_installed/x64-osx/include"
+)
+
+list(REMOVE_DUPLICATES _wamr_hint_candidates)
+
+# Check if WAMR_INCLUDE_DIR was provided (e.g., from parent build)
+if(DEFINED WAMR_INCLUDE_DIR)
+    message(STATUS "Using WAMR from parent build: ${WAMR_INCLUDE_DIR}")
+    include_directories(${WAMR_INCLUDE_DIR})
+else()
+    # Try to find WAMR in common locations
+    set(WAMR_INCLUDE_HINT "")
+    foreach(_hint IN LISTS _wamr_hint_candidates)
+        if(NOT WAMR_INCLUDE_HINT AND EXISTS "${_hint}/wasm_export.h")
+            set(WAMR_INCLUDE_HINT "${_hint}")
+        endif()
+    endforeach()
+
+    if(WAMR_INCLUDE_HINT)
+        message(STATUS "Using WAMR from: ${WAMR_INCLUDE_HINT}")
+        include_directories(${WAMR_INCLUDE_HINT})
+    else()
+        find_path(WAMR_INCLUDE_DIR wasm_export.h)
+        if(WAMR_INCLUDE_DIR)
+            message(STATUS "Found WAMR at: ${WAMR_INCLUDE_DIR}")
+            include_directories(${WAMR_INCLUDE_DIR})
+        else()
+            message(WARNING "WAMR headers not found. Stubs requiring wasm_export.h will fail to compile.")
+        endif()
+    endif()
+endif()
+
+# Suppress narrowing conversion warnings for WebAssembly 32-bit ABI
+if(MSVC)
+    add_compile_options(
+        /wd4244  # conversion from 'type1' to 'type2', possible loss of data
+        /wd4267  # conversion from 'size_t' to 'type', possible loss of data
+        /wd4305  # truncation from 'type1' to 'type2'
+        /wd4309  # truncation of constant value
+    )
+endif()
+
+# Add all stub subdirectories
+message(STATUS "Adding WIT test stub subdirectories...")
+
+@STUB_SUBDIRECTORIES@
+
+# Summary
+message(STATUS "Added @STUB_COUNT@ WIT test stub directories")
