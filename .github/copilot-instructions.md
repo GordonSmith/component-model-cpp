@@ -42,3 +42,4 @@
 - Dependencies are managed through `vcpkg.json` with overlays in `vcpkg_overlays/` (notably for WAMR); stick with preset builds so CMake wires in the correct toolchain file automatically.
 - Cargo manifest (`Cargo.toml`) is only for fetching `wasm-tools` and `wit-bindgen-cli`; if you touch wasm generation logic, update both the manifest and any scripts referencing those versions.
 - Keep documentation alongside code: update `README.md` when introducing new host types or workflows so downstream integrators stay aligned with the canonical ABI behavior.
+- When you need a patch file, prefer generating it with git: stage the changes you want included, run `git diff --staged > <name>.patch`, and double-check the file starts with `---`/`+++` headers before using it in `PATCHES` lists.

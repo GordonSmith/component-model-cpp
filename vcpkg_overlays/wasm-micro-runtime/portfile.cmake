@@ -6,6 +6,7 @@ vcpkg_from_github(
     HEAD_REF main
     PATCHES
         fix-version-output.patch
+        fix-msvc-c11.patch
 )
 
 vcpkg_check_features(OUT_FEATURE_OPTIONS FEATURE_OPTIONS
@@ -36,6 +37,10 @@ if (VCPKG_TARGET_IS_WINDOWS)
     string(REPLACE "-DWAMR_BUILD_FAST_JIT=1" "-DWAMR_BUILD_FAST_JIT=0" FEATURE_OPTIONS "${FEATURE_OPTIONS}")
     # Set platform explicitly
     list(APPEND FEATURE_OPTIONS "-DWAMR_BUILD_PLATFORM=windows")
+    
+    # Disable hardware bound check on Windows to avoid Zydis dependency
+    # This is a workaround since Zydis integration in WAMR uses FetchContent
+    list(APPEND FEATURE_OPTIONS "-DWAMR_DISABLE_HW_BOUND_CHECK=1")
 endif ()
 message("FEATURE_OPTIONS:  ${FEATURE_OPTIONS}")
 
@@ -48,6 +53,12 @@ vcpkg_cmake_configure(
 vcpkg_cmake_install()
 
 vcpkg_cmake_config_fixup(PACKAGE_NAME iwasm CONFIG_PATH lib/cmake/iwasm)
+
+file(INSTALL
+    DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}"
+    TYPE FILE
+    FILES "${CMAKE_CURRENT_LIST_DIR}/usage"
+)
 
 vcpkg_install_copyright(FILE_LIST "${SOURCE_PATH}/LICENSE")
 
