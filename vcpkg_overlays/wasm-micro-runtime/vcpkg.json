@@ -1,8 +1,8 @@
 {
   "name": "wasm-micro-runtime",
-  "version": "2.4.1",
+  "version": "2.4.3",
   "port-version": 0,
-  "description": "WebAssembly Micro Runtime (WAMR) is a lightweight standalone WebAssembly (Wasm) runtime with small footprint, high performance and highly configurable features.",
+  "description": "WebAssembly Micro Runtime (WAMR) is a lightweight standalone WebAssembly (Wasm) runtime with small footprint, high performance and highly configurable features. Default features match WAMR CMakeLists.txt defaults: INTERP=1, AOT=1, FAST_INTERP=1, LIBC_BUILTIN=1, LIBC_WASI=1, SIMD=1, REF_TYPES=1.",
   "homepage": "https://github.com/bytecodealliance/wasm-micro-runtime",
   "license": "Apache-2.0",
   "supports": "linux | osx | windows",
@@ -19,7 +19,10 @@
   "default-features": [
     "aot",
     "classic-interpreter",
-    "fast-interpreter"
+    "fast-interpreter",
+    "libc-builtin",
+    "libc-wasi",
+    "ref-types"
   ],
   "features": {
     "aot": {
@@ -40,6 +43,42 @@
     },
     "fast-jit": {
       "description": "Build with the fast JIT support",
+      "dependencies": []
+    },
+    "libc-builtin": {
+      "description": "Build with libc builtin support",
+      "dependencies": []
+    },
+    "libc-wasi": {
+      "description": "Build with libc WASI support",
+      "dependencies": []
+    },
+    "multi-module": {
+      "description": "Build with multiple module support",
+      "dependencies": []
+    },
+    "lib-pthread": {
+      "description": "Build with pthread library support",
+      "dependencies": []
+    },
+    "lib-wasi-threads": {
+      "description": "Build with WASI threads library support",
+      "dependencies": []
+    },
+    "simd": {
+      "description": "Build with SIMD support",
+      "dependencies": []
+    },
+    "ref-types": {
+      "description": "Build with reference types support",
+      "dependencies": []
+    },
+    "mini-loader": {
+      "description": "Build with mini loader support",
+      "dependencies": []
+    },
+    "copy-call-stack": {
+      "description": "Build with copy call stack support",
       "dependencies": []
     }
   }
