@@ -13,7 +13,7 @@ class PackageRegistry;
 class CodeGenerator
 {
 public:
-    static void generateHeader(const std::vector<InterfaceInfo> &interfaces, const std::string &filename, const PackageRegistry *registry = nullptr, const std::set<std::string> *external_deps = nullptr, const std::set<std::string> *world_imports = nullptr, const std::set<std::string> *world_exports = nullptr);
+    static void generateHeader(const std::vector<InterfaceInfo> &interfaces, const std::string &filename, const PackageRegistry *registry = nullptr, const std::set<std::string> *external_deps = nullptr, const std::set<std::string> *world_imports = nullptr, const std::set<std::string> *world_exports = nullptr, const std::string &source_wit_file = "");
 
     // NOTE: This function generates stub implementations but is intentionally not called.
     // Host applications are responsible for providing their own implementations of the

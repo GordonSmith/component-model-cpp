@@ -49,13 +49,19 @@ CompilationResults parse_compilation_log(const fs::path &log_file)
     // [XX%] Building CXX object SUBDIR/CMakeFiles/TARGET-stub.dir/FILE_wamr.cpp.o
     std::regex building_pattern(R"(\[\s*\d+%\] Building CXX object (.+)/CMakeFiles/(.+)-stub\.dir/(.+)_wamr\.cpp\.o)");
 
-    // Pattern for successful target build
+    // Pattern for successful target build (Unix make/Ninja)
     // [XX%] Built target TARGET-stub
     std::regex success_pattern(R"(\[\s*\d+%\] Built target (.+)-stub)");
 
-    // Pattern for compilation errors
+    // Pattern for compilation errors (Unix make)
     // gmake[2]: *** [SUBDIR/CMakeFiles/TARGET-stub.dir/build.make:XX: ...] Error 1
     std::regex error_pattern(R"(gmake\[\d+\]: \*\*\* \[(.+)/CMakeFiles/(.+)-stub\.dir/)");
+
+    // MSBuild patterns (Visual Studio generator on Windows)
+    // TARGET-stub.vcxproj -> G:\...\TARGET-stub.lib
+    std::regex msbuild_success_pattern(R"((.+)-stub\.vcxproj -> )");
+    // TARGET-stub.vcxproj(NN,NN) : error C2XXX:
+    std::regex msbuild_error_pattern(R"((.+)-stub\.vcxproj\(.*\) : error )");
 
     // Legacy pattern for monolithic build
     // [XX/YY] Building CXX object test/CMakeFiles/test-stubs-compiled.dir/generated_stubs/NAME_wamr.cpp.o
@@ -80,6 +86,24 @@ CompilationResults parse_compilation_log(const fs::path &log_file)
     while (std::regex_search(search_start, content.cend(), match, error_pattern))
     {
         std::string target = match[2].str();
+        results.failed.insert(target);
+        results.successful.erase(target); // Remove from successful if it was there
+        search_start = match.suffix().first;
+    }
+
+    // MSBuild: Find all successful target builds (Windows Visual Studio generator)
+    search_start = content.cbegin();
+    while (std::regex_search(search_start, content.cend(), match, msbuild_success_pattern))
+    {
+        results.successful.insert(match[1].str());
+        search_start = match.suffix().first;
+    }
+
+    // MSBuild: Find all failed builds (Windows Visual Studio generator)
+    search_start = content.cbegin();
+    while (std::regex_search(search_start, content.cend(), match, msbuild_error_pattern))
+    {
+        std::string target = match[1].str();
         results.failed.insert(target);
         results.successful.erase(target); // Remove from successful if it was there
         search_start = match.suffix().first;

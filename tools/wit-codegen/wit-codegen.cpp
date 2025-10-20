@@ -246,7 +246,7 @@ int main(int argc, char *argv[])
         const std::set<std::string> *world_imports_ptr = parseResult.worldImports.empty() ? nullptr : &parseResult.worldImports;
         const std::set<std::string> *world_exports_ptr = parseResult.worldExports.empty() ? nullptr : &parseResult.worldExports;
 
-        CodeGenerator::generateHeader(parseResult.interfaces, headerFile, registryPtr, external_deps_ptr, world_imports_ptr, world_exports_ptr);
+        CodeGenerator::generateHeader(parseResult.interfaces, headerFile, registryPtr, external_deps_ptr, world_imports_ptr, world_exports_ptr, witFile);
         CodeGenerator::generateWAMRHeader(parseResult.interfaces, wamrHeaderFile, parseResult.packageName, headerFilename, registryPtr, world_imports_ptr, world_exports_ptr);
         CodeGenerator::generateWAMRBindings(parseResult.interfaces, wamrBindingsFile, parseResult.packageName, headerFilename, wamrHeaderFilename, registryPtr, world_imports_ptr, world_exports_ptr);
 

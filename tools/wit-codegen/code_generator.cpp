@@ -2,6 +2,7 @@
 #include "type_mapper.hpp"
 #include "utils.hpp"
 #include "package_registry.hpp"
+#include "wit_parser.hpp"
 #include <algorithm>
 #include <cctype>
 #include <filesystem>
@@ -10,7 +11,7 @@
 #include <set>
 #include <sstream>
 
-void CodeGenerator::generateHeader(const std::vector<InterfaceInfo> &interfaces, const std::string &filename, const PackageRegistry *registry, const std::set<std::string> *external_deps, const std::set<std::string> *world_imports, const std::set<std::string> *world_exports)
+void CodeGenerator::generateHeader(const std::vector<InterfaceInfo> &interfaces, const std::string &filename, const PackageRegistry *registry, const std::set<std::string> *external_deps, const std::set<std::string> *world_imports, const std::set<std::string> *world_exports, const std::string &source_wit_file)
 {
     // Set interfaces for TypeMapper to resolve cross-namespace references
     TypeMapper::setInterfaces(&interfaces);
@@ -45,6 +46,78 @@ void CodeGenerator::generateHeader(const std::vector<InterfaceInfo> &interfaces,
     {
         out << "// Note: This WIT file contains no concrete interface definitions.\n";
         out << "// It may reference external packages that are defined elsewhere.\n\n";
+
+        // Collect same-package exports to generate includes
+        // Note: For same-package exports, we need to find which WIT file defines the interface.
+        // Since the interface name may differ from the filename (e.g., "incoming-handler"
+        // is defined in "handler.wit"), we need to check sibling WIT files.
+        std::map<std::string, std::string> interface_to_file; // interface name -> wit filename (without extension)
+
+        // Build mapping by parsing sibling WIT files if source file is provided
+        if (!source_wit_file.empty() && std::filesystem::exists(source_wit_file))
+        {
+            std::filesystem::path source_path(source_wit_file);
+            auto parent_dir = source_path.parent_path();
+
+            // Scan for other .wit files in the same directory
+            for (const auto &entry : std::filesystem::directory_iterator(parent_dir))
+            {
+                if (entry.is_regular_file() && entry.path().extension() == ".wit")
+                {
+                    try
+                    {
+                        // Quick parse to extract interface names from this file
+                        auto sibling_result = WitGrammarParser::parse(entry.path().string());
+                        std::string wit_basename = entry.path().stem().string();
+
+                        // Map each interface name to this WIT file
+                        for (const auto &iface : sibling_result.interfaces)
+                        {
+                            std::string sanitized_iface = sanitize_identifier(iface.name);
+                            interface_to_file[sanitized_iface] = sanitize_identifier(wit_basename);
+                        }
+                    }
+                    catch (...)
+                    {
+                        // Skip files that fail to parse
+                    }
+                }
+            }
+        }
+
+        std::set<std::string> same_package_exports;
+        if (world_exports && !world_exports->empty())
+        {
+            for (const auto &export_name : *world_exports)
+            {
+                // Check if this is a same-package export (no ':' and '/')
+                if (export_name.find(':') == std::string::npos && export_name.find('/') == std::string::npos)
+                {
+                    same_package_exports.insert(export_name);
+                }
+            }
+        }
+
+        // Generate includes for same-package exports
+        if (!same_package_exports.empty())
+        {
+            out << "// Include same-package interface headers\n";
+            for (const auto &iface_name : same_package_exports)
+            {
+                std::string sanitized_iface = sanitize_identifier(iface_name);
+
+                // Look up the actual WIT filename for this interface
+                std::string wit_file = sanitized_iface; // Default: assume interface name matches file name
+                auto it = interface_to_file.find(sanitized_iface);
+                if (it != interface_to_file.end())
+                {
+                    wit_file = it->second; // Use mapped filename
+                }
+
+                out << "#include \"../" << wit_file << "/" << wit_file << ".hpp\"\n";
+            }
+            out << "\n";
+        }
 
         // Generate host namespace (for world imports - host implements these)
         if (world_imports && !world_imports->empty())
