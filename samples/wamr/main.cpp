@@ -72,6 +72,53 @@ char *read_wasm_binary_to_buffer(const std::filesystem::path &filename, uint32_t
     return buffer;
 }
 
+void_t void_func()
+{
+    std::cout << "Hello, Void_Func!" << std::endl;
+}
+NativeSymbol root_symbol[] = {
+    host_function("void-func", void_func),
+};
+
+bool_t and_func(bool_t a, bool_t b)
+{
+    return a && b;
+}
+NativeSymbol booleans_symbol[] = {
+    host_function("and", and_func),
+};
+
+float64_t add(float64_t a, float64_t b)
+{
+    return a + b;
+}
+NativeSymbol floats_symbol[] = {
+    host_function("add", add),
+};
+
+string_t reverse(const string_t &a)
+{
+    std::string result = a;
+    std::transform(result.begin(), result.end(), result.begin(), ::toupper);
+    return result;
+}
+uint32_t lots(const string_t &p1, const string_t &p2, const string_t &p3, const string_t &p4, const string_t &p5, const string_t &p6, const string_t &p7, const string_t &p8, const string_t &p9, const string_t &p10, const string_t &p11, const string_t &p12, const string_t &p13, const string_t &p14, const string_t &p15, const string_t &p16, const string_t &p17)
+{
+    return p1.length() + p2.length() + p3.length() + p4.length() + p5.length() + p6.length() + p7.length() + p8.length() + p9.length() + p10.length() + p11.length() + p12.length() + p13.length() + p14.length() + p15.length() + p16.length() + p17.length();
+}
+NativeSymbol strings_symbol[] = {
+    host_function("reverse", reverse),
+    host_function("lots", lots),
+};
+
+void_t log_u32(uint32_t a, string_t b)
+{
+    std::cout << "wasm-log:  " << b << a << std::endl;
+}
+NativeSymbol logging_symbol[] = {
+    host_function("log-u32", log_u32),
+};
+
 int main(int argc, char **argv)
 {
     static_cast<void>(argc);

@@ -59,11 +59,13 @@ inline std::unique_ptr<LiftLowerContext> createLiftLowerContext(Heap *heap, Enco
 
 inline std::unique_ptr<LiftLowerContext> createLiftLowerContext(Heap *heap, CanonicalOptions options)
 {
-    std::unique_ptr<cmcpp::InstanceContext> instanceContext = std::make_unique<cmcpp::InstanceContext>(trap, convert,
-                                                                                                       [heap](int original_ptr, int original_size, int alignment, int new_size) -> int
-                                                                                                       {
-                                                                                                           return heap->realloc(original_ptr, original_size, alignment, new_size);
-                                                                                                       });
+    std::unique_ptr<cmcpp::InstanceContext> instanceContext = std::make_unique<cmcpp::InstanceContext>(
+        trap,
+        convert,
+        [heap](int original_ptr, int original_size, int alignment, int new_size) -> int
+        {
+            return heap->realloc(original_ptr, original_size, alignment, new_size);
+        });
     options.memory = heap->memory;
     return instanceContext->createLiftLowerContext(std::move(options));
 }

@@ -12,15 +12,58 @@ using namespace cmcpp;
 #include <cassert>
 #include <any>
 #include <atomic>
+#include <chrono>
+#include <bit>
 #include <limits>
 #include <cmath>
 #include <cstdint>
 #include <stdexcept>
 #include <cstring>
+#include <thread>
 // #include <fmt/core.h>
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
+
+TEST_CASE("context.get and context.set use thread-local storage")
+{
+    Store store;
+    ComponentInstance inst;
+    inst.store = &store;
+
+    auto thread = Thread::create(
+        store,
+        []()
+        {
+            return true;
+        },
+        [](bool)
+        {
+            return false;
+        });
+
+    Task task1(inst);
+    Task task2(inst);
+    task1.set_thread(thread);
+    task2.set_thread(thread);
+
+    canon_context_set(task1, 0, 123, trap);
+    CHECK(canon_context_get(task2, 0, trap) == 123);
+
+    auto thread2 = Thread::create(
+        store,
+        []()
+        {
+            return true;
+        },
+        [](bool)
+        {
+            return false;
+        });
+    Task task3(inst);
+    task3.set_thread(thread2);
+    CHECK(canon_context_get(task3, 0, trap) == 0);
+}
 
 TEST_CASE("Async runtime schedules threads")
 {
@@ -207,6 +250,61 @@ TEST_CASE("Async runtime propagates cancellation")
     CHECK(thread->completed());
 }
 
+TEST_CASE("Cancellation wakes suspended cancellable thread")
+{
+    Store store;
+
+    bool resumed = false;
+    bool was_cancelled = false;
+    bool first_resume = true;
+
+    auto gate = std::make_shared<std::atomic<bool>>(false);
+
+    std::shared_ptr<Thread> thread;
+
+    thread = Thread::create(
+        store,
+        []()
+        {
+            return true;
+        },
+        [&thread, &resumed, &was_cancelled, &first_resume, gate](bool cancelled)
+        {
+            if (first_resume)
+            {
+                first_resume = false;
+                bool completed = thread->suspend_until(
+                    [gate]()
+                    {
+                        return gate->load();
+                    },
+                    true);
+                CHECK_FALSE(completed);
+                return true;
+            }
+
+            resumed = true;
+            was_cancelled = cancelled;
+            return false;
+        },
+        true,
+        {});
+
+    CHECK(store.pending_size() == 1);
+
+    store.tick();
+    CHECK_FALSE(resumed);
+    CHECK_FALSE(thread->ready());
+
+    auto call = Call::from_thread(thread);
+    call.request_cancellation();
+    store.tick();
+
+    CHECK(resumed);
+    CHECK(was_cancelled);
+    CHECK(thread->completed());
+}
+
 TEST_CASE("Thread suspend_until supports force yield gating")
 {
     Store store;
@@ -311,7 +409,7 @@ TEST_CASE("Backpressure counters and may_leave guards")
     CHECK_NOTHROW(canon_waitable_set_new(inst, trap));
 }
 
-TEST_CASE("Context locals provide per-task storage")
+TEST_CASE("Context locals provide per-thread storage")
 {
     ComponentInstance inst;
     HostTrap trap = [](const char *msg)
@@ -319,13 +417,32 @@ TEST_CASE("Context locals provide per-task storage")
         throw std::runtime_error(msg ? msg : "trap");
     };
 
-    Task task(inst);
+    Store store;
+    inst.store = &store;
 
-    CHECK(ContextLocalStorage::LENGTH == 1);
+    auto thread = Thread::create(
+        store,
+        []()
+        {
+            return true;
+        },
+        [](bool)
+        {
+            return false;
+        });
+
+    Task task(inst);
+    task.set_thread(thread);
+
+    CHECK(ContextLocalStorage::LENGTH == 2);
     CHECK(canon_context_get(task, 0, trap) == 0);
+    CHECK(canon_context_get(task, 1, trap) == 0);
 
     canon_context_set(task, 0, 42, trap);
     CHECK(canon_context_get(task, 0, trap) == 42);
+
+    canon_context_set(task, 1, 7, trap);
+    CHECK(canon_context_get(task, 1, trap) == 7);
 
     CHECK_THROWS(canon_context_get(task, ContextLocalStorage::LENGTH, trap));
     CHECK_THROWS(canon_context_set(task, ContextLocalStorage::LENGTH, 99, trap));
@@ -485,8 +602,8 @@ TEST_CASE("Task yield, cancel, and return")
         {
             CHECK(was_cancelled);
             REQUIRE(cancel_task->enter(trap));
-            auto event_code = canon_yield(true, *cancel_task, trap);
-            CHECK(event_code == 1);
+            auto suspend_result = canon_thread_yield(true, *cancel_task, trap);
+            CHECK(suspend_result == static_cast<uint32_t>(SuspendResult::CANCELLED));
             canon_task_cancel(*cancel_task, trap);
             cancel_task->exit();
             return false;
@@ -525,8 +642,8 @@ TEST_CASE("Task yield, cancel, and return")
         {
             CHECK_FALSE(was_cancelled);
             REQUIRE(return_task->enter(trap));
-            auto event_code = canon_yield(false, *return_task, trap);
-            CHECK(event_code == 0);
+            auto suspend_result = canon_thread_yield(false, *return_task, trap);
+            CHECK(suspend_result == static_cast<uint32_t>(SuspendResult::NOT_CANCELLED));
             std::vector<std::any> payload;
             payload.emplace_back(int32_t(42));
             canon_task_return(*return_task, std::move(payload), trap);
@@ -541,6 +658,566 @@ TEST_CASE("Task yield, cancel, and return")
     REQUIRE(resolved_value.has_value());
     REQUIRE(resolved_value->size() == 1);
     CHECK(std::any_cast<int32_t>((*resolved_value)[0]) == 42);
+    CHECK(store.pending_size() == 0);
+}
+
+TEST_CASE("thread.yield returns suspend result")
+{
+    HostTrap trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    SUBCASE("not cancelled")
+    {
+        Store store;
+        ComponentInstance inst;
+        inst.store = &store;
+
+        CanonicalOptions async_opts;
+        async_opts.sync = false;
+
+        auto task = std::make_shared<Task>(inst, async_opts);
+        auto thread = Thread::create(
+            store,
+            []()
+            {
+                return true;
+            },
+            [task, &trap](bool)
+            {
+                CHECK(canon_thread_yield(true, *task, trap) == static_cast<uint32_t>(SuspendResult::NOT_CANCELLED));
+                return false;
+            },
+            true,
+            {});
+        task->set_thread(thread);
+
+        store.tick();
+        store.tick();
+        CHECK(store.pending_size() == 0);
+    }
+
+    SUBCASE("cancelled")
+    {
+        Store store;
+        ComponentInstance inst;
+        inst.store = &store;
+
+        CanonicalOptions async_opts;
+        async_opts.sync = false;
+
+        auto task = std::make_shared<Task>(inst, async_opts);
+        auto thread = Thread::create(
+            store,
+            []()
+            {
+                return true;
+            },
+            [task, &trap](bool)
+            {
+                task->request_cancellation();
+                CHECK(task->state() == Task::State::CancelDelivered);
+                CHECK(canon_thread_yield(true, *task, trap) == static_cast<uint32_t>(SuspendResult::CANCELLED));
+                return false;
+            },
+            true,
+            {});
+        task->set_thread(thread);
+
+        store.tick();
+        CHECK(store.pending_size() == 0);
+    }
+}
+
+TEST_CASE("task.wait returns blocked or event")
+{
+    ComponentInstance inst;
+    HostTrap trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    auto desc = make_stream_descriptor<int32_t>();
+    uint64_t handles = canon_stream_new(inst, desc, trap);
+    uint32_t readable = static_cast<uint32_t>(handles & 0xFFFFFFFFu);
+
+    uint32_t waitable_set = canon_waitable_set_new(inst, trap);
+    canon_waitable_join(inst, readable, waitable_set, trap);
+
+    Heap heap(128);
+    GuestMemory mem(heap.memory.data(), heap.memory.size());
+    uint32_t event_ptr = 32;
+
+    Task task(inst);
+
+    auto code = canon_task_wait(false, mem, task, waitable_set, event_ptr, trap);
+    CHECK(code == BLOCKED);
+    uint32_t p1 = 123;
+    uint32_t p2 = 456;
+    std::memcpy(&p1, heap.memory.data() + event_ptr, sizeof(uint32_t));
+    std::memcpy(&p2, heap.memory.data() + event_ptr + sizeof(uint32_t), sizeof(uint32_t));
+    CHECK(p1 == 0);
+    CHECK(p2 == 0);
+
+    auto waitable = inst.table.get<Waitable>(readable, trap);
+    waitable->set_pending_event({EventCode::STREAM_READ, readable, 0xCAFE'BEEFu});
+    code = canon_task_wait(false, mem, task, waitable_set, event_ptr, trap);
+    CHECK(code == static_cast<uint32_t>(EventCode::STREAM_READ));
+    std::memcpy(&p1, heap.memory.data() + event_ptr, sizeof(uint32_t));
+    std::memcpy(&p2, heap.memory.data() + event_ptr + sizeof(uint32_t), sizeof(uint32_t));
+    CHECK(p1 == readable);
+    CHECK(p2 == 0xCAFE'BEEFu);
+
+    canon_stream_drop_readable(inst, readable, trap);
+    canon_waitable_set_drop(inst, waitable_set, trap);
+}
+
+TEST_CASE("thread.yield-to resumes suspended thread")
+{
+    Store store;
+    ComponentInstance inst;
+    inst.store = &store;
+
+    HostTrap trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    CanonicalOptions async_opts;
+    async_opts.sync = false;
+
+    auto ran_other = std::make_shared<bool>(false);
+
+    // Create a suspended thread and put it in the instance table.
+    auto other = Thread::create_suspended(
+        store,
+        [ran_other](bool)
+        {
+            *ran_other = true;
+            return false;
+        },
+        true,
+        {});
+    REQUIRE(other->suspended());
+    uint32_t other_index = inst.table.add(std::make_shared<ThreadEntry>(other), trap);
+
+    auto task = std::make_shared<Task>(inst, async_opts);
+    auto current = Thread::create(
+        store,
+        []()
+        {
+            return true;
+        },
+        [task, other_index, ran_other, &trap](bool)
+        {
+            REQUIRE_FALSE(*ran_other);
+            CHECK(canon_thread_yield_to(true, *task, other_index, trap) == static_cast<uint32_t>(SuspendResult::NOT_CANCELLED));
+            return false;
+        },
+        true,
+        {});
+    task->set_thread(current);
+
+    store.tick();
+    CHECK_FALSE(*ran_other);
+    store.tick();
+    CHECK(*ran_other);
+    store.tick();
+    CHECK(store.pending_size() == 0);
+}
+
+TEST_CASE("thread.yield-to traps if target not suspended")
+{
+    Store store;
+    ComponentInstance inst;
+    inst.store = &store;
+
+    HostTrap trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    CanonicalOptions async_opts;
+    async_opts.sync = false;
+
+    // Not suspended: created pending.
+    auto gate = std::make_shared<std::atomic<bool>>(false);
+    auto other = Thread::create(
+        store,
+        [gate]()
+        {
+            return gate->load();
+        },
+        [](bool)
+        {
+            return false;
+        },
+        true,
+        {});
+    uint32_t other_index = inst.table.add(std::make_shared<ThreadEntry>(other), trap);
+
+    auto task = std::make_shared<Task>(inst, async_opts);
+    auto current = Thread::create(
+        store,
+        []()
+        {
+            return true;
+        },
+        [task, other_index, &trap](bool)
+        {
+            CHECK_THROWS(canon_thread_yield_to(true, *task, other_index, trap));
+            return false;
+        },
+        true,
+        {});
+    task->set_thread(current);
+
+    store.tick();
+    store.tick();
+    gate->store(true);
+    store.tick();
+    CHECK(store.pending_size() == 0);
+}
+
+TEST_CASE("thread.new-indirect creates a suspended thread")
+{
+    Store store;
+    ComponentInstance inst;
+    inst.store = &store;
+
+    HostTrap trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    CanonicalOptions async_opts;
+    async_opts.sync = false;
+
+    auto ran = std::make_shared<bool>(false);
+    std::vector<std::function<void(uint32_t)>> table;
+    table.push_back({});
+    table.push_back([ran](uint32_t c)
+                    {
+                        CHECK(c == 123u);
+                        *ran = true; });
+
+    auto task = std::make_shared<Task>(inst, async_opts);
+    auto current = Thread::create(
+        store,
+        []()
+        {
+            return true;
+        },
+        [task, &inst, &trap, &table, ran](bool)
+        {
+            uint32_t idx = canon_thread_new_indirect(false, *task, table, 1, 123, trap);
+            auto entry = inst.table.get<ThreadEntry>(idx, trap);
+            REQUIRE(entry->thread());
+            CHECK(entry->thread()->suspended());
+
+            canon_thread_resume_later(*task, idx, trap);
+            return false;
+        },
+        true,
+        {});
+    task->set_thread(current);
+
+    store.tick();
+    CHECK_FALSE(*ran);
+    store.tick();
+    CHECK(*ran);
+    store.tick();
+    CHECK(store.pending_size() == 0);
+
+    CHECK_THROWS(canon_thread_new_indirect(false, *task, table, 999, 0, trap));
+    CHECK_THROWS(canon_thread_new_indirect(false, *task, table, 0, 0, trap));
+}
+
+TEST_CASE("thread.new-ref and spawn-ref create threads")
+{
+    Store store;
+    ComponentInstance inst;
+    inst.store = &store;
+
+    HostTrap trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    CanonicalOptions async_opts;
+    async_opts.sync = false;
+
+    auto ran_new = std::make_shared<bool>(false);
+    auto ran_spawn = std::make_shared<bool>(false);
+
+    auto task = std::make_shared<Task>(inst, async_opts);
+    auto current = Thread::create(
+        store,
+        []()
+        {
+            return true;
+        },
+        [task, &inst, &trap, ran_new, ran_spawn](bool)
+        {
+            uint32_t idx_new = canon_thread_new_ref(false, *task, [ran_new](uint32_t c)
+                                                    {
+                                                        CHECK(c == 7u);
+                                                        *ran_new = true; }, 7, trap);
+            auto new_entry = inst.table.get<ThreadEntry>(idx_new, trap);
+            REQUIRE(new_entry->thread());
+            CHECK(new_entry->thread()->suspended());
+            canon_thread_resume_later(*task, idx_new, trap);
+
+            uint32_t idx_spawn = canon_thread_spawn_ref(false, *task, [ran_spawn](uint32_t c)
+                                                        {
+                                                            CHECK(c == 9u);
+                                                            *ran_spawn = true; }, 9, trap);
+            auto spawn_entry = inst.table.get<ThreadEntry>(idx_spawn, trap);
+            REQUIRE(spawn_entry->thread());
+            CHECK_FALSE(spawn_entry->thread()->suspended());
+            return false;
+        },
+        true,
+        {});
+    task->set_thread(current);
+
+    store.tick();
+    CHECK_FALSE(*ran_new);
+    CHECK_FALSE(*ran_spawn);
+    store.tick();
+    CHECK(*ran_new);
+    store.tick();
+    CHECK(*ran_spawn);
+    store.tick();
+    CHECK(store.pending_size() == 0);
+}
+
+TEST_CASE("thread.spawn-indirect resumes and runs")
+{
+    Store store;
+    ComponentInstance inst;
+    inst.store = &store;
+
+    HostTrap trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    CanonicalOptions async_opts;
+    async_opts.sync = false;
+
+    auto ran_spawn = std::make_shared<bool>(false);
+    std::vector<std::function<void(uint32_t)>> table;
+    table.push_back({});
+    table.push_back([ran_spawn](uint32_t c)
+                    {
+                        CHECK(c == 55u);
+                        *ran_spawn = true; });
+
+    auto task = std::make_shared<Task>(inst, async_opts);
+    auto current = Thread::create(
+        store,
+        []()
+        {
+            return true;
+        },
+        [task, &inst, &trap, &table](bool)
+        {
+            uint32_t idx = canon_thread_spawn_indirect(false, *task, table, 1, 55, trap);
+            auto entry = inst.table.get<ThreadEntry>(idx, trap);
+            REQUIRE(entry->thread());
+            CHECK_FALSE(entry->thread()->suspended());
+            return false;
+        },
+        true,
+        {});
+    task->set_thread(current);
+
+    store.tick();
+    CHECK_FALSE(*ran_spawn);
+    store.tick();
+    CHECK(*ran_spawn);
+    store.tick();
+    CHECK(store.pending_size() == 0);
+}
+
+TEST_CASE("thread.available-parallelism returns at least 1")
+{
+    Store store;
+    ComponentInstance inst;
+    inst.store = &store;
+
+    HostTrap trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    CanonicalOptions async_opts;
+    async_opts.sync = false;
+
+    Task task(inst, async_opts);
+
+    CHECK(canon_thread_available_parallelism(false, task, trap) == 1);
+    CHECK(canon_thread_available_parallelism(true, task, trap) >= 1);
+}
+
+TEST_CASE("thread.switch-to schedules a suspended thread")
+{
+    Store store;
+    ComponentInstance inst;
+    inst.store = &store;
+
+    HostTrap trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    CanonicalOptions async_opts;
+    async_opts.sync = false;
+
+    bool ran_other = false;
+    bool ran_second = false;
+    bool first = true;
+
+    auto other = Thread::create_suspended(
+        store,
+        [&ran_other](bool)
+        {
+            ran_other = true;
+            return false;
+        },
+        true,
+        {});
+    uint32_t other_index = inst.table.add(std::make_shared<ThreadEntry>(other), trap);
+
+    auto task = std::make_shared<Task>(inst, async_opts);
+    auto current = Thread::create(
+        store,
+        []()
+        {
+            return true;
+        },
+        [task, &trap, other_index, &ran_other, &ran_second, &first](bool)
+        {
+            REQUIRE(task->enter(trap));
+            if (first)
+            {
+                first = false;
+                CHECK(canon_thread_switch_to(false, *task, other_index, trap) == static_cast<uint32_t>(SuspendResult::NOT_CANCELLED));
+                task->exit();
+                return true;
+            }
+            ran_second = true;
+            task->exit();
+            return false;
+        },
+        true,
+        {});
+    task->set_thread(current);
+
+    store.tick();
+    CHECK_FALSE(ran_other);
+    CHECK_FALSE(ran_second);
+    store.tick();
+    CHECK(ran_other);
+    CHECK_FALSE(ran_second);
+    store.tick();
+    CHECK_FALSE(ran_second);
+    store.tick();
+    CHECK(ran_second);
+    store.tick();
+    CHECK(store.pending_size() == 0);
+}
+
+TEST_CASE("thread.index returns current thread index")
+{
+    Store store;
+    ComponentInstance inst;
+    inst.store = &store;
+
+    HostTrap trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    CanonicalOptions async_opts;
+    async_opts.sync = false;
+
+    auto task = std::make_shared<Task>(inst, async_opts);
+
+    auto thread = Thread::create(
+        store,
+        []()
+        {
+            return true;
+        },
+        [task, &trap](bool)
+        {
+            CHECK_THROWS(canon_thread_index(*task, trap));
+            task->thread()->set_index(1234);
+            CHECK(canon_thread_index(*task, trap) == 1234u);
+            return false;
+        },
+        true,
+        {});
+
+    task->set_thread(thread);
+    store.tick();
+    CHECK(store.pending_size() == 0);
+}
+
+TEST_CASE("thread.suspend forces a yield")
+{
+    Store store;
+    ComponentInstance inst;
+    inst.store = &store;
+
+    HostTrap trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    CanonicalOptions async_opts;
+    async_opts.sync = false;
+
+    auto task = std::make_shared<Task>(inst, async_opts);
+    bool second_resume = false;
+    bool first_resume = true;
+
+    auto thread = Thread::create(
+        store,
+        []()
+        {
+            return true;
+        },
+        [task, &trap, &second_resume, &first_resume](bool)
+        {
+            REQUIRE(task->enter(trap));
+            if (first_resume)
+            {
+                first_resume = false;
+                CHECK(canon_thread_suspend(false, *task, trap) == static_cast<uint32_t>(SuspendResult::NOT_CANCELLED));
+                task->exit();
+                return true;
+            }
+
+            second_resume = true;
+            task->exit();
+            return false;
+        },
+        true,
+        {});
+
+    task->set_thread(thread);
+
+    store.tick();
+    CHECK_FALSE(second_resume);
+    store.tick();
+    CHECK_FALSE(second_resume);
+    store.tick();
+    CHECK(second_resume);
+    store.tick();
     CHECK(store.pending_size() == 0);
 }
 
@@ -631,7 +1308,7 @@ TEST_CASE("Canonical options control lift/lower callbacks")
         CHECK(blocked == BLOCKED);
         CHECK_FALSE(callback_called);
 
-        writable.write(cx, 2, write_ptr, 1, trap);
+        writable.write(cx, 2, write_ptr, 1, false, trap);
 
         CHECK(callback_called);
         CHECK(observed_code == EventCode::STREAM_READ);
@@ -758,6 +1435,182 @@ TEST_CASE("Canonical callbacks surface waitable events")
     canon_stream_drop_readable(inst, readable, trap);
     canon_stream_drop_writable(inst, writable, trap);
     canon_waitable_set_drop(inst, waitable_set, trap);
+}
+
+TEST_CASE("context.hpp: trap_if throws when no HostTrap")
+{
+    LiftLowerContext cx = make_trap_context(HostTrap{});
+    CHECK_THROWS_AS(trap_if(cx, true, "boom"), std::runtime_error);
+}
+
+TEST_CASE("context.hpp: normalize_alignment clamps and defaults")
+{
+    CHECK(normalize_alignment(0) == 1);
+    CHECK(normalize_alignment(1) == 1);
+    CHECK(normalize_alignment(256) == 255);
+}
+
+TEST_CASE("context.hpp: write_event_fields traps on out-of-bounds")
+{
+    std::array<uint8_t, 4> bytes{};
+    GuestMemory mem(bytes.data(), bytes.size());
+    HostTrap host_trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    CHECK_THROWS(write_event_fields(mem, 0, 1, 2, host_trap));
+}
+
+TEST_CASE("context.hpp: WaitableSet take_pending_event trap paths")
+{
+    HostTrap host_trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    SUBCASE("empty waitable set traps")
+    {
+        WaitableSet set;
+        CHECK_THROWS(set.take_pending_event(host_trap));
+    }
+
+    SUBCASE("missing event traps")
+    {
+        WaitableSet set;
+        Waitable w;
+        w.join(&set, host_trap);
+        CHECK_THROWS(set.take_pending_event(host_trap));
+    }
+}
+
+TEST_CASE("context.hpp: SharedStreamState branch coverage")
+{
+    Heap heap(128);
+    CanonicalOptions options;
+    auto cx = std::shared_ptr<LiftLowerContext>(createLiftLowerContext(&heap, options).release(), [](LiftLowerContext *ptr)
+                                                { delete ptr; });
+
+    HostTrap host_trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    auto descriptor = make_stream_descriptor<uint8_t>();
+
+    SUBCASE("drop causes immediate Dropped")
+    {
+        auto shared = std::make_shared<SharedStreamState>(descriptor);
+        shared->drop();
+
+        auto dst = std::make_shared<WritableBufferGuestImpl>(descriptor.element_size, descriptor.alignment, cx, 0, 1, host_trap);
+        bool done_called = false;
+        shared->read(dst, {}, [&](CopyResult result)
+                     {
+                         done_called = true;
+                         CHECK(result == CopyResult::Dropped); }, host_trap);
+        CHECK(done_called);
+    }
+
+    SUBCASE("pending readable exhausted triggers reset_and_notify_pending")
+    {
+        auto shared = std::make_shared<SharedStreamState>(descriptor);
+
+        auto src_zero = std::make_shared<ReadableBufferGuestImpl>(descriptor.element_size, descriptor.alignment, cx, 0, 0, host_trap);
+        bool src_done_called = false;
+        shared->write(src_zero, {}, [&](CopyResult result)
+                      {
+                          src_done_called = true;
+                          CHECK(result == CopyResult::Completed); }, host_trap);
+
+        auto dst = std::make_shared<WritableBufferGuestImpl>(descriptor.element_size, descriptor.alignment, cx, 16, 1, host_trap);
+        bool dst_done_called = false;
+        shared->read(dst, {}, [&](CopyResult result)
+                     {
+                         dst_done_called = true;
+                         CHECK(result == CopyResult::Completed); }, host_trap);
+
+        CHECK(src_done_called);
+        CHECK_FALSE(dst_done_called);
+        CHECK(shared->pending_buffer == dst);
+    }
+
+    SUBCASE("both buffers zero-length short-circuits")
+    {
+        auto shared = std::make_shared<SharedStreamState>(descriptor);
+
+        auto dst_zero = std::make_shared<WritableBufferGuestImpl>(descriptor.element_size, descriptor.alignment, cx, 0, 0, host_trap);
+        shared->read(dst_zero, {}, [](CopyResult)
+                     { FAIL("unexpected on_copy_done for first caller"); }, host_trap);
+
+        auto src_zero = std::make_shared<ReadableBufferGuestImpl>(descriptor.element_size, descriptor.alignment, cx, 0, 0, host_trap);
+        bool done_called = false;
+        shared->write(src_zero, {}, [&](CopyResult result)
+                      {
+                          done_called = true;
+                          CHECK(result == CopyResult::Completed); }, host_trap);
+        CHECK(done_called);
+    }
+
+    SUBCASE("reclaim buffer resets pending after lock released")
+    {
+        auto shared = std::make_shared<SharedStreamState>(descriptor);
+
+        uint32_t read_ptr = 0;
+        uint32_t write_ptr = 32;
+        heap.memory[write_ptr] = 0xAB;
+
+        auto dst = std::make_shared<WritableBufferGuestImpl>(descriptor.element_size, descriptor.alignment, cx, read_ptr, 1, host_trap);
+        auto src = std::make_shared<ReadableBufferGuestImpl>(descriptor.element_size, descriptor.alignment, cx, write_ptr, 1, host_trap);
+
+        ReclaimBuffer reclaim;
+        shared->read(dst, [&](ReclaimBuffer r)
+                     { reclaim = std::move(r); }, [](CopyResult)
+                     { FAIL("unexpected on_copy_done for first caller"); }, host_trap);
+
+        bool done_called = false;
+        shared->write(src, {}, [&](CopyResult result)
+                      {
+                          done_called = true;
+                          CHECK(result == CopyResult::Completed); }, host_trap);
+
+        REQUIRE(done_called);
+        REQUIRE(reclaim);
+        CHECK(shared->pending_buffer != nullptr);
+
+        reclaim();
+        CHECK(shared->pending_buffer == nullptr);
+    }
+
+    SUBCASE("reclaim buffer resets pending after read-side lock released")
+    {
+        auto shared = std::make_shared<SharedStreamState>(descriptor);
+
+        uint32_t read_ptr = 0;
+        uint32_t write_ptr = 32;
+        heap.memory[write_ptr] = 0xCD;
+
+        auto dst = std::make_shared<WritableBufferGuestImpl>(descriptor.element_size, descriptor.alignment, cx, read_ptr, 1, host_trap);
+        auto src = std::make_shared<ReadableBufferGuestImpl>(descriptor.element_size, descriptor.alignment, cx, write_ptr, 1, host_trap);
+
+        ReclaimBuffer reclaim;
+        shared->write(src, [&](ReclaimBuffer r)
+                      { reclaim = std::move(r); }, [](CopyResult)
+                      { FAIL("unexpected on_copy_done for first caller"); }, host_trap);
+
+        bool done_called = false;
+        shared->read(dst, {}, [&](CopyResult result)
+                     {
+                         done_called = true;
+                         CHECK(result == CopyResult::Completed); }, host_trap);
+
+        REQUIRE(done_called);
+        REQUIRE(reclaim);
+        CHECK(shared->pending_buffer != nullptr);
+
+        reclaim();
+        CHECK(shared->pending_buffer == nullptr);
+    }
 }
 
 TEST_CASE("Resource handle lifecycle mirrors canonical definitions")
@@ -1421,6 +2274,168 @@ TEST_CASE("Stream cancellation posts events")
     canon_waitable_set_drop(inst, waitable_set, host_trap);
 }
 
+TEST_CASE("Stream cancel requires pending async copy")
+{
+    ComponentInstance inst;
+    HostTrap host_trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    auto desc = make_stream_descriptor<int32_t>();
+    uint64_t handles = canon_stream_new(inst, desc, host_trap);
+    uint32_t readable = static_cast<uint32_t>(handles & 0xFFFFFFFFu);
+    uint32_t writable = static_cast<uint32_t>(handles >> 32);
+
+    CHECK_THROWS(canon_stream_cancel_read(inst, readable, false, host_trap));
+    CHECK_THROWS(canon_stream_cancel_write(inst, writable, false, host_trap));
+
+    canon_stream_drop_readable(inst, readable, host_trap);
+    canon_stream_drop_writable(inst, writable, host_trap);
+}
+
+TEST_CASE("Stream sync read blocks until write")
+{
+    Heap heap(256);
+    CanonicalOptions options;
+    options.sync = true;
+    auto cx = std::shared_ptr<LiftLowerContext>(createLiftLowerContext(&heap, options).release(), [](LiftLowerContext *ptr)
+                                                { delete ptr; });
+
+    HostTrap host_trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    auto descriptor = make_stream_descriptor<uint8_t>();
+    auto shared_state = std::make_shared<SharedStreamState>(descriptor);
+    ReadableStreamEnd readable(shared_state);
+    WritableStreamEnd writable(shared_state);
+
+    uint32_t read_ptr = 0;
+    uint32_t write_ptr = 64;
+    heap.memory[write_ptr] = 0x7B;
+
+    std::atomic<uint32_t> read_result{0};
+    std::thread t([&]()
+                  { read_result = readable.read(cx, 1, read_ptr, 1, true, host_trap); });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+    auto write_payload = writable.write(cx, 2, write_ptr, 1, true, host_trap);
+    CHECK((write_payload & 0xF) == static_cast<uint32_t>(CopyResult::Completed));
+
+    t.join();
+    CHECK(read_result.load() == pack_copy_result(CopyResult::Completed, 1));
+    CHECK(heap.memory[read_ptr] == 0x7B);
+}
+
+TEST_CASE("Stream cancel-write posts events")
+{
+    ComponentInstance inst;
+    HostTrap host_trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    auto desc = make_stream_descriptor<int32_t>();
+    uint64_t handles = canon_stream_new(inst, desc, host_trap);
+    uint32_t writable = static_cast<uint32_t>(handles >> 32);
+
+    uint32_t waitable_set = canon_waitable_set_new(inst, host_trap);
+    canon_waitable_join(inst, writable, waitable_set, host_trap);
+
+    Heap heap(256);
+    CanonicalOptions options;
+    options.sync = false;
+    auto cx = std::shared_ptr<LiftLowerContext>(createLiftLowerContext(&heap, options).release(), [](LiftLowerContext *ptr)
+                                                { delete ptr; });
+
+    uint32_t write_ptr = 32;
+    uint32_t event_ptr = 128;
+    int32_t value = 123;
+    std::memcpy(heap.memory.data() + write_ptr, &value, sizeof(value));
+
+    auto blocked = canon_stream_write(inst, desc, writable, cx, write_ptr, 1, host_trap);
+    CHECK(blocked == BLOCKED);
+
+    auto cancel_blocked = canon_stream_cancel_write(inst, writable, false, host_trap);
+    CHECK(cancel_blocked == BLOCKED);
+
+    GuestMemory mem(heap.memory.data(), heap.memory.size());
+    auto code = canon_waitable_set_poll(false, mem, inst, waitable_set, event_ptr, host_trap);
+    CHECK(code == static_cast<uint32_t>(EventCode::STREAM_WRITE));
+
+    uint32_t payload = 0;
+    std::memcpy(&payload, heap.memory.data() + event_ptr + sizeof(uint32_t), sizeof(uint32_t));
+    CHECK((payload & 0xF) == static_cast<uint32_t>(CopyResult::Cancelled));
+    CHECK((payload >> 4) == 0);
+
+    canon_stream_drop_writable(inst, writable, host_trap);
+    canon_waitable_set_drop(inst, waitable_set, host_trap);
+}
+
+TEST_CASE("Stream read can be retried after cancellation")
+{
+    ComponentInstance inst;
+    HostTrap host_trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    auto desc = make_stream_descriptor<int32_t>();
+    uint64_t handles = canon_stream_new(inst, desc, host_trap);
+    uint32_t readable = static_cast<uint32_t>(handles & 0xFFFFFFFFu);
+    uint32_t writable = static_cast<uint32_t>(handles >> 32);
+
+    uint32_t waitable_set = canon_waitable_set_new(inst, host_trap);
+    canon_waitable_join(inst, readable, waitable_set, host_trap);
+
+    Heap heap(256);
+    CanonicalOptions options;
+    options.sync = false;
+    auto cx = std::shared_ptr<LiftLowerContext>(createLiftLowerContext(&heap, options).release(), [](LiftLowerContext *ptr)
+                                                { delete ptr; });
+
+    uint32_t read_ptr = 0;
+    uint32_t write_ptr = 64;
+    uint32_t event_ptr = 160;
+
+    auto blocked = canon_stream_read(inst, desc, readable, cx, read_ptr, 1, false, host_trap);
+    CHECK(blocked == BLOCKED);
+
+    auto cancel_result = canon_stream_cancel_read(inst, readable, false, host_trap);
+    CHECK(cancel_result == BLOCKED);
+
+    GuestMemory mem(heap.memory.data(), heap.memory.size());
+    auto code = canon_waitable_set_poll(false, mem, inst, waitable_set, event_ptr, host_trap);
+    CHECK(code == static_cast<uint32_t>(EventCode::STREAM_READ));
+
+    // Start a new read after cancellation.
+    blocked = canon_stream_read(inst, desc, readable, cx, read_ptr, 1, false, host_trap);
+    CHECK(blocked == BLOCKED);
+
+    int32_t value = 1234;
+    std::memcpy(heap.memory.data() + write_ptr, &value, sizeof(value));
+    (void)canon_stream_write(inst, desc, writable, cx, write_ptr, 1, host_trap);
+
+    code = canon_waitable_set_poll(false, mem, inst, waitable_set, event_ptr, host_trap);
+    CHECK(code == static_cast<uint32_t>(EventCode::STREAM_READ));
+
+    uint32_t payload = 0;
+    std::memcpy(&payload, heap.memory.data() + event_ptr + sizeof(uint32_t), sizeof(uint32_t));
+    CHECK((payload & 0xF) == static_cast<uint32_t>(CopyResult::Completed));
+    CHECK((payload >> 4) == 1);
+
+    int32_t observed = 0;
+    std::memcpy(&observed, heap.memory.data() + read_ptr, sizeof(observed));
+    CHECK(observed == value);
+
+    canon_stream_drop_readable(inst, readable, host_trap);
+    canon_stream_drop_writable(inst, writable, host_trap);
+    canon_waitable_set_drop(inst, waitable_set, host_trap);
+}
+
 TEST_CASE("Future lifecycle completes")
 {
     ComponentInstance inst;
@@ -1454,9 +2469,7 @@ TEST_CASE("Future lifecycle completes")
     std::memcpy(heap.memory.data() + write_ptr, &value, sizeof(int32_t));
 
     auto write_payload = canon_future_write(inst, desc, writable, cx, write_ptr, host_trap);
-    CHECK((write_payload & 0xF) == static_cast<uint32_t>(CopyResult::Completed));
-    auto write_count = write_payload >> 4;
-    CHECK(write_count == 1);
+    CHECK(write_payload == static_cast<uint32_t>(CopyResult::Completed));
 
     GuestMemory mem(heap.memory.data(), heap.memory.size());
     auto code = canon_waitable_set_poll(false, mem, inst, waitable_set, event_ptr, host_trap);
@@ -1464,9 +2477,7 @@ TEST_CASE("Future lifecycle completes")
 
     uint32_t payload = 0;
     std::memcpy(&payload, heap.memory.data() + event_ptr + sizeof(uint32_t), sizeof(uint32_t));
-    CHECK((payload & 0xF) == static_cast<uint32_t>(CopyResult::Completed));
-    auto read_count = payload >> 4;
-    CHECK(read_count == 1);
+    CHECK(payload == static_cast<uint32_t>(CopyResult::Completed));
 
     int32_t observed = 0;
     std::memcpy(&observed, heap.memory.data() + read_ptr, sizeof(int32_t));
@@ -1474,6 +2485,306 @@ TEST_CASE("Future lifecycle completes")
 
     canon_future_drop_readable(inst, readable, host_trap);
     canon_future_drop_writable(inst, writable, host_trap);
+    canon_waitable_set_drop(inst, waitable_set, host_trap);
+}
+
+TEST_CASE("Future read can be retried after cancellation")
+{
+    ComponentInstance inst;
+    HostTrap host_trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    auto desc = make_future_descriptor<int32_t>();
+    uint64_t handles = canon_future_new(inst, desc, host_trap);
+    uint32_t readable = static_cast<uint32_t>(handles & 0xFFFFFFFFu);
+    uint32_t writable = static_cast<uint32_t>(handles >> 32);
+
+    uint32_t waitable_set = canon_waitable_set_new(inst, host_trap);
+    canon_waitable_join(inst, readable, waitable_set, host_trap);
+
+    Heap heap(256);
+    CanonicalOptions options;
+    options.sync = false;
+    auto cx = std::shared_ptr<LiftLowerContext>(createLiftLowerContext(&heap, options).release(), [](LiftLowerContext *ptr)
+                                                { delete ptr; });
+
+    uint32_t read_ptr = 0;
+    uint32_t write_ptr = 32;
+    uint32_t event_ptr = 96;
+
+    auto blocked = canon_future_read(inst, desc, readable, cx, read_ptr, false, host_trap);
+    CHECK(blocked == BLOCKED);
+
+    auto cancel_result = canon_future_cancel_read(inst, readable, false, host_trap);
+    CHECK(cancel_result == BLOCKED);
+
+    GuestMemory mem(heap.memory.data(), heap.memory.size());
+    auto code = canon_waitable_set_poll(false, mem, inst, waitable_set, event_ptr, host_trap);
+    CHECK(code == static_cast<uint32_t>(EventCode::FUTURE_READ));
+
+    blocked = canon_future_read(inst, desc, readable, cx, read_ptr, false, host_trap);
+    CHECK(blocked == BLOCKED);
+
+    int32_t value = 4321;
+    std::memcpy(heap.memory.data() + write_ptr, &value, sizeof(value));
+    (void)canon_future_write(inst, desc, writable, cx, write_ptr, host_trap);
+
+    code = canon_waitable_set_poll(false, mem, inst, waitable_set, event_ptr, host_trap);
+    CHECK(code == static_cast<uint32_t>(EventCode::FUTURE_READ));
+
+    uint32_t payload = 0;
+    std::memcpy(&payload, heap.memory.data() + event_ptr + sizeof(uint32_t), sizeof(uint32_t));
+    CHECK(payload == static_cast<uint32_t>(CopyResult::Completed));
+
+    int32_t observed = 0;
+    std::memcpy(&observed, heap.memory.data() + read_ptr, sizeof(observed));
+    CHECK(observed == value);
+
+    canon_future_drop_readable(inst, readable, host_trap);
+    canon_future_drop_writable(inst, writable, host_trap);
+    canon_waitable_set_drop(inst, waitable_set, host_trap);
+}
+
+TEST_CASE("Future cancel requires pending async copy")
+{
+    ComponentInstance inst;
+    HostTrap host_trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    auto desc = make_future_descriptor<int32_t>();
+    uint64_t handles = canon_future_new(inst, desc, host_trap);
+    uint32_t readable = static_cast<uint32_t>(handles & 0xFFFFFFFFu);
+    uint32_t writable = static_cast<uint32_t>(handles >> 32);
+
+    CHECK_THROWS(canon_future_cancel_read(inst, readable, false, host_trap));
+    CHECK_THROWS(canon_future_cancel_write(inst, writable, false, host_trap));
+
+    canon_future_drop_readable(inst, readable, host_trap);
+    CHECK_THROWS(canon_future_drop_writable(inst, writable, host_trap));
+}
+
+TEST_CASE("Future sync read blocks until write")
+{
+    ComponentInstance inst;
+    HostTrap host_trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    auto desc = make_future_descriptor<int32_t>();
+    uint64_t handles = canon_future_new(inst, desc, host_trap);
+    uint32_t readable = static_cast<uint32_t>(handles & 0xFFFFFFFFu);
+    uint32_t writable = static_cast<uint32_t>(handles >> 32);
+
+    Heap heap(256);
+    CanonicalOptions options;
+    options.sync = true;
+    auto cx = std::shared_ptr<LiftLowerContext>(createLiftLowerContext(&heap, options).release(), [](LiftLowerContext *ptr)
+                                                { delete ptr; });
+
+    uint32_t read_ptr = 0;
+    uint32_t write_ptr = 32;
+
+    std::atomic<uint32_t> read_result{0};
+    std::thread t([&]()
+                  { read_result = canon_future_read(inst, desc, readable, cx, read_ptr, true, host_trap); });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+    int32_t value = 777;
+    std::memcpy(heap.memory.data() + write_ptr, &value, sizeof(value));
+    auto write_payload = canon_future_write(inst, desc, writable, cx, write_ptr, host_trap);
+    CHECK(write_payload == static_cast<uint32_t>(CopyResult::Completed));
+
+    t.join();
+    CHECK(read_result.load() == static_cast<uint32_t>(CopyResult::Completed));
+    int32_t observed = 0;
+    std::memcpy(&observed, heap.memory.data() + read_ptr, sizeof(observed));
+    CHECK(observed == value);
+
+    canon_future_drop_readable(inst, readable, host_trap);
+    canon_future_drop_writable(inst, writable, host_trap);
+}
+
+TEST_CASE("Future/Stream self-copy - Python Reference Parity")
+{
+    // Mirrors ref/component-model/design/mvp/canonical-abi/run_tests.py::test_self_copy
+    ComponentInstance inst;
+    HostTrap host_trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    Heap heap(256);
+
+    CanonicalOptions sync_opts;
+    sync_opts.sync = true;
+    auto sync_cx = std::shared_ptr<LiftLowerContext>(createLiftLowerContext(&heap, sync_opts).release(), [](LiftLowerContext *ptr)
+                                                     { delete ptr; });
+
+    CanonicalOptions async_opts;
+    async_opts.sync = false;
+    auto async_cx = std::shared_ptr<LiftLowerContext>(createLiftLowerContext(&heap, async_opts).release(), [](LiftLowerContext *ptr)
+                                                      { delete ptr; });
+
+    uint32_t waitable_set = canon_waitable_set_new(inst, host_trap);
+    GuestMemory mem(heap.memory.data(), heap.memory.size());
+
+    // ---- Future self-copy ----
+    {
+        auto desc = make_future_descriptor<int32_t>();
+        uint64_t handles = canon_future_new(inst, desc, host_trap);
+        uint32_t readable = static_cast<uint32_t>(handles & 0xFFFFFFFFu);
+        uint32_t writable = static_cast<uint32_t>(handles >> 32);
+
+        uint32_t ptr = 0;
+        // Start an async write (no reader yet) => BLOCKED
+        auto write_ret = canon_future_write(inst, desc, writable, async_cx, ptr, host_trap);
+        CHECK(write_ret == BLOCKED);
+
+        // Now read in async mode; should complete immediately from pending write
+        auto read_ret = canon_future_read(inst, desc, readable, async_cx, ptr, false, host_trap);
+        CHECK(read_ret == static_cast<uint32_t>(CopyResult::Completed));
+        canon_future_drop_readable(inst, readable, host_trap);
+
+        canon_waitable_join(inst, writable, waitable_set, host_trap);
+        uint32_t event_ptr = 32;
+        auto event = canon_waitable_set_wait(true, mem, inst, waitable_set, event_ptr, host_trap);
+        CHECK(event == static_cast<uint32_t>(EventCode::FUTURE_WRITE));
+
+        uint32_t recorded_index = 0;
+        uint32_t recorded_payload = 0;
+        std::memcpy(&recorded_index, heap.memory.data() + event_ptr, sizeof(uint32_t));
+        std::memcpy(&recorded_payload, heap.memory.data() + event_ptr + sizeof(uint32_t), sizeof(uint32_t));
+        CHECK(recorded_index == writable);
+        CHECK(recorded_payload == static_cast<uint32_t>(CopyResult::Completed));
+
+        canon_future_drop_writable(inst, writable, host_trap);
+    }
+
+    // ---- Stream self-copy ----
+    {
+        auto desc = make_stream_descriptor<int32_t>();
+        uint64_t handles = canon_stream_new(inst, desc, host_trap);
+        uint32_t readable = static_cast<uint32_t>(handles & 0xFFFFFFFFu);
+        uint32_t writable = static_cast<uint32_t>(handles >> 32);
+
+        // Prepare 3 elements to write.
+        uint32_t write_ptr = 0;
+        int32_t values[3] = {1, 2, 3};
+        std::memcpy(heap.memory.data() + write_ptr, values, sizeof(values));
+
+        // Start async write => BLOCKED
+        auto write_ret = canon_stream_write(inst, desc, writable, async_cx, write_ptr, 3, host_trap);
+        CHECK(write_ret == BLOCKED);
+
+        // Read 1 element; should complete immediately
+        uint32_t read_ptr = 64;
+        auto read_payload1 = canon_stream_read(inst, desc, readable, async_cx, read_ptr, 1, false, host_trap);
+        CHECK((read_payload1 & 0xF) == static_cast<uint32_t>(CopyResult::Completed));
+        CHECK((read_payload1 >> 4) == 1);
+
+        int32_t observed1 = 0;
+        std::memcpy(&observed1, heap.memory.data() + read_ptr, sizeof(observed1));
+        CHECK(observed1 == 1);
+
+        // Read up to 4 more; only 2 remain.
+        auto read_payload2 = canon_stream_read(inst, desc, readable, async_cx, read_ptr, 4, false, host_trap);
+        CHECK((read_payload2 & 0xF) == static_cast<uint32_t>(CopyResult::Completed));
+        CHECK((read_payload2 >> 4) == 2);
+
+        int32_t observed2[2] = {0, 0};
+        std::memcpy(observed2, heap.memory.data() + read_ptr, sizeof(observed2));
+        CHECK(observed2[0] == 2);
+        CHECK(observed2[1] == 3);
+
+        canon_stream_drop_readable(inst, readable, host_trap);
+
+        canon_waitable_join(inst, writable, waitable_set, host_trap);
+        uint32_t event_ptr = 96;
+        auto event = canon_waitable_set_wait(true, mem, inst, waitable_set, event_ptr, host_trap);
+        CHECK(event == static_cast<uint32_t>(EventCode::STREAM_WRITE));
+
+        uint32_t recorded_index = 0;
+        uint32_t recorded_payload = 0;
+        std::memcpy(&recorded_index, heap.memory.data() + event_ptr, sizeof(uint32_t));
+        std::memcpy(&recorded_payload, heap.memory.data() + event_ptr + sizeof(uint32_t), sizeof(uint32_t));
+        CHECK(recorded_index == writable);
+        CHECK((recorded_payload & 0xF) == static_cast<uint32_t>(CopyResult::Dropped));
+        CHECK((recorded_payload >> 4) == 3);
+
+        canon_stream_drop_writable(inst, writable, host_trap);
+    }
+
+    canon_waitable_set_drop(inst, waitable_set, host_trap);
+}
+
+TEST_CASE("Stream host partial reads/writes - Python Reference Parity")
+{
+    // Covers the partial progress + drop behavior exercised by the Python reference (see test_self_copy).
+    ComponentInstance inst;
+    HostTrap host_trap = [](const char *msg)
+    {
+        throw std::runtime_error(msg ? msg : "trap");
+    };
+
+    auto desc = make_stream_descriptor<uint8_t>();
+    uint64_t handles = canon_stream_new(inst, desc, host_trap);
+    uint32_t readable = static_cast<uint32_t>(handles & 0xFFFFFFFFu);
+    uint32_t writable = static_cast<uint32_t>(handles >> 32);
+
+    uint32_t waitable_set = canon_waitable_set_new(inst, host_trap);
+    canon_waitable_join(inst, writable, waitable_set, host_trap);
+
+    Heap heap(256);
+    CanonicalOptions options;
+    options.sync = false;
+    auto cx = std::shared_ptr<LiftLowerContext>(createLiftLowerContext(&heap, options).release(), [](LiftLowerContext *ptr)
+                                                { delete ptr; });
+    GuestMemory mem(heap.memory.data(), heap.memory.size());
+
+    uint32_t write_ptr = 0;
+    uint32_t read_ptr = 64;
+    uint32_t event_ptr = 128;
+
+    const uint8_t bytes[5] = {10, 20, 30, 40, 50};
+    std::memcpy(heap.memory.data() + write_ptr, bytes, sizeof(bytes));
+
+    // Start write of 5 bytes; no pending read => BLOCKED
+    auto wret = canon_stream_write(inst, desc, writable, cx, write_ptr, 5, host_trap);
+    CHECK(wret == BLOCKED);
+
+    // Read 2 bytes; should complete immediately.
+    auto rpay1 = canon_stream_read(inst, desc, readable, cx, read_ptr, 2, false, host_trap);
+    CHECK((rpay1 & 0xF) == static_cast<uint32_t>(CopyResult::Completed));
+    CHECK((rpay1 >> 4) == 2);
+    CHECK(heap.memory[read_ptr + 0] == 10);
+    CHECK(heap.memory[read_ptr + 1] == 20);
+
+    // Read remaining 3 bytes.
+    auto rpay2 = canon_stream_read(inst, desc, readable, cx, read_ptr, 10, false, host_trap);
+    CHECK((rpay2 & 0xF) == static_cast<uint32_t>(CopyResult::Completed));
+    CHECK((rpay2 >> 4) == 3);
+    CHECK(heap.memory[read_ptr + 0] == 30);
+    CHECK(heap.memory[read_ptr + 1] == 40);
+    CHECK(heap.memory[read_ptr + 2] == 50);
+
+    // Per the reference behavior, the writer remains pending and observes Dropped when the readable end is dropped.
+    canon_stream_drop_readable(inst, readable, host_trap);
+
+    auto code = canon_waitable_set_wait(true, mem, inst, waitable_set, event_ptr, host_trap);
+    CHECK(code == static_cast<uint32_t>(EventCode::STREAM_WRITE));
+
+    uint32_t payload = 0;
+    std::memcpy(&payload, heap.memory.data() + event_ptr + sizeof(uint32_t), sizeof(uint32_t));
+    CHECK((payload & 0xF) == static_cast<uint32_t>(CopyResult::Dropped));
+    CHECK((payload >> 4) == 5);
+
+    canon_stream_drop_writable(inst, writable, host_trap);
     canon_waitable_set_drop(inst, waitable_set, host_trap);
 }
 
@@ -2138,53 +3449,65 @@ TEST_CASE("Type Conversions and Boundary Values - Python Reference Parity")
 
     // U32 boundary values
     {
+        constexpr int32_t i32_max = std::bit_cast<int32_t>(uint32_t{0x7fffffff});
+        constexpr int32_t i32_min = std::bit_cast<int32_t>(uint32_t{0x80000000});
+
         auto check_u32 = [&](int32_t input, uint32_t expected)
         {
             WasmValVector flat = {input};
             auto result = lift_flat<uint32_t>(*cx, flat);
             CHECK(result == expected);
         };
-        check_u32((1 << 31) - 1, (1u << 31) - 1);
-        check_u32(1 << 31, 1u << 31);
+        check_u32(i32_max, (uint32_t{1} << 31) - 1);
+        check_u32(i32_min, (uint32_t{1} << 31));
         check_u32(-1, 0xFFFFFFFF);
     }
 
     // S32 boundary values
     {
+        constexpr int32_t i32_max = std::bit_cast<int32_t>(uint32_t{0x7fffffff});
+        constexpr int32_t i32_min = std::bit_cast<int32_t>(uint32_t{0x80000000});
+
         auto check_s32 = [&](int32_t input, int32_t expected)
         {
             WasmValVector flat = {input};
             auto result = lift_flat<int32_t>(*cx, flat);
             CHECK(result == expected);
         };
-        check_s32((1 << 31) - 1, (1 << 31) - 1);
-        check_s32(1 << 31, -(1 << 31)); // INT32_MIN
+        check_s32(i32_max, i32_max);
+        check_s32(i32_min, i32_min); // INT32_MIN
         check_s32(-1, -1);
     }
 
     // U64 boundary values
     {
+        constexpr int64_t i64_max = std::bit_cast<int64_t>(uint64_t{0x7fffffffffffffffULL});
+        constexpr int64_t i64_min = std::bit_cast<int64_t>(uint64_t{0x8000000000000000ULL});
+
         auto check_u64 = [&](int64_t input, uint64_t expected)
         {
             WasmValVector flat = {input};
             auto result = lift_flat<uint64_t>(*cx, flat);
             CHECK(result == expected);
         };
-        check_u64((1LL << 63) - 1, (1ULL << 63) - 1);
-        check_u64(1LL << 63, 1ULL << 63);
+        check_u64(i64_max, (uint64_t{1} << 63) - 1);
+        check_u64(i64_min, (uint64_t{1} << 63));
         check_u64(-1, 0xFFFFFFFFFFFFFFFFULL);
     }
 
     // S64 boundary values
     {
+        constexpr int64_t i64_max = std::bit_cast<int64_t>(uint64_t{0x7fffffffffffffffULL});
+        constexpr int64_t i64_min = std::bit_cast<int64_t>(uint64_t{0x8000000000000000ULL});
+
         auto check_s64 = [&](int64_t input, int64_t expected)
         {
             WasmValVector flat = {input};
             auto result = lift_flat<int64_t>(*cx, flat);
             CHECK(result == expected);
         };
-        check_s64((1LL << 63) - 1, (1LL << 63) - 1);
-        check_s64(1LL << 63, -(1LL << 63)); // INT64_MIN
+        check_s64(i64_max, i64_max);
+        check_s64(i64_min, i64_min); // INT64_MIN
         check_s64(-1, -1);
     }
 

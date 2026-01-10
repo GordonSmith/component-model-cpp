@@ -3,7 +3,9 @@
 
 #include <algorithm>
 #include <any>
+#include <array>
 #include <atomic>
+#include <cstdint>
 #include <deque>
 #include <functional>
 #include <memory>
@@ -16,6 +18,33 @@ namespace cmcpp
 {
     class Store;
     struct ComponentInstance;
+
+    class ContextLocalStorage
+    {
+    public:
+        // Number of int32_t "slots" available for context-local data.
+        //
+        // Slot 0: reserved for cmcpp runtime/internal bookkeeping associated
+        //         with the current execution context.
+        // Slot 1: additional per-context storage, intended for extensibility
+        //         (e.g., user-defined or future runtime data).
+        static constexpr uint32_t LENGTH = 2;
+
+        ContextLocalStorage() = default;
+
+        void set(uint32_t index, int32_t value)
+        {
+            storage_[index] = value;
+        }
+
+        int32_t get(uint32_t index) const
+        {
+            return storage_[index];
+        }
+
+    private:
+        std::array<int32_t, LENGTH> storage_{};
+    };
 
     struct Supertask;
     using SupertaskPtr = std::shared_ptr<Supertask>;
@@ -31,6 +60,7 @@ namespace cmcpp
         using CancelFn = std::function<void()>;
 
         static std::shared_ptr<Thread> create(Store &store, ReadyFn ready, ResumeFn resume, bool cancellable = false, CancelFn on_cancel = {});
+        static std::shared_ptr<Thread> create_suspended(Store &store, ResumeFn resume, bool cancellable = false, CancelFn on_cancel = {});
 
         Thread(Store &store, ReadyFn ready, ResumeFn resume, bool cancellable, CancelFn on_cancel);
 
@@ -41,6 +71,12 @@ namespace cmcpp
         bool cancelled() const;
         bool completed() const;
 
+        void set_index(uint32_t index);
+        std::optional<uint32_t> index() const;
+
+        bool suspended() const;
+        void resume_later();
+
         bool suspend_until(ReadyFn ready, bool cancellable, bool force_yield = false);
         void set_ready(ReadyFn ready);
         void set_allow_cancellation(bool allow);
@@ -48,9 +84,20 @@ namespace cmcpp
         void set_in_event_loop(bool value);
         bool in_event_loop() const;
 
+        ContextLocalStorage &context()
+        {
+            return context_;
+        }
+
+        const ContextLocalStorage &context() const
+        {
+            return context_;
+        }
+
     private:
         enum class State
         {
+            Suspended,
             Pending,
             Running,
             Completed
@@ -66,6 +113,8 @@ namespace cmcpp
         bool cancellable_;
         bool cancelled_;
         bool in_event_loop_;
+        ContextLocalStorage context_{};
+        std::optional<uint32_t> index_;
         mutable std::mutex mutex_;
         State state_;
         std::atomic<bool> reschedule_requested_{false};
@@ -137,6 +186,16 @@ namespace cmcpp
         return thread;
     }
 
+    inline std::shared_ptr<Thread> Thread::create_suspended(Store &store, ResumeFn resume, bool cancellable, CancelFn on_cancel)
+    {
+        auto thread = std::shared_ptr<Thread>(new Thread(store, nullptr, std::move(resume), cancellable, std::move(on_cancel)));
+        {
+            std::lock_guard lock(thread->mutex_);
+            thread->state_ = State::Suspended;
+        }
+        return thread;
+    }
+
     inline Thread::Thread(Store &store, ReadyFn ready, ResumeFn resume, bool cancellable, CancelFn on_cancel)
         : store_(&store),
           ready_(std::move(ready)),
@@ -157,6 +216,10 @@ namespace cmcpp
         {
             return false;
         }
+        if (cancelled_ && cancellable_)
+        {
+            return true;
+        }
         if (!ready_)
         {
             return true;
@@ -172,7 +235,7 @@ namespace cmcpp
 
         {
             std::lock_guard lock(mutex_);
-            if (state_ != State::Pending)
+            if (state_ != State::Pending && state_ != State::Suspended)
             {
                 return;
             }
@@ -227,6 +290,44 @@ namespace cmcpp
     {
         std::lock_guard lock(mutex_);
         return state_ == State::Completed;
+    }
+
+    inline void Thread::set_index(uint32_t index)
+    {
+        std::lock_guard lock(mutex_);
+        index_ = index;
+    }
+
+    inline std::optional<uint32_t> Thread::index() const
+    {
+        std::lock_guard lock(mutex_);
+        return index_;
+    }
+
+    inline bool Thread::suspended() const
+    {
+        std::lock_guard lock(mutex_);
+        return state_ == State::Suspended;
+    }
+
+    inline void Thread::resume_later()
+    {
+        auto self = shared_from_this();
+        {
+            std::lock_guard lock(mutex_);
+            if (state_ != State::Suspended)
+            {
+                return;
+            }
+            ready_ = []()
+            {
+                return true;
+            };
+            cancellable_ = false;
+            cancelled_ = false;
+            state_ = State::Pending;
+        }
+        store_->schedule(self);
     }
 
     inline bool Thread::suspend_until(ReadyFn ready, bool cancellable, bool force_yield)

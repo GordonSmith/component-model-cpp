@@ -3,10 +3,6 @@
 
 #include "context.hpp"
 
-#include <limits>
-#include <stdexcept>
-#include <type_traits>
-
 namespace cmcpp
 {
     const bool DETERMINISTIC_PROFILE = false;
