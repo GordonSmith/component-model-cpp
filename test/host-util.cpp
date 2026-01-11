@@ -38,7 +38,8 @@ std::pair<void *, size_t> convert(void *dest, uint32_t dest_byte_len, const void
     if (from_encoding == to_encoding)
     {
         assert(dest_byte_len >= src_byte_len);
-        if (src_byte_len > 0){
+        if (src_byte_len > 0)
+        {
             std::memcpy(dest, src, src_byte_len);
             return std::make_pair(dest, src_byte_len);
         }
