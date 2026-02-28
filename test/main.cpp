@@ -586,10 +586,11 @@ TEST_CASE("Task yield, cancel, and return")
     bool resolved_called = false;
     std::optional<std::vector<std::any>> resolved_value;
 
+    FuncType async_ft{true};
     auto cancel_task = std::make_shared<Task>(inst, async_opts, nullptr, [&](std::optional<std::vector<std::any>> values)
                                               {
                                                  resolved_called = true;
-                                                 resolved_value = std::move(values); });
+                                                 resolved_value = std::move(values); }, async_ft);
 
     auto cancel_gate = std::make_shared<std::atomic<bool>>(true);
     auto cancel_thread = Thread::create(
@@ -629,7 +630,7 @@ TEST_CASE("Task yield, cancel, and return")
     auto return_task = std::make_shared<Task>(inst, async_opts, nullptr, [&](std::optional<std::vector<std::any>> values)
                                               {
                                                  resolved_called = true;
-                                                 resolved_value = std::move(values); });
+                                                 resolved_value = std::move(values); }, async_ft);
 
     auto return_gate = std::make_shared<std::atomic<bool>>(true);
     auto return_thread = Thread::create(
@@ -677,7 +678,7 @@ TEST_CASE("thread.yield returns suspend result")
         CanonicalOptions async_opts;
         async_opts.sync = false;
 
-        auto task = std::make_shared<Task>(inst, async_opts);
+        auto task = std::make_shared<Task>(inst, async_opts, nullptr, nullptr, FuncType{true});
         auto thread = Thread::create(
             store,
             []()
@@ -707,7 +708,7 @@ TEST_CASE("thread.yield returns suspend result")
         CanonicalOptions async_opts;
         async_opts.sync = false;
 
-        auto task = std::make_shared<Task>(inst, async_opts);
+        auto task = std::make_shared<Task>(inst, async_opts, nullptr, nullptr, FuncType{true});
         auto thread = Thread::create(
             store,
             []()
@@ -757,7 +758,7 @@ TEST_CASE("task.wait returns event from waitable set")
 
     CanonicalOptions async_opts;
     async_opts.sync = false;
-    Task task(inst, async_opts);
+    Task task(inst, async_opts, nullptr, nullptr, FuncType{true});
     auto thread = Thread::create(
         store,
         []()
@@ -1187,7 +1188,7 @@ TEST_CASE("thread.suspend forces a yield")
     CanonicalOptions async_opts;
     async_opts.sync = false;
 
-    auto task = std::make_shared<Task>(inst, async_opts);
+    auto task = std::make_shared<Task>(inst, async_opts, nullptr, nullptr, FuncType{true});
     bool second_resume = false;
     bool first_resume = true;
 

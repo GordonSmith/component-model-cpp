@@ -83,7 +83,10 @@ namespace cmcpp
             trap_if(cx, canon->sync && max_flat == 0, "async lowering requires async canonical options");
         }
         WasmValVector retVal = {};
-        // cx.inst.may_leave=false;
+        if (cx.inst)
+        {
+            cx.inst->may_leave = false;
+        }
         constexpr auto flat_types = ValTrait<tuple_t<Ts...>>::flat_types;
         if (flat_types.size() > max_flat)
         {
@@ -97,10 +100,17 @@ namespace cmcpp
                 retVal.insert(retVal.end(), flat.begin(), flat.end());
             };
             (lower_v(vs), ...);
+            if (cx.inst)
+            {
+                cx.inst->may_leave = true;
+            }
             cx.invoke_post_return();
             return retVal;
         }
-        // cx.inst.may_leave=true;
+        if (cx.inst)
+        {
+            cx.inst->may_leave = true;
+        }
         cx.invoke_post_return();
         return retVal;
     }
