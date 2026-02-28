@@ -15,6 +15,7 @@
 #include <thread>
 #include <condition_variable>
 #include <typeindex>
+#include <set>
 #include <unordered_map>
 #include <vector>
 #include <cstring>
@@ -757,11 +758,7 @@ namespace cmcpp
                         pending_on_copy(
                             [this]()
                             {
-                                std::unique_lock<std::mutex> reclaim_lock(mu, std::try_to_lock);
-                                if (!reclaim_lock.owns_lock())
-                                {
-                                    return;
-                                }
+                                std::scoped_lock<std::mutex> reclaim_lock(mu);
                                 reset_pending();
                             });
                     }
@@ -902,11 +899,6 @@ namespace cmcpp
                 }
             }
 
-            if (!sync)
-            {
-                return BLOCKED;
-            }
-
             auto event = get_pending_event(trap);
             return event.payload;
         }
@@ -1023,11 +1015,6 @@ namespace cmcpp
                 {
                     return BLOCKED;
                 }
-            }
-
-            if (!sync)
-            {
-                return BLOCKED;
             }
 
             auto event = get_pending_event(trap);
@@ -1240,10 +1227,6 @@ namespace cmcpp
                     return BLOCKED;
                 }
             }
-            if (!sync)
-            {
-                return BLOCKED;
-            }
             auto event = get_pending_event(trap);
             return event.payload;
         }
@@ -1328,11 +1311,15 @@ namespace cmcpp
             }
             if (!has_pending_event())
             {
-                return BLOCKED;
-            }
-            if (!sync)
-            {
-                return BLOCKED;
+                if (sync)
+                {
+                    shared_->wait_until([this]()
+                                        { return has_pending_event(); });
+                }
+                else
+                {
+                    return BLOCKED;
+                }
             }
             auto event = get_pending_event(trap);
             return event.payload;
@@ -1475,6 +1462,7 @@ namespace cmcpp
     struct ComponentInstance
     {
         Store *store = nullptr;
+        ComponentInstance *parent = nullptr;
         bool may_leave = true;
         bool may_enter = true;
         bool exclusive = false;
@@ -1482,6 +1470,32 @@ namespace cmcpp
         uint32_t num_waiting_to_enter = 0;
         HandleTables handles;
         InstanceTable table;
+        InstanceTable threads;
+
+        std::set<const ComponentInstance *> reflexive_ancestors() const
+        {
+            std::set<const ComponentInstance *> s;
+            const ComponentInstance *inst = this;
+            while (inst != nullptr)
+            {
+                s.insert(inst);
+                inst = inst->parent;
+            }
+            return s;
+        }
+
+        bool is_reflexive_ancestor_of(const ComponentInstance *other) const
+        {
+            while (other != nullptr)
+            {
+                if (this == other)
+                {
+                    return true;
+                }
+                other = other->parent;
+            }
+            return false;
+        }
     };
 
     inline void ensure_may_leave(ComponentInstance &inst, const HostTrap &trap)
@@ -1507,6 +1521,40 @@ namespace cmcpp
         auto trap_cx = make_trap_context(trap);
         trap_if(trap_cx, inst.backpressure == 0, "backpressure underflow");
         inst.backpressure -= 1;
+    }
+
+    inline bool call_might_be_recursive(const SupertaskPtr &caller, const ComponentInstance *callee_inst)
+    {
+        if (!caller || !callee_inst)
+        {
+            return false;
+        }
+        if (caller->instance == nullptr)
+        {
+            auto callee_ancestors = callee_inst->reflexive_ancestors();
+            auto current = caller.get();
+            while (current != nullptr)
+            {
+                if (current->instance)
+                {
+                    auto caller_ancestors = current->instance->reflexive_ancestors();
+                    for (auto *a : caller_ancestors)
+                    {
+                        if (callee_ancestors.count(a))
+                        {
+                            return true;
+                        }
+                    }
+                }
+                current = current->parent.get();
+            }
+            return false;
+        }
+        else
+        {
+            return caller->instance->is_reflexive_ancestor_of(callee_inst) ||
+                   callee_inst->is_reflexive_ancestor_of(caller->instance);
+        }
     }
 
     class Task : public std::enable_shared_from_this<Task>
@@ -1656,6 +1704,36 @@ namespace cmcpp
             return {EventCode::NONE, 0, 0};
         }
 
+        Event wait_until(Thread::ReadyFn ready, bool cancellable, std::shared_ptr<WaitableSet> wset, const HostTrap &trap)
+        {
+            if (wset)
+            {
+                wset->begin_wait();
+            }
+            auto ready_and_has_event = [ready = std::move(ready), wset]() -> bool
+            {
+                return ready() && (!wset || wset->has_pending_event());
+            };
+            Event event;
+            if (!suspend_until(ready_and_has_event, cancellable))
+            {
+                event = {EventCode::TASK_CANCELLED, 0, 0};
+            }
+            else if (wset)
+            {
+                event = wset->take_pending_event(trap);
+            }
+            else
+            {
+                event = {EventCode::NONE, 0, 0};
+            }
+            if (wset)
+            {
+                wset->end_wait();
+            }
+            return event;
+        }
+
         void return_result(std::vector<std::any> result, const HostTrap &trap)
         {
             ensure_resolvable(trap);
@@ -1796,7 +1874,7 @@ namespace cmcpp
         trap_if(trap_cx, inst == nullptr, "thread.resume-later missing component instance");
         ensure_may_leave(*inst, trap);
 
-        auto entry = inst->table.get<ThreadEntry>(thread_index, trap);
+        auto entry = inst->threads.get<ThreadEntry>(thread_index, trap);
         auto other_thread = entry->thread();
         trap_if(trap_cx, !other_thread, "thread.resume-later null thread");
         trap_if(trap_cx, !other_thread->suspended(), "thread not suspended");
@@ -1810,7 +1888,7 @@ namespace cmcpp
         trap_if(trap_cx, inst == nullptr, "thread.yield-to missing component instance");
         ensure_may_leave(*inst, trap);
 
-        auto entry = inst->table.get<ThreadEntry>(thread_index, trap);
+        auto entry = inst->threads.get<ThreadEntry>(thread_index, trap);
         auto other_thread = entry->thread();
         trap_if(trap_cx, !other_thread, "thread.yield-to null thread");
         trap_if(trap_cx, !other_thread->suspended(), "thread not suspended");
@@ -1836,7 +1914,7 @@ namespace cmcpp
         trap_if(trap_cx, inst == nullptr, "thread.switch-to missing component instance");
         ensure_may_leave(*inst, trap);
 
-        auto entry = inst->table.get<ThreadEntry>(thread_index, trap);
+        auto entry = inst->threads.get<ThreadEntry>(thread_index, trap);
         auto other_thread = entry->thread();
         trap_if(trap_cx, !other_thread, "thread.switch-to null thread");
         trap_if(trap_cx, !other_thread->suspended(), "thread not suspended");
@@ -1881,7 +1959,7 @@ namespace cmcpp
             {});
         trap_if(trap_cx, !thread || !thread->suspended(), "thread.new-ref failed to create suspended thread");
 
-        uint32_t index = inst->table.add(std::make_shared<ThreadEntry>(thread), trap);
+        uint32_t index = inst->threads.add(std::make_shared<ThreadEntry>(thread), trap);
         thread->set_index(index);
         return index;
     }
@@ -1959,7 +2037,7 @@ namespace cmcpp
         return static_cast<uint32_t>(SuspendResult::NOT_CANCELLED);
     }
 
-    inline uint32_t canon_task_wait(bool /*cancellable*/,
+    inline uint32_t canon_task_wait(bool cancellable,
                                     GuestMemory mem,
                                     Task &task,
                                     uint32_t waitable_set_handle,
@@ -1970,17 +2048,15 @@ namespace cmcpp
         auto trap_cx = make_trap_context(trap);
         trap_if(trap_cx, inst == nullptr, "task.wait missing component instance");
         ensure_may_leave(*inst, trap);
+        trap_if(trap_cx, !task.may_block(), "task.wait may not block");
 
         auto wset = inst->table.get<WaitableSet>(waitable_set_handle, trap);
-        wset->begin_wait();
-        if (!wset->has_pending_event())
-        {
-            wset->end_wait();
-            write_event_fields(mem, event_ptr, 0, 0, trap);
-            return BLOCKED;
-        }
-        auto event = wset->take_pending_event(trap);
-        wset->end_wait();
+        auto event = task.wait_until(
+            []()
+            { return true; },
+            cancellable,
+            wset,
+            trap);
         write_event_fields(mem, event_ptr, event.index, event.payload, trap);
         return static_cast<uint32_t>(event.code);
     }

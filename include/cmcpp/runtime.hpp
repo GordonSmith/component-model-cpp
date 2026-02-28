@@ -443,7 +443,10 @@ namespace cmcpp
         {
             return Call();
         }
-        return func(*this, std::move(caller), std::move(on_start), std::move(on_resolve));
+        auto host_caller = std::make_shared<Supertask>();
+        host_caller->instance = nullptr;
+        host_caller->parent = std::move(caller);
+        return func(*this, std::move(host_caller), std::move(on_start), std::move(on_resolve));
     }
 
     inline void Store::tick()
