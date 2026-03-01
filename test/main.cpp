@@ -586,10 +586,11 @@ TEST_CASE("Task yield, cancel, and return")
     bool resolved_called = false;
     std::optional<std::vector<std::any>> resolved_value;
 
+    FuncType async_ft{true};
     auto cancel_task = std::make_shared<Task>(inst, async_opts, nullptr, [&](std::optional<std::vector<std::any>> values)
                                               {
                                                  resolved_called = true;
-                                                 resolved_value = std::move(values); });
+                                                 resolved_value = std::move(values); }, async_ft);
 
     auto cancel_gate = std::make_shared<std::atomic<bool>>(true);
     auto cancel_thread = Thread::create(
@@ -629,7 +630,7 @@ TEST_CASE("Task yield, cancel, and return")
     auto return_task = std::make_shared<Task>(inst, async_opts, nullptr, [&](std::optional<std::vector<std::any>> values)
                                               {
                                                  resolved_called = true;
-                                                 resolved_value = std::move(values); });
+                                                 resolved_value = std::move(values); }, async_ft);
 
     auto return_gate = std::make_shared<std::atomic<bool>>(true);
     auto return_thread = Thread::create(
@@ -677,7 +678,7 @@ TEST_CASE("thread.yield returns suspend result")
         CanonicalOptions async_opts;
         async_opts.sync = false;
 
-        auto task = std::make_shared<Task>(inst, async_opts);
+        auto task = std::make_shared<Task>(inst, async_opts, nullptr, nullptr, FuncType{true});
         auto thread = Thread::create(
             store,
             []()
@@ -707,7 +708,7 @@ TEST_CASE("thread.yield returns suspend result")
         CanonicalOptions async_opts;
         async_opts.sync = false;
 
-        auto task = std::make_shared<Task>(inst, async_opts);
+        auto task = std::make_shared<Task>(inst, async_opts, nullptr, nullptr, FuncType{true});
         auto thread = Thread::create(
             store,
             []()
@@ -730,9 +731,11 @@ TEST_CASE("thread.yield returns suspend result")
     }
 }
 
-TEST_CASE("task.wait returns blocked or event")
+TEST_CASE("task.wait returns event from waitable set")
 {
     ComponentInstance inst;
+    Store store;
+    inst.store = &store;
     HostTrap trap = [](const char *msg)
     {
         throw std::runtime_error(msg ? msg : "trap");
@@ -749,21 +752,25 @@ TEST_CASE("task.wait returns blocked or event")
     GuestMemory mem(heap.memory.data(), heap.memory.size());
     uint32_t event_ptr = 32;
 
-    Task task(inst);
-
-    auto code = canon_task_wait(false, mem, task, waitable_set, event_ptr, trap);
-    CHECK(code == BLOCKED);
-    uint32_t p1 = 123;
-    uint32_t p2 = 456;
-    std::memcpy(&p1, heap.memory.data() + event_ptr, sizeof(uint32_t));
-    std::memcpy(&p2, heap.memory.data() + event_ptr + sizeof(uint32_t), sizeof(uint32_t));
-    CHECK(p1 == 0);
-    CHECK(p2 == 0);
-
+    // Post an event before calling wait so it resolves immediately.
     auto waitable = inst.table.get<Waitable>(readable, trap);
     waitable->set_pending_event({EventCode::STREAM_READ, readable, 0xCAFE'BEEFu});
-    code = canon_task_wait(false, mem, task, waitable_set, event_ptr, trap);
+
+    CanonicalOptions async_opts;
+    async_opts.sync = false;
+    Task task(inst, async_opts, nullptr, nullptr, FuncType{true});
+    auto thread = Thread::create(
+        store,
+        []()
+        { return true; },
+        [](bool)
+        { return false; });
+    task.set_thread(thread);
+
+    auto code = canon_task_wait(false, mem, task, waitable_set, event_ptr, trap);
     CHECK(code == static_cast<uint32_t>(EventCode::STREAM_READ));
+    uint32_t p1 = 0;
+    uint32_t p2 = 0;
     std::memcpy(&p1, heap.memory.data() + event_ptr, sizeof(uint32_t));
     std::memcpy(&p2, heap.memory.data() + event_ptr + sizeof(uint32_t), sizeof(uint32_t));
     CHECK(p1 == readable);
@@ -800,7 +807,7 @@ TEST_CASE("thread.yield-to resumes suspended thread")
         true,
         {});
     REQUIRE(other->suspended());
-    uint32_t other_index = inst.table.add(std::make_shared<ThreadEntry>(other), trap);
+    uint32_t other_index = inst.threads.add(std::make_shared<ThreadEntry>(other), trap);
 
     auto task = std::make_shared<Task>(inst, async_opts);
     auto current = Thread::create(
@@ -855,7 +862,7 @@ TEST_CASE("thread.yield-to traps if target not suspended")
         },
         true,
         {});
-    uint32_t other_index = inst.table.add(std::make_shared<ThreadEntry>(other), trap);
+    uint32_t other_index = inst.threads.add(std::make_shared<ThreadEntry>(other), trap);
 
     auto task = std::make_shared<Task>(inst, async_opts);
     auto current = Thread::create(
@@ -912,7 +919,7 @@ TEST_CASE("thread.new-indirect creates a suspended thread")
         [task, &inst, &trap, &table, ran](bool)
         {
             uint32_t idx = canon_thread_new_indirect(false, *task, table, 1, 123, trap);
-            auto entry = inst.table.get<ThreadEntry>(idx, trap);
+            auto entry = inst.threads.get<ThreadEntry>(idx, trap);
             REQUIRE(entry->thread());
             CHECK(entry->thread()->suspended());
 
@@ -964,7 +971,7 @@ TEST_CASE("thread.new-ref and spawn-ref create threads")
                                                     {
                                                         CHECK(c == 7u);
                                                         *ran_new = true; }, 7, trap);
-            auto new_entry = inst.table.get<ThreadEntry>(idx_new, trap);
+            auto new_entry = inst.threads.get<ThreadEntry>(idx_new, trap);
             REQUIRE(new_entry->thread());
             CHECK(new_entry->thread()->suspended());
             canon_thread_resume_later(*task, idx_new, trap);
@@ -973,7 +980,7 @@ TEST_CASE("thread.new-ref and spawn-ref create threads")
                                                         {
                                                             CHECK(c == 9u);
                                                             *ran_spawn = true; }, 9, trap);
-            auto spawn_entry = inst.table.get<ThreadEntry>(idx_spawn, trap);
+            auto spawn_entry = inst.threads.get<ThreadEntry>(idx_spawn, trap);
             REQUIRE(spawn_entry->thread());
             CHECK_FALSE(spawn_entry->thread()->suspended());
             return false;
@@ -1025,7 +1032,7 @@ TEST_CASE("thread.spawn-indirect resumes and runs")
         [task, &inst, &trap, &table](bool)
         {
             uint32_t idx = canon_thread_spawn_indirect(false, *task, table, 1, 55, trap);
-            auto entry = inst.table.get<ThreadEntry>(idx, trap);
+            auto entry = inst.threads.get<ThreadEntry>(idx, trap);
             REQUIRE(entry->thread());
             CHECK_FALSE(entry->thread()->suspended());
             return false;
@@ -1089,7 +1096,7 @@ TEST_CASE("thread.switch-to schedules a suspended thread")
         },
         true,
         {});
-    uint32_t other_index = inst.table.add(std::make_shared<ThreadEntry>(other), trap);
+    uint32_t other_index = inst.threads.add(std::make_shared<ThreadEntry>(other), trap);
 
     auto task = std::make_shared<Task>(inst, async_opts);
     auto current = Thread::create(
@@ -1181,7 +1188,7 @@ TEST_CASE("thread.suspend forces a yield")
     CanonicalOptions async_opts;
     async_opts.sync = false;
 
-    auto task = std::make_shared<Task>(inst, async_opts);
+    auto task = std::make_shared<Task>(inst, async_opts, nullptr, nullptr, FuncType{true});
     bool second_resume = false;
     bool first_resume = true;
 
@@ -1360,6 +1367,141 @@ TEST_CASE("InstanceContext wires canonical options")
     CHECK(observed_events.back().code == EventCode::STREAM_READ);
     CHECK(observed_events.back().index == 5);
     CHECK(observed_events.back().payload == 0xCAFE'BEEFu);
+}
+
+TEST_CASE("ComponentInstance reflexive_ancestors returns self and parents")
+{
+    Store store;
+    ComponentInstance root;
+    root.store = &store;
+
+    ComponentInstance child;
+    child.store = &store;
+    child.parent = &root;
+
+    ComponentInstance grandchild;
+    grandchild.store = &store;
+    grandchild.parent = &child;
+
+    auto root_ancestors = root.reflexive_ancestors();
+    CHECK(root_ancestors.size() == 1);
+    CHECK(root_ancestors.count(&root) == 1);
+
+    auto child_ancestors = child.reflexive_ancestors();
+    CHECK(child_ancestors.size() == 2);
+    CHECK(child_ancestors.count(&child) == 1);
+    CHECK(child_ancestors.count(&root) == 1);
+
+    auto gc_ancestors = grandchild.reflexive_ancestors();
+    CHECK(gc_ancestors.size() == 3);
+    CHECK(gc_ancestors.count(&grandchild) == 1);
+    CHECK(gc_ancestors.count(&child) == 1);
+    CHECK(gc_ancestors.count(&root) == 1);
+}
+
+TEST_CASE("ComponentInstance is_reflexive_ancestor_of checks ancestry")
+{
+    Store store;
+    ComponentInstance root;
+    root.store = &store;
+
+    ComponentInstance child;
+    child.store = &store;
+    child.parent = &root;
+
+    ComponentInstance grandchild;
+    grandchild.store = &store;
+    grandchild.parent = &child;
+
+    ComponentInstance unrelated;
+    unrelated.store = &store;
+
+    CHECK(root.is_reflexive_ancestor_of(&root));
+    CHECK(root.is_reflexive_ancestor_of(&child));
+    CHECK(root.is_reflexive_ancestor_of(&grandchild));
+    CHECK(child.is_reflexive_ancestor_of(&child));
+    CHECK(child.is_reflexive_ancestor_of(&grandchild));
+    CHECK_FALSE(child.is_reflexive_ancestor_of(&root));
+    CHECK_FALSE(grandchild.is_reflexive_ancestor_of(&root));
+    CHECK_FALSE(root.is_reflexive_ancestor_of(&unrelated));
+    CHECK_FALSE(unrelated.is_reflexive_ancestor_of(&root));
+}
+
+TEST_CASE("call_might_be_recursive detects same-instance recursion")
+{
+    Store store;
+    ComponentInstance inst;
+    inst.store = &store;
+
+    auto caller = std::make_shared<Supertask>();
+    caller->instance = &inst;
+
+    CHECK(call_might_be_recursive(caller, &inst));
+}
+
+TEST_CASE("call_might_be_recursive detects ancestor recursion")
+{
+    Store store;
+    ComponentInstance root;
+    root.store = &store;
+
+    ComponentInstance child;
+    child.store = &store;
+    child.parent = &root;
+
+    auto caller = std::make_shared<Supertask>();
+    caller->instance = &root;
+
+    CHECK(call_might_be_recursive(caller, &child));
+    CHECK(call_might_be_recursive(caller, &root));
+
+    auto child_caller = std::make_shared<Supertask>();
+    child_caller->instance = &child;
+
+    CHECK(call_might_be_recursive(child_caller, &root));
+}
+
+TEST_CASE("call_might_be_recursive returns false for unrelated instances")
+{
+    Store store;
+    ComponentInstance inst_a;
+    inst_a.store = &store;
+
+    ComponentInstance inst_b;
+    inst_b.store = &store;
+
+    auto caller = std::make_shared<Supertask>();
+    caller->instance = &inst_a;
+
+    CHECK_FALSE(call_might_be_recursive(caller, &inst_b));
+}
+
+TEST_CASE("call_might_be_recursive walks host caller chain")
+{
+    Store store;
+    ComponentInstance inst;
+    inst.store = &store;
+
+    // Simulate host caller (instance == nullptr) with a parent that has an instance
+    auto inner = std::make_shared<Supertask>();
+    inner->instance = &inst;
+
+    auto host_caller = std::make_shared<Supertask>();
+    host_caller->instance = nullptr;
+    host_caller->parent = inner;
+
+    CHECK(call_might_be_recursive(host_caller, &inst));
+
+    // Unrelated instance should return false
+    ComponentInstance other;
+    other.store = &store;
+    CHECK_FALSE(call_might_be_recursive(host_caller, &other));
+}
+
+TEST_CASE("call_might_be_recursive returns false for null caller")
+{
+    ComponentInstance inst;
+    CHECK_FALSE(call_might_be_recursive(nullptr, &inst));
 }
 
 TEST_CASE("Canonical callbacks surface waitable events")
@@ -2258,17 +2400,9 @@ TEST_CASE("Stream cancellation posts events")
     CHECK(blocked == BLOCKED);
 
     auto cancel_payload = canon_stream_cancel_read(inst, readable, false, host_trap);
-    CHECK(cancel_payload == BLOCKED);
-
-    GuestMemory mem(heap.memory.data(), heap.memory.size());
-    auto code = canon_waitable_set_poll(false, mem, inst, waitable_set, event_ptr, host_trap);
-    CHECK(code == static_cast<uint32_t>(EventCode::STREAM_READ));
-
-    uint32_t payload = 0;
-    std::memcpy(&payload, heap.memory.data() + event_ptr + sizeof(uint32_t), sizeof(uint32_t));
-    CHECK((payload & 0xF) == static_cast<uint32_t>(CopyResult::Cancelled));
-    auto cancel_count = payload >> 4;
-    CHECK(cancel_count == 0);
+    // Cancel immediately resolves — event is available from on_copy_done callback.
+    CHECK(cancel_payload != BLOCKED);
+    CHECK((cancel_payload & 0xF) == static_cast<uint32_t>(CopyResult::Cancelled));
 
     canon_stream_drop_readable(inst, readable, host_trap);
     canon_waitable_set_drop(inst, waitable_set, host_trap);
@@ -2359,17 +2493,10 @@ TEST_CASE("Stream cancel-write posts events")
     auto blocked = canon_stream_write(inst, desc, writable, cx, write_ptr, 1, host_trap);
     CHECK(blocked == BLOCKED);
 
-    auto cancel_blocked = canon_stream_cancel_write(inst, writable, false, host_trap);
-    CHECK(cancel_blocked == BLOCKED);
-
-    GuestMemory mem(heap.memory.data(), heap.memory.size());
-    auto code = canon_waitable_set_poll(false, mem, inst, waitable_set, event_ptr, host_trap);
-    CHECK(code == static_cast<uint32_t>(EventCode::STREAM_WRITE));
-
-    uint32_t payload = 0;
-    std::memcpy(&payload, heap.memory.data() + event_ptr + sizeof(uint32_t), sizeof(uint32_t));
-    CHECK((payload & 0xF) == static_cast<uint32_t>(CopyResult::Cancelled));
-    CHECK((payload >> 4) == 0);
+    auto cancel_payload = canon_stream_cancel_write(inst, writable, false, host_trap);
+    // Cancel immediately resolves — event is available from on_copy_done callback.
+    CHECK(cancel_payload != BLOCKED);
+    CHECK((cancel_payload & 0xF) == static_cast<uint32_t>(CopyResult::Cancelled));
 
     canon_stream_drop_writable(inst, writable, host_trap);
     canon_waitable_set_drop(inst, waitable_set, host_trap);
@@ -2405,11 +2532,9 @@ TEST_CASE("Stream read can be retried after cancellation")
     CHECK(blocked == BLOCKED);
 
     auto cancel_result = canon_stream_cancel_read(inst, readable, false, host_trap);
-    CHECK(cancel_result == BLOCKED);
-
-    GuestMemory mem(heap.memory.data(), heap.memory.size());
-    auto code = canon_waitable_set_poll(false, mem, inst, waitable_set, event_ptr, host_trap);
-    CHECK(code == static_cast<uint32_t>(EventCode::STREAM_READ));
+    // Cancel immediately resolves.
+    CHECK(cancel_result != BLOCKED);
+    CHECK((cancel_result & 0xF) == static_cast<uint32_t>(CopyResult::Cancelled));
 
     // Start a new read after cancellation.
     blocked = canon_stream_read(inst, desc, readable, cx, read_ptr, 1, false, host_trap);
@@ -2419,7 +2544,8 @@ TEST_CASE("Stream read can be retried after cancellation")
     std::memcpy(heap.memory.data() + write_ptr, &value, sizeof(value));
     (void)canon_stream_write(inst, desc, writable, cx, write_ptr, 1, host_trap);
 
-    code = canon_waitable_set_poll(false, mem, inst, waitable_set, event_ptr, host_trap);
+    GuestMemory mem(heap.memory.data(), heap.memory.size());
+    auto code = canon_waitable_set_poll(false, mem, inst, waitable_set, event_ptr, host_trap);
     CHECK(code == static_cast<uint32_t>(EventCode::STREAM_READ));
 
     uint32_t payload = 0;
@@ -2518,11 +2644,8 @@ TEST_CASE("Future read can be retried after cancellation")
     CHECK(blocked == BLOCKED);
 
     auto cancel_result = canon_future_cancel_read(inst, readable, false, host_trap);
-    CHECK(cancel_result == BLOCKED);
-
-    GuestMemory mem(heap.memory.data(), heap.memory.size());
-    auto code = canon_waitable_set_poll(false, mem, inst, waitable_set, event_ptr, host_trap);
-    CHECK(code == static_cast<uint32_t>(EventCode::FUTURE_READ));
+    // Cancel immediately resolves.
+    CHECK(cancel_result != BLOCKED);
 
     blocked = canon_future_read(inst, desc, readable, cx, read_ptr, false, host_trap);
     CHECK(blocked == BLOCKED);
@@ -2531,7 +2654,8 @@ TEST_CASE("Future read can be retried after cancellation")
     std::memcpy(heap.memory.data() + write_ptr, &value, sizeof(value));
     (void)canon_future_write(inst, desc, writable, cx, write_ptr, host_trap);
 
-    code = canon_waitable_set_poll(false, mem, inst, waitable_set, event_ptr, host_trap);
+    GuestMemory mem(heap.memory.data(), heap.memory.size());
+    auto code = canon_waitable_set_poll(false, mem, inst, waitable_set, event_ptr, host_trap);
     CHECK(code == static_cast<uint32_t>(EventCode::FUTURE_READ));
 
     uint32_t payload = 0;

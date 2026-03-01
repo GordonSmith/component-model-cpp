@@ -177,6 +177,9 @@ namespace cmcpp
         Func,
         Own,
         Borrow,
+        ErrorContext,
+        Stream,
+        Future,
         LAST
     };
 

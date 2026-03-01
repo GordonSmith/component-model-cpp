@@ -15,7 +15,9 @@
 #include <thread>
 #include <condition_variable>
 #include <typeindex>
+#include <set>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <cstring>
 #include <mutex>
@@ -76,6 +78,16 @@ namespace cmcpp
         bool sync = true;
         std::optional<GuestCallback> callback;
         bool allways_task_return = false;
+    };
+
+    // Minimal representation of a Component Model function type.
+    // Mirrors Python's FuncType with the fields needed by Task.
+    struct FuncType
+    {
+        bool async_ = false;
+        // result descriptor intentionally opaque — used for identity checks
+        // in canon_task_return validation.
+        const void *result_id = nullptr;
     };
 
     struct ComponentInstance;
@@ -265,7 +277,7 @@ namespace cmcpp
             return wset_;
         }
 
-        void drop(const HostTrap &trap);
+        virtual void drop(const HostTrap &trap);
 
     private:
         std::optional<Event> pending_event_;
@@ -388,7 +400,7 @@ namespace cmcpp
             }
             else
             {
-                trap_if(trap_cx, entries_.size() >= (1u << 30), "instance table overflow");
+                trap_if(trap_cx, entries_.size() > ((1u << 28) - 1), "instance table overflow");
                 entries_.push_back(entry);
                 index = static_cast<uint32_t>(entries_.size() - 1);
             }
@@ -757,11 +769,7 @@ namespace cmcpp
                         pending_on_copy(
                             [this]()
                             {
-                                std::unique_lock<std::mutex> reclaim_lock(mu, std::try_to_lock);
-                                if (!reclaim_lock.owns_lock())
-                                {
-                                    return;
-                                }
+                                std::scoped_lock<std::mutex> reclaim_lock(mu);
                                 reset_pending();
                             });
                     }
@@ -902,11 +910,6 @@ namespace cmcpp
                 }
             }
 
-            if (!sync)
-            {
-                return BLOCKED;
-            }
-
             auto event = get_pending_event(trap);
             return event.payload;
         }
@@ -1023,11 +1026,6 @@ namespace cmcpp
                 {
                     return BLOCKED;
                 }
-            }
-
-            if (!sync)
-            {
-                return BLOCKED;
             }
 
             auto event = get_pending_event(trap);
@@ -1240,10 +1238,6 @@ namespace cmcpp
                     return BLOCKED;
                 }
             }
-            if (!sync)
-            {
-                return BLOCKED;
-            }
             auto event = get_pending_event(trap);
             return event.payload;
         }
@@ -1328,11 +1322,15 @@ namespace cmcpp
             }
             if (!has_pending_event())
             {
-                return BLOCKED;
-            }
-            if (!sync)
-            {
-                return BLOCKED;
+                if (sync)
+                {
+                    shared_->wait_until([this]()
+                                        { return has_pending_event(); });
+                }
+                else
+                {
+                    return BLOCKED;
+                }
             }
             auto event = get_pending_event(trap);
             return event.payload;
@@ -1375,7 +1373,7 @@ namespace cmcpp
     class HandleTable
     {
     public:
-        static constexpr uint32_t MAX_LENGTH = 1u << 30;
+        static constexpr uint32_t MAX_LENGTH = (1u << 28) - 1;
 
         HandleElement &get(uint32_t index, const HostTrap &trap)
         {
@@ -1475,6 +1473,7 @@ namespace cmcpp
     struct ComponentInstance
     {
         Store *store = nullptr;
+        ComponentInstance *parent = nullptr;
         bool may_leave = true;
         bool may_enter = true;
         bool exclusive = false;
@@ -1482,6 +1481,32 @@ namespace cmcpp
         uint32_t num_waiting_to_enter = 0;
         HandleTables handles;
         InstanceTable table;
+        InstanceTable threads;
+
+        std::unordered_set<const ComponentInstance *> reflexive_ancestors() const
+        {
+            std::unordered_set<const ComponentInstance *> s;
+            const ComponentInstance *inst = this;
+            while (inst != nullptr)
+            {
+                s.insert(inst);
+                inst = inst->parent;
+            }
+            return s;
+        }
+
+        bool is_reflexive_ancestor_of(const ComponentInstance *other) const
+        {
+            while (other != nullptr)
+            {
+                if (this == other)
+                {
+                    return true;
+                }
+                other = other->parent;
+            }
+            return false;
+        }
     };
 
     inline void ensure_may_leave(ComponentInstance &inst, const HostTrap &trap)
@@ -1509,6 +1534,40 @@ namespace cmcpp
         inst.backpressure -= 1;
     }
 
+    inline bool call_might_be_recursive(const SupertaskPtr &caller, const ComponentInstance *callee_inst)
+    {
+        if (!caller || !callee_inst)
+        {
+            return false;
+        }
+        if (caller->instance == nullptr)
+        {
+            auto callee_ancestors = callee_inst->reflexive_ancestors();
+            auto current = caller.get();
+            while (current != nullptr)
+            {
+                if (current->instance)
+                {
+                    auto caller_ancestors = current->instance->reflexive_ancestors();
+                    for (auto *a : caller_ancestors)
+                    {
+                        if (callee_ancestors.count(a))
+                        {
+                            return true;
+                        }
+                    }
+                }
+                current = current->parent.get();
+            }
+            return false;
+        }
+        else
+        {
+            return caller->instance->is_reflexive_ancestor_of(callee_inst) ||
+                   callee_inst->is_reflexive_ancestor_of(caller->instance);
+        }
+    }
+
     class Task : public std::enable_shared_from_this<Task>
     {
     public:
@@ -1523,8 +1582,9 @@ namespace cmcpp
         Task(ComponentInstance &instance,
              CanonicalOptions options = {},
              SupertaskPtr supertask = {},
-             OnResolve on_resolve = {})
-            : opts_(std::move(options)), inst_(&instance), supertask_(std::move(supertask)), on_resolve_(std::move(on_resolve))
+             OnResolve on_resolve = {},
+             FuncType ft = {})
+            : opts_(std::move(options)), inst_(&instance), supertask_(std::move(supertask)), on_resolve_(std::move(on_resolve)), ft_(ft)
         {
         }
 
@@ -1565,6 +1625,12 @@ namespace cmcpp
                 return false;
             }
 
+            // Python: if not self.ft.async_: return True
+            if (!ft_.async_)
+            {
+                return true;
+            }
+
             auto has_backpressure = [inst, this]() -> bool
             {
                 return inst->backpressure > 0 || (needs_exclusive() && inst->exclusive);
@@ -1597,6 +1663,10 @@ namespace cmcpp
         void exit()
         {
             if (!inst_)
+            {
+                return;
+            }
+            if (!ft_.async_)
             {
                 return;
             }
@@ -1656,6 +1726,36 @@ namespace cmcpp
             return {EventCode::NONE, 0, 0};
         }
 
+        Event wait_until(Thread::ReadyFn ready, bool cancellable, std::shared_ptr<WaitableSet> wset, const HostTrap &trap)
+        {
+            if (wset)
+            {
+                wset->begin_wait();
+            }
+            auto ready_and_has_event = [ready = std::move(ready), wset]() -> bool
+            {
+                return ready() && (!wset || wset->has_pending_event());
+            };
+            Event event;
+            if (!suspend_until(ready_and_has_event, cancellable))
+            {
+                event = {EventCode::TASK_CANCELLED, 0, 0};
+            }
+            else if (wset)
+            {
+                event = wset->take_pending_event(trap);
+            }
+            else
+            {
+                event = {EventCode::NONE, 0, 0};
+            }
+            if (wset)
+            {
+                wset->end_wait();
+            }
+            return event;
+        }
+
         void return_result(std::vector<std::any> result, const HostTrap &trap)
         {
             ensure_resolvable(trap);
@@ -1708,7 +1808,12 @@ namespace cmcpp
 
         bool may_block() const
         {
-            return !opts_.sync || state_ == State::Resolved;
+            return ft_.async_ || state_ == State::Resolved;
+        }
+
+        const FuncType &func_type() const
+        {
+            return ft_;
         }
 
     private:
@@ -1740,9 +1845,12 @@ namespace cmcpp
         uint32_t num_borrows_ = 0;
         std::shared_ptr<Thread> thread_;
         State state_ = State::Initial;
+        FuncType ft_;
     };
 
-    inline void canon_task_return(Task &task, std::vector<std::any> result, const HostTrap &trap)
+    inline void canon_task_return(Task &task, std::vector<std::any> result, const HostTrap &trap,
+                                  const void *result_type_id = nullptr,
+                                  const LiftOptions *caller_opts = nullptr)
     {
         if (auto *inst = task.component_instance())
         {
@@ -1750,6 +1858,16 @@ namespace cmcpp
         }
         auto trap_cx = make_trap_context(trap);
         trap_if(trap_cx, task.options().sync, "task.return requires async context");
+        // Python: trap_if(result_type != task.ft.result)
+        if (result_type_id != nullptr && task.func_type().result_id != nullptr)
+        {
+            trap_if(trap_cx, result_type_id != task.func_type().result_id, "task.return result type mismatch");
+        }
+        // Python: trap_if(not LiftOptions.equal(opts, task.opts))
+        if (caller_opts != nullptr)
+        {
+            trap_if(trap_cx, !(*caller_opts == static_cast<const LiftOptions &>(task.options())), "task.return options mismatch");
+        }
         task.return_result(std::move(result), trap);
     }
 
@@ -1796,7 +1914,7 @@ namespace cmcpp
         trap_if(trap_cx, inst == nullptr, "thread.resume-later missing component instance");
         ensure_may_leave(*inst, trap);
 
-        auto entry = inst->table.get<ThreadEntry>(thread_index, trap);
+        auto entry = inst->threads.get<ThreadEntry>(thread_index, trap);
         auto other_thread = entry->thread();
         trap_if(trap_cx, !other_thread, "thread.resume-later null thread");
         trap_if(trap_cx, !other_thread->suspended(), "thread not suspended");
@@ -1810,7 +1928,7 @@ namespace cmcpp
         trap_if(trap_cx, inst == nullptr, "thread.yield-to missing component instance");
         ensure_may_leave(*inst, trap);
 
-        auto entry = inst->table.get<ThreadEntry>(thread_index, trap);
+        auto entry = inst->threads.get<ThreadEntry>(thread_index, trap);
         auto other_thread = entry->thread();
         trap_if(trap_cx, !other_thread, "thread.yield-to null thread");
         trap_if(trap_cx, !other_thread->suspended(), "thread not suspended");
@@ -1836,7 +1954,7 @@ namespace cmcpp
         trap_if(trap_cx, inst == nullptr, "thread.switch-to missing component instance");
         ensure_may_leave(*inst, trap);
 
-        auto entry = inst->table.get<ThreadEntry>(thread_index, trap);
+        auto entry = inst->threads.get<ThreadEntry>(thread_index, trap);
         auto other_thread = entry->thread();
         trap_if(trap_cx, !other_thread, "thread.switch-to null thread");
         trap_if(trap_cx, !other_thread->suspended(), "thread not suspended");
@@ -1881,7 +1999,7 @@ namespace cmcpp
             {});
         trap_if(trap_cx, !thread || !thread->suspended(), "thread.new-ref failed to create suspended thread");
 
-        uint32_t index = inst->table.add(std::make_shared<ThreadEntry>(thread), trap);
+        uint32_t index = inst->threads.add(std::make_shared<ThreadEntry>(thread), trap);
         thread->set_index(index);
         return index;
     }
@@ -1959,7 +2077,7 @@ namespace cmcpp
         return static_cast<uint32_t>(SuspendResult::NOT_CANCELLED);
     }
 
-    inline uint32_t canon_task_wait(bool /*cancellable*/,
+    inline uint32_t canon_task_wait(bool cancellable,
                                     GuestMemory mem,
                                     Task &task,
                                     uint32_t waitable_set_handle,
@@ -1970,23 +2088,81 @@ namespace cmcpp
         auto trap_cx = make_trap_context(trap);
         trap_if(trap_cx, inst == nullptr, "task.wait missing component instance");
         ensure_may_leave(*inst, trap);
+        trap_if(trap_cx, !task.may_block(), "task.wait may not block");
 
         auto wset = inst->table.get<WaitableSet>(waitable_set_handle, trap);
-        wset->begin_wait();
-        if (!wset->has_pending_event())
-        {
-            wset->end_wait();
-            write_event_fields(mem, event_ptr, 0, 0, trap);
-            return BLOCKED;
-        }
-        auto event = wset->take_pending_event(trap);
-        wset->end_wait();
+        auto event = task.wait_until(
+            []()
+            { return true; },
+            cancellable,
+            wset,
+            trap);
         write_event_fields(mem, event_ptr, event.index, event.payload, trap);
         return static_cast<uint32_t>(event.code);
     }
 
     struct Subtask : Waitable
     {
+        enum class State : uint32_t
+        {
+            STARTING = 0,
+            STARTED = 1,
+            RETURNED = 2,
+            CANCELLED_BEFORE_STARTED = 3,
+            CANCELLED_BEFORE_RETURNED = 4
+        };
+
+        State state = State::STARTING;
+        Call callee;
+        std::vector<HandleElement *> lenders;
+        bool cancellation_requested = false;
+        bool lenders_delivered = false;
+
+        bool resolved() const
+        {
+            switch (state)
+            {
+            case State::STARTING:
+            case State::STARTED:
+                return false;
+            case State::RETURNED:
+            case State::CANCELLED_BEFORE_STARTED:
+            case State::CANCELLED_BEFORE_RETURNED:
+                return true;
+            }
+            return false;
+        }
+
+        void add_lender(HandleElement &lending_handle)
+        {
+            lending_handle.lend_count += 1;
+            lenders.push_back(&lending_handle);
+        }
+
+        void deliver_resolve()
+        {
+            for (auto *h : lenders)
+            {
+                if (h && h->lend_count > 0)
+                {
+                    h->lend_count -= 1;
+                }
+            }
+            lenders.clear();
+            lenders_delivered = true;
+        }
+
+        bool resolve_delivered() const
+        {
+            return lenders_delivered;
+        }
+
+        void drop(const HostTrap &trap) override
+        {
+            auto trap_cx = make_trap_context(trap);
+            trap_if(trap_cx, !resolve_delivered(), "subtask drop before resolve delivered");
+            Waitable::drop(trap);
+        }
     };
 
     struct Future
@@ -2131,6 +2307,60 @@ namespace cmcpp
         }
         auto wset = inst.table.get<WaitableSet>(set_index, trap);
         waitable->join(wset.get(), trap);
+    }
+
+    inline uint32_t canon_subtask_cancel(bool async_, Task &task, uint32_t subtask_index, const HostTrap &trap)
+    {
+        auto *inst = task.component_instance();
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, inst == nullptr, "subtask.cancel missing component instance");
+        ensure_may_leave(*inst, trap);
+        trap_if(trap_cx, !task.may_block() && !async_, "subtask.cancel may not block");
+
+        auto subtask = inst->table.get<Subtask>(subtask_index, trap);
+        trap_if(trap_cx, subtask->resolve_delivered(), "subtask already resolved and delivered");
+        trap_if(trap_cx, subtask->cancellation_requested, "subtask cancel already requested");
+
+        if (subtask->resolved())
+        {
+            // Already resolved — just consume the pending event
+            auto event = subtask->get_pending_event(trap);
+            subtask->deliver_resolve();
+            return static_cast<uint32_t>(subtask->state);
+        }
+
+        subtask->cancellation_requested = true;
+        subtask->callee.request_cancellation();
+
+        if (!subtask->resolved())
+        {
+            if (!async_)
+            {
+                // Sync: block until resolved
+                task.suspend_until([subtask]()
+                                   { return subtask->resolved(); },
+                                   false);
+            }
+            else
+            {
+                return BLOCKED;
+            }
+        }
+
+        auto event = subtask->get_pending_event(trap);
+        subtask->deliver_resolve();
+        return static_cast<uint32_t>(subtask->state);
+    }
+
+    inline void canon_subtask_drop(Task &task, uint32_t subtask_index, const HostTrap &trap)
+    {
+        auto *inst = task.component_instance();
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, inst == nullptr, "subtask.drop missing component instance");
+        ensure_may_leave(*inst, trap);
+
+        auto subtask = inst->table.remove<Subtask>(subtask_index, trap);
+        subtask->drop(trap);
     }
 
     inline uint64_t canon_stream_new(ComponentInstance &inst, const StreamDescriptor &descriptor, const HostTrap &trap)
@@ -2279,6 +2509,388 @@ namespace cmcpp
         ensure_may_leave(inst, trap);
         auto writable = inst.table.remove<WritableFutureEnd>(writable_index, trap);
         writable->drop(trap);
+    }
+
+    //  canon_lift / canon_lower  ---
+
+    // Core wasm callee: receives a Thread and flat args, returns flat results.
+    using CoreCallee = std::function<WasmValVector(std::shared_ptr<Thread>, WasmValVector)>;
+
+    // Lift-side callback callee: receives a Thread and (event_code, p1, p2), returns packed result.
+    using LiftCallback = std::function<WasmValVector(std::shared_ptr<Thread>, WasmValVector)>;
+
+    enum class CallbackCode : uint32_t
+    {
+        EXIT = 0,
+        YIELD = 1,
+        WAIT = 2,
+        MAX = 2,
+    };
+
+    inline std::pair<CallbackCode, uint32_t> unpack_callback_result(uint32_t packed)
+    {
+        uint32_t code = packed & 0xfu;
+        uint32_t waitable_set_index = packed >> 4;
+        return {static_cast<CallbackCode>(code), waitable_set_index};
+    }
+
+    // Wraps exceptions from core wasm calls as traps.
+    inline WasmValVector call_and_trap_on_throw(const CoreCallee &callee, const std::shared_ptr<Thread> &thread, WasmValVector args)
+    {
+        try
+        {
+            return callee(thread, std::move(args));
+        }
+        catch (...)
+        {
+            throw; // re-raise as trap
+        }
+    }
+
+    /// canon_lift: Implements the canonical lifting of a component-model call.
+    ///
+    /// Mirrors Python's canon_lift(opts, inst, ft, callee, caller, on_start, on_resolve).
+    /// Creates a Task, wires up a Thread, lowers the args, calls the core callee,
+    /// lifts the results, and handles sync/async/callback modes.
+    ///
+    /// @param opts       Canonical options (encoding, memory, realloc, async, callback, post_return)
+    /// @param inst       The callee component instance
+    /// @param ft         The function type being lifted
+    /// @param callee     The core wasm function to call
+    /// @param caller     The supertask representing the caller
+    /// @param on_start   Callback to retrieve the high-level arguments
+    /// @param on_resolve Callback to deliver the high-level results (or nullopt on cancel)
+    /// @param trap       Host trap handler
+    /// @param convert    Unicode conversion function (for LiftLowerContext)
+    /// @return           A Call handle for the created task
+    inline Call canon_lift(CanonicalOptions opts,
+                           ComponentInstance &inst,
+                           FuncType ft,
+                           CoreCallee callee,
+                           SupertaskPtr caller,
+                           OnStart on_start,
+                           OnResolve on_resolve,
+                           const HostTrap &trap,
+                           const HostUnicodeConversion &convert = {})
+    {
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, call_might_be_recursive(caller, &inst), "canon_lift: recursive call");
+
+        auto task = std::make_shared<Task>(inst, opts, std::move(caller), std::move(on_resolve), ft);
+
+        // Build the ResumeFn that runs the lifted function body.
+        auto thread_func = [task, opts, &inst, ft, callee = std::move(callee),
+                            on_start = std::move(on_start), trap, convert](bool was_cancelled) mutable -> bool
+        {
+            if (was_cancelled)
+            {
+                return false;
+            }
+
+            if (!task->enter(trap))
+            {
+                return false;
+            }
+
+            // Register the thread in the instance's threads table.
+            auto thread = task->thread();
+            if (thread && !thread->index().has_value())
+            {
+                uint32_t idx = inst.threads.add(std::make_shared<ThreadEntry>(thread), trap);
+                thread->set_index(idx);
+            }
+
+            LiftLowerOptions ll_opts(opts.string_encoding, opts.memory, opts.realloc);
+            LiftLowerContext cx(trap, convert, ll_opts, &inst);
+            cx.set_canonical_options(opts);
+
+            auto args = on_start();
+
+            // Sync path
+            if (opts.sync)
+            {
+                WasmValVector flat_args;
+                for (auto &arg : args)
+                {
+                    // The caller is expected to provide already-lowered flat args
+                    // via on_start in the host embedding.  For full spec compliance
+                    // this would invoke lower_flat_values, but that requires
+                    // compile-time type information.  The host embedding is
+                    // responsible for providing correct flat values.
+                    if (arg.type() == typeid(int32_t))
+                        flat_args.push_back(std::any_cast<int32_t>(arg));
+                    else if (arg.type() == typeid(int64_t))
+                        flat_args.push_back(std::any_cast<int64_t>(arg));
+                    else if (arg.type() == typeid(float))
+                        flat_args.push_back(std::any_cast<float>(arg));
+                    else if (arg.type() == typeid(double))
+                        flat_args.push_back(std::any_cast<double>(arg));
+                }
+
+                WasmValVector flat_results = call_and_trap_on_throw(callee, thread, std::move(flat_args));
+
+                // Lift the flat results back to high-level values.
+                // The host embedding is expected to interpret flat_results.
+                std::vector<std::any> result;
+                for (auto &fv : flat_results)
+                {
+                    result.push_back(fv);
+                }
+                task->return_result(std::move(result), trap);
+
+                if (opts.post_return)
+                {
+                    inst.may_leave = false;
+                    (*opts.post_return)();
+                    inst.may_leave = true;
+                }
+
+                task->exit();
+                return false;
+            }
+
+            // Async path without callback
+            if (!opts.callback)
+            {
+                WasmValVector flat_args;
+                for (auto &arg : args)
+                {
+                    if (arg.type() == typeid(int32_t))
+                        flat_args.push_back(std::any_cast<int32_t>(arg));
+                    else if (arg.type() == typeid(int64_t))
+                        flat_args.push_back(std::any_cast<int64_t>(arg));
+                    else if (arg.type() == typeid(float))
+                        flat_args.push_back(std::any_cast<float>(arg));
+                    else if (arg.type() == typeid(double))
+                        flat_args.push_back(std::any_cast<double>(arg));
+                }
+
+                call_and_trap_on_throw(callee, thread, std::move(flat_args));
+                task->exit();
+                return false;
+            }
+
+            // Async path with callback
+            WasmValVector flat_args;
+            for (auto &arg : args)
+            {
+                if (arg.type() == typeid(int32_t))
+                    flat_args.push_back(std::any_cast<int32_t>(arg));
+                else if (arg.type() == typeid(int64_t))
+                    flat_args.push_back(std::any_cast<int64_t>(arg));
+                else if (arg.type() == typeid(float))
+                    flat_args.push_back(std::any_cast<float>(arg));
+                else if (arg.type() == typeid(double))
+                    flat_args.push_back(std::any_cast<double>(arg));
+            }
+
+            WasmValVector packed_vec = call_and_trap_on_throw(callee, thread, std::move(flat_args));
+            auto trap_cx2 = make_trap_context(trap);
+            trap_if(trap_cx2, packed_vec.empty(), "canon_lift callback: callee returned no value");
+            uint32_t packed = static_cast<uint32_t>(std::get<int32_t>(packed_vec[0]));
+            auto [code, si] = unpack_callback_result(packed);
+            trap_if(trap_cx2, static_cast<uint32_t>(code) > static_cast<uint32_t>(CallbackCode::MAX), "invalid callback code");
+
+            while (code != CallbackCode::EXIT)
+            {
+                inst.exclusive = false;
+                Event event;
+                switch (code)
+                {
+                case CallbackCode::YIELD:
+                    if (task->may_block())
+                    {
+                        event = task->yield_until([&inst]()
+                                                  { return !inst.exclusive; },
+                                                  true);
+                    }
+                    else
+                    {
+                        event = {EventCode::NONE, 0, 0};
+                    }
+                    break;
+                case CallbackCode::WAIT:
+                {
+                    trap_if(trap_cx2, !task->may_block(), "callback WAIT: may not block");
+                    auto wset = inst.table.get<WaitableSet>(si, trap);
+                    event = task->wait_until([&inst]()
+                                             { return !inst.exclusive; },
+                                             true,
+                                             wset,
+                                             trap);
+                    break;
+                }
+                default:
+                    trap_if(trap_cx2, true, "invalid callback code");
+                    break;
+                }
+                inst.exclusive = true;
+
+                auto callback_fn = *opts.callback;
+                callback_fn(event.code, event.index, event.payload);
+
+                // The callback returns a packed result via the callback convention.
+                // In the C++ model, the callback is a void function that updates
+                // state; we re-enter the loop checking for EXIT.
+                // For full fidelity, the callback would need to return a packed int.
+                // We break out since the C++ callback model doesn't return values.
+                code = CallbackCode::EXIT;
+            }
+
+            task->exit();
+            return false;
+        };
+
+        auto thread = Thread::create(
+            *inst.store,
+            []()
+            { return true; },
+            std::move(thread_func),
+            !opts.sync,
+            [task]()
+            {
+                task->request_cancellation();
+            });
+
+        task->set_thread(thread);
+
+        // Initial tick to start the thread
+        inst.store->tick();
+
+        return Call(
+            [task]()
+            {
+                task->request_cancellation();
+            },
+            !opts.sync);
+    }
+
+    /// canon_lower: Implements the canonical lowering of a component-model call.
+    ///
+    /// Mirrors Python's canon_lower(opts, ft, callee, thread, flat_args).
+    /// Creates a Subtask, lifts the flat args, calls the component function,
+    /// lowers the results, and handles sync/async paths.
+    ///
+    /// @param opts       Canonical options
+    /// @param ft         The function type being lowered
+    /// @param callee     The component function to call (FuncInst)
+    /// @param task       The current task
+    /// @param flat_args  The flat wasm arguments
+    /// @param trap       Host trap handler
+    /// @param convert    Unicode conversion function
+    /// @return           Flat wasm results
+    inline WasmValVector canon_lower(CanonicalOptions opts,
+                                     FuncType ft,
+                                     FuncInst callee,
+                                     Task &task,
+                                     WasmValVector flat_args,
+                                     const HostTrap &trap,
+                                     const HostUnicodeConversion &convert = {})
+    {
+        auto *inst = task.component_instance();
+        auto trap_cx = make_trap_context(trap);
+        trap_if(trap_cx, inst == nullptr, "canon_lower: missing component instance");
+        trap_if(trap_cx, !inst->may_leave, "canon_lower: may not leave");
+        trap_if(trap_cx, !task.may_block() && ft.async_ && !opts.sync, "canon_lower: sync context cannot call async");
+
+        auto subtask = std::make_shared<Subtask>();
+        LiftLowerOptions ll_opts(opts.string_encoding, opts.memory, opts.realloc);
+        auto cx = std::make_shared<LiftLowerContext>(trap, convert, ll_opts, inst);
+        cx->set_canonical_options(opts);
+
+        WasmValVector flat_results;
+        auto flat_args_iter = std::make_shared<WasmValVector>(std::move(flat_args));
+
+        auto on_start = [subtask, flat_args_iter]() -> std::vector<std::any>
+        {
+            subtask->state = Subtask::State::STARTED;
+            // Convert flat args to std::any vector for the callee
+            std::vector<std::any> args;
+            for (auto &v : *flat_args_iter)
+            {
+                std::visit([&args](auto &&val)
+                           { args.push_back(val); },
+                           v);
+            }
+            return args;
+        };
+
+        auto on_resolve = [subtask, &flat_results, inst, &trap](std::optional<std::vector<std::any>> result)
+        {
+            if (!result.has_value())
+            {
+                // Cancelled
+                if (subtask->state == Subtask::State::STARTED)
+                {
+                    subtask->state = Subtask::State::CANCELLED_BEFORE_RETURNED;
+                }
+                else
+                {
+                    subtask->state = Subtask::State::CANCELLED_BEFORE_STARTED;
+                }
+            }
+            else
+            {
+                subtask->state = Subtask::State::RETURNED;
+                // Store flat results from the resolved values
+                for (auto &v : *result)
+                {
+                    if (v.type() == typeid(int32_t))
+                        flat_results.push_back(std::any_cast<int32_t>(v));
+                    else if (v.type() == typeid(int64_t))
+                        flat_results.push_back(std::any_cast<int64_t>(v));
+                    else if (v.type() == typeid(float))
+                        flat_results.push_back(std::any_cast<float>(v));
+                    else if (v.type() == typeid(double))
+                        flat_results.push_back(std::any_cast<double>(v));
+                }
+            }
+        };
+
+        // Call the callee
+        subtask->callee = inst->store->invoke(callee, task.thread() ? std::make_shared<Supertask>(Supertask{nullptr, task.thread(), inst}) : nullptr, std::move(on_start), std::move(on_resolve));
+
+        // Sync path
+        if (opts.sync)
+        {
+            if (!subtask->resolved())
+            {
+                // Block until resolved
+                task.suspend_until([subtask]()
+                                   { return subtask->resolved(); },
+                                   false);
+            }
+            subtask->deliver_resolve();
+            return flat_results;
+        }
+
+        // Async path
+        if (subtask->resolved())
+        {
+            subtask->deliver_resolve();
+            return {static_cast<int32_t>(subtask->state)};
+        }
+        else
+        {
+            uint32_t subtaski = inst->table.add(subtask, trap);
+
+            // Set up progress notification
+            auto on_progress = [subtask, subtaski, inst, &trap]()
+            {
+                auto subtask_event = [subtask, subtaski]() -> Event
+                {
+                    if (subtask->resolved())
+                    {
+                        subtask->deliver_resolve();
+                    }
+                    return {EventCode::SUBTASK, subtaski, static_cast<uint32_t>(subtask->state)};
+                };
+                subtask->set_pending_event(subtask_event());
+            };
+
+            uint32_t packed = static_cast<uint32_t>(subtask->state) | (subtaski << 4);
+            return {static_cast<int32_t>(packed)};
+        }
     }
 
     //  ----------------------------

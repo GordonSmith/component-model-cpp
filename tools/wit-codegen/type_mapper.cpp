@@ -650,7 +650,16 @@ std::string TypeMapper::mapType(const std::string &witType, const InterfaceInfo 
     if (type.find("list<") == 0)
     {
         std::string innerType = extract_template_content(type);
-        return "cmcpp::list_t<" + mapType(innerType, iface) + ">";
+        auto parts = split_respecting_brackets(innerType);
+
+        if (!parts.empty())
+        {
+            // WIT fixed-length list syntax is list<T, N>.
+            // The current C++ model represents lists as cmcpp::list_t<T>.
+            return "cmcpp::list_t<" + mapType(parts[0], iface) + ">";
+        }
+
+        return "cmcpp::list_t<cmcpp::monostate>";
     }
 
     // Option types
