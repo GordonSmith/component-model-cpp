@@ -12,6 +12,7 @@
 #include <cmcpp/tuple.hpp>
 #include <cmcpp/record.hpp>
 #include <cmcpp/list.hpp>
+#include <cmcpp/map.hpp>
 #include <cmcpp/variant.hpp>
 #include <cmcpp/func.hpp>
 #include <cmcpp/lower.hpp>

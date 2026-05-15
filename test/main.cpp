@@ -3575,6 +3575,57 @@ TEST_CASE("List-Latin1_Utf16")
     CHECK(strs[2] == "!");
 }
 
+TEST_CASE("Map")
+{
+    Heap heap(1024 * 1024);
+    auto cx = createLiftLowerContext(&heap, Encoding::Utf8);
+
+    using NamesById = map_t<uint32_t, string_t>;
+    static_assert(ValTrait<NamesById>::type == ValType::Map);
+    static_assert(ValTrait<NamesById>::size == ValTrait<list_t<tuple_t<uint32_t, string_t>>>::size);
+    static_assert(ValTrait<NamesById>::alignment == ValTrait<list_t<tuple_t<uint32_t, string_t>>>::alignment);
+
+    NamesById names = {
+        {1, "one"},
+        {2, "two"},
+        {42, "forty-two"}};
+
+    auto flat = lower_flat(*cx, names);
+    auto roundtrip = lift_flat<NamesById>(*cx, flat);
+    CHECK(roundtrip == names);
+
+    store(*cx, names, 100);
+    auto loaded = load<NamesById>(*cx, 100);
+    CHECK(loaded == names);
+
+    using NestedMap = map_t<string_t, NamesById>;
+    NestedMap nested = {
+        {"left", NamesById{{7, "seven"}}},
+        {"right", NamesById{{8, "eight"}, {9, "nine"}}}};
+
+    auto nested_flat = lower_flat(*cx, nested);
+    auto nested_roundtrip = lift_flat<NestedMap>(*cx, nested_flat);
+    CHECK(nested_roundtrip == nested);
+}
+
+TEST_CASE("Map duplicate keys use last value")
+{
+    Heap heap(1024 * 1024);
+    auto cx = createLiftLowerContext(&heap, Encoding::Utf8);
+
+    using Entry = tuple_t<uint32_t, string_t>;
+    list_t<Entry> entries = {
+        std::make_tuple(uint32_t(7), string_t("old")),
+        std::make_tuple(uint32_t(8), string_t("other")),
+        std::make_tuple(uint32_t(7), string_t("new"))};
+
+    store(*cx, entries, 200);
+    auto loaded = load<map_t<uint32_t, string_t>>(*cx, 200);
+    CHECK(loaded.size() == 2);
+    CHECK(loaded[7] == "new");
+    CHECK(loaded[8] == "other");
+}
+
 TEST_CASE("List Boundary Cases - Enhanced")
 {
     Heap heap(1024 * 1024);

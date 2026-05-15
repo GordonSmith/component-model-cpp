@@ -184,6 +184,7 @@ The test suite validates the grammar against **95+ official WIT test files** inc
 - ✅ Flags (bitsets)
 - ✅ Tuples
 - ✅ Lists (including fixed-length lists)
+- ✅ Maps
 - ✅ Options and Results
 
 **Async Features (Recently Added)**
@@ -342,7 +343,7 @@ cmake --build build --target test-wit-grammar
 #### Grammar Coverage
 
 The test suite ensures complete coverage of the WIT specification:
-- ✅ All keywords (as, async, bool, borrow, char, constructor, enum, export, f32, f64, flags, from, func, future, import, include, interface, list, option, own, package, record, resource, result, s8-s64, static, stream, string, tuple, type, u8-u64, use, variant, with, world)
+- ✅ All keywords (as, async, bool, borrow, char, constructor, enum, export, f32, f64, flags, from, func, future, import, include, interface, list, map, option, own, package, record, resource, result, s8-s64, static, stream, string, tuple, type, u8-u64, use, variant, with, world)
 - ✅ All operators (=, ,, :, ;, (, ), {, }, <, >, *, ->, /, ., @)
 - ✅ Package versions (SemVer 2.0.0)
 - ✅ Comments (line and block)

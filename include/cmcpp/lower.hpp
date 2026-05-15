@@ -6,6 +6,7 @@
 #include "float.hpp"
 #include "string.hpp"
 #include "list.hpp"
+#include "map.hpp"
 #include "flags.hpp"
 #include "tuple.hpp"
 #include "func.hpp"

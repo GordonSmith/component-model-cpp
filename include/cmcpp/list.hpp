@@ -10,6 +10,8 @@ namespace cmcpp
 {
     namespace list
     {
+        const uint32_t MAX_LIST_BYTE_LENGTH = (1U << 28) - 1;
+
         template <typename T>
         std::tuple<offset, size> store_into_valid_range(LiftLowerContext &cx, const list_t<T> &v, uint32_t ptr)
         {
@@ -29,7 +31,7 @@ namespace cmcpp
             ValType d = ValTrait<T>::type;
             size_t nbytes = ValTrait<T>::size;
             auto byte_length = v.size() * nbytes;
-            trap_if(cx, byte_length > std::numeric_limits<size>::max(), "byte_length exceeds limit");
+            trap_if(cx, byte_length > MAX_LIST_BYTE_LENGTH, "list byte length exceeds limit");
             uint32_t ptr = cx.opts.realloc(0, 0, ValTrait<T>::alignment, byte_length);
             trap_if(cx, ptr != align_to(ptr, ValTrait<T>::alignment), "misaligned");
             trap_if(cx, ptr + byte_length > cx.opts.memory.size(), "memory overflow");
@@ -54,6 +56,7 @@ namespace cmcpp
         template <typename T>
         list_t<T> load_from_range(const LiftLowerContext &cx, offset ptr, size length)
         {
+            trap_if(cx, static_cast<uint64_t>(length) * ValTrait<T>::size > MAX_LIST_BYTE_LENGTH, "list byte length exceeds limit");
             assert(ptr == align_to(ptr, ValTrait<T>::alignment));
             assert(ptr + length * ValTrait<T>::size <= cx.opts.memory.size());
             list_t<T> list = {};

@@ -36,6 +36,7 @@ This repository contains a C++ ABI implementation of the WebAssembly Component M
 - [x] Char
 - [x] Strings (UTF-8, UTF-16, Latin-1+UTF-16)
 - [x] List
+- [x] Map
 - [x] Record
 - [x] Tuple
 - [x] Variant

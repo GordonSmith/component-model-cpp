@@ -653,6 +653,16 @@ std::string TypeMapper::mapType(const std::string &witType, const InterfaceInfo 
         return "cmcpp::list_t<" + mapType(innerType, iface) + ">";
     }
 
+    // Map types despecialize to list<tuple<K, V>> in the canonical ABI.
+    if (type.find("map<") == 0)
+    {
+        auto parts = split_respecting_brackets(extract_template_content(type));
+        if (parts.size() == 2)
+        {
+            return "cmcpp::map_t<" + mapType(parts[0], iface) + ", " + mapType(parts[1], iface) + ">";
+        }
+    }
+
     // Option types
     if (type.find("option<") == 0)
     {

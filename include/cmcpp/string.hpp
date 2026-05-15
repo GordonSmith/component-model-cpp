@@ -9,7 +9,7 @@ namespace cmcpp
 {
     namespace string
     {
-        const uint32_t MAX_STRING_BYTE_LENGTH = (1U << 31) - 1;
+        const uint32_t MAX_STRING_BYTE_LENGTH = (1U << 28) - 1;
 
         inline std::pair<uint32_t, uint32_t> store_string_copy(LiftLowerContext &cx, const void *src, uint32_t src_code_units, uint32_t dst_code_unit_size, uint32_t dst_alignment, Encoding dst_encoding)
         {
@@ -260,7 +260,7 @@ namespace cmcpp
         T load_from_range(const LiftLowerContext &cx, uint32_t ptr, uint32_t tagged_code_units)
         {
             uint32_t alignment = 0;
-            uint32_t byte_length = 0;
+            uint64_t byte_length = 0;
             Encoding encoding = Encoding::Utf8;
             switch (cx.opts.string_encoding)
             {
@@ -271,14 +271,14 @@ namespace cmcpp
                 break;
             case Encoding::Utf16:
                 alignment = 2;
-                byte_length = 2 * tagged_code_units;
+                byte_length = 2ull * tagged_code_units;
                 encoding = Encoding::Utf16;
                 break;
             case Encoding::Latin1_Utf16:
                 alignment = 2;
                 if (tagged_code_units & UTF16_TAG)
                 {
-                    byte_length = 2 * (tagged_code_units ^ UTF16_TAG);
+                    byte_length = 2ull * (tagged_code_units ^ UTF16_TAG);
                     encoding = Encoding::Utf16;
                 }
                 else
@@ -290,10 +290,11 @@ namespace cmcpp
             default:
                 trap_if(cx, false);
             }
+            trap_if(cx, byte_length > MAX_STRING_BYTE_LENGTH, "string byte length exceeds limit");
             trap_if(cx, ptr != align_to(ptr, alignment));
-            trap_if(cx, ptr + byte_length > cx.opts.memory.size());
+            trap_if(cx, static_cast<uint64_t>(ptr) + byte_length > cx.opts.memory.size());
             size_t char_size = ValTrait<T>::char_size;
-            size_t host_byte_length = byte_length * 2;
+            size_t host_byte_length = static_cast<size_t>(byte_length * 2);
             T retVal;
             if constexpr (std::is_same<T, latin1_u16string_t>::value)
             {

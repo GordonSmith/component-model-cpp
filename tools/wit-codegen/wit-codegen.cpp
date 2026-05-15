@@ -32,7 +32,7 @@ void print_help(const char *program_name)
     std::cout << "  <prefix>_wamr.hpp     - WAMR runtime integration header\n";
     std::cout << "  <prefix>_wamr.cpp     - WAMR binding implementation with NativeSymbol arrays\n\n";
     std::cout << "FEATURES:\n";
-    std::cout << "  - Supports all Component Model types (primitives, strings, lists, records,\n";
+    std::cout << "  - Supports all Component Model types (primitives, strings, lists, maps, records,\n";
     std::cout << "    variants, enums, options, results, flags)\n";
     std::cout << "  - Generates bidirectional bindings (imports and exports)\n";
     std::cout << "  - Type-safe C++ wrappers using cmcpp canonical ABI\n";

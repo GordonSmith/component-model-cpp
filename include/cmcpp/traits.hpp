@@ -11,6 +11,7 @@
 #include <cstring>
 #include <functional>
 #include <limits>
+#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -165,6 +166,7 @@ namespace cmcpp
         Char,
         String,
         List,
+        Map,
         Field,
         Record,
         Tuple,
@@ -751,6 +753,29 @@ namespace cmcpp
     };
     template <typename T>
     concept Tuple = !is_result_wrapper<T>::value && ValTrait<T>::type == ValType::Tuple;
+
+    //  Map  --------------------------------------------------------------------
+    template <typename T>
+    concept MapKey = Boolean<T> || Integer<T> || Char<T> || String<T>;
+
+    template <MapKey K, Field V>
+    using map_t = std::map<K, V>;
+
+    template <MapKey K, Field V, typename Compare, typename Allocator>
+    struct ValTrait<std::map<K, V, Compare, Allocator>>
+    {
+        static constexpr ValType type = ValType::Map;
+        using key_type = K;
+        using mapped_type = V;
+        using entry_type = tuple_t<K, V>;
+        using list_type = list_t<entry_type>;
+        static constexpr uint32_t size = ValTrait<list_type>::size;
+        static constexpr uint32_t alignment = ValTrait<list_type>::alignment;
+        static constexpr auto flat_types = ValTrait<list_type>::flat_types;
+    };
+
+    template <typename T>
+    concept Map = !is_result_wrapper<T>::value && ValTrait<T>::type == ValType::Map;
 
     //  Record  ------------------------------------------------------------------
     template <typename S>
