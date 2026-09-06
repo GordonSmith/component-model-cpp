@@ -2,6 +2,7 @@
 
 This document tracks alignment between the upstream Component Model spec/reference (in `ref/component-model`) and this library’s C++ entrypoints.
 
+- Upstream baseline: `2bed77e4228841c1d2721996d3ecc169ff96b158`
 - Upstream references:
   - `ref/component-model/design/mvp/CanonicalABI.md`
   - `ref/component-model/design/mvp/Concurrency.md`
@@ -53,11 +54,11 @@ This document tracks alignment between the upstream Component Model spec/referen
 
 ## Thread built-ins (upstream)
 
-These are referenced by the upstream spec/reference but do not currently have direct C++ canonical built-in entrypoints in this repo:
+These additional thread built-ins are implemented by direct C++ canonical entrypoints:
 
-- `thread.new_ref` / `thread.new-ref` (implemented: `cmcpp::canon_thread_new_ref`)
-- `thread.new-indirect` (implemented: `cmcpp::canon_thread_new_indirect`)
-- `thread.spawn-ref` (implemented: `cmcpp::canon_thread_spawn_ref`)
-- `thread.spawn-indirect` (implemented: `cmcpp::canon_thread_spawn_indirect`)
-- `thread.switch-to` (implemented: `cmcpp::canon_thread_switch_to`)
-- `thread.available-parallelism` (implemented: `cmcpp::canon_thread_available_parallelism`)
+- `thread.new-ref`: `cmcpp::canon_thread_new_ref`
+- `thread.new-indirect`: `cmcpp::canon_thread_new_indirect`
+- `thread.spawn-ref`: `cmcpp::canon_thread_spawn_ref`
+- `thread.spawn-indirect`: `cmcpp::canon_thread_spawn_indirect`
+- `thread.switch-to`: `cmcpp::canon_thread_switch_to`
+- `thread.available-parallelism`: `cmcpp::canon_thread_available_parallelism`

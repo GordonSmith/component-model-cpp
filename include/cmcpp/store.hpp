@@ -26,6 +26,9 @@ namespace cmcpp
     template <List T>
     inline void store(LiftLowerContext &cx, const T &v, uint32_t ptr);
 
+    template <FixedList T>
+    inline void store(LiftLowerContext &cx, const T &v, uint32_t ptr);
+
     template <Tuple T>
     inline void store(LiftLowerContext &cx, const T &v, uint32_t ptr);
 

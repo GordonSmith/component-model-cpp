@@ -10,44 +10,274 @@
 
 # Component Model C++
 
-This repository contains a C++ ABI implementation of the WebAssembly Component Model.
+This repository contains a header-only C++20 implementation of the WebAssembly
+Component Model Canonical ABI. The public API is aggregated by
+`include/cmcpp.hpp`; tests, code-generation tools, and runtime samples are built
+as separate executables around the library.
+
+The library uses templates, concepts, `constexpr` metadata, and `static_assert`
+checks to describe Component Model values at compile time. For each supported
+host type, its Component Model kind, memory size, alignment, and WebAssembly
+flat representation are available through `ValTrait<T>`. This lets invalid or
+unsupported type combinations fail during compilation, while lifting, lowering,
+and guest-memory access remain runtime operations.
 
 ## Features
 
 ### OS
 - [x] Ubuntu 24.04
-- [ ] MacOS 13
-- [ ] MacOS 14 (Arm)
+- [x] Ubuntu 26.04
+- [x] macOS (latest, builds and passes tests)
 - [ ] Windows 2019
 - [x] Windows 2022
 
 ### Host Data Types
-- [x] Bool
-- [x] S8
-- [x] U8
-- [x] S16
-- [x] U16
-- [x] S32
-- [x] U32
-- [x] S64
-- [x] U64
-- [x] F32
-- [x] F64
-- [x] Char
-- [x] Strings (UTF-8, UTF-16, Latin-1+UTF-16)
-- [x] List
-- [x] Map
-- [x] Record
-- [x] Tuple
-- [x] Variant
-- [x] Enum
-- [x] Option
-- [x] Result
-- [x] Flags
-- [x] Streams (readable/writable)
-- [x] Futures (readable/writable)
-- [x] Own
-- [x] Borrow
+The C++ aliases use the canonical value kind followed by `_t`: for example,
+canonical `OptionType(T)` is represented as `cmcpp::option_t<T>`, and
+`ListType(T)` as `cmcpp::list_t<T>`.
+
+| Type | Real-world example |
+| --- | --- |
+| Bool | `cmcpp::bool_t feature_enabled` |
+| S8 | `int8_t temperature_delta` |
+| U8 | `uint8_t channel_id` |
+| S16 | `int16_t altitude_delta` |
+| U16 | `uint16_t network_port` |
+| S32 | `int32_t file_offset` |
+| U32 | `uint32_t message_length` |
+| S64 | `int64_t timestamp` |
+| U64 | `uint64_t byte_count` |
+| F32 | `cmcpp::float32_t sensor_reading` |
+| F64 | `cmcpp::float64_t exchange_rate` |
+| Char | `cmcpp::char_t initial` |
+| Strings (UTF-8, UTF-16, Latin-1+UTF-16) | `cmcpp::string_t user_name` |
+| List | `cmcpp::list_t<cmcpp::string_t> tags` |
+| Fixed-length list | `cmcpp::fixed_list_t<cmcpp::float32_t, 3> rgb` |
+| Map | `cmcpp::map_t<cmcpp::string_t, uint32_t> inventory` |
+| Record | `cmcpp::record_t<Account> account` |
+| Tuple | `cmcpp::tuple_t<cmcpp::string_t, uint32_t> user_id_and_age` |
+| Variant | `cmcpp::variant_t<cmcpp::string_t, int32_t> setting` |
+| Enum | `cmcpp::enum_t<OrderStatus> status` |
+| Option | `cmcpp::option_t<cmcpp::string_t> middle_name` |
+| Result | `cmcpp::result_t<Order, cmcpp::string_t> response` |
+| Flags | `cmcpp::flags_t<"read", "write", "admin"> permissions` |
+| Streams (readable/writable) | `cmcpp::make_stream_descriptor<LogEntry>()` |
+| Futures (readable/writable) | `cmcpp::make_future_descriptor<Response>()` |
+| Own | An owned `ResourceType` handle for a file or socket |
+| Borrow | A borrowed `ResourceType` handle passed to a call |
+
+### Host Data Type Examples
+
+**Bool.** Use `cmcpp::bool_t` for a two-state setting such as whether a feature is enabled. A host can lower `feature_enabled` directly and let the canonical ABI represent it as an `i32` value.
+
+```cpp
+cmcpp::bool_t feature_enabled = true;
+```
+
+**S8.** A signed 8-bit value is useful for a small signed delta, such as `int8_t temperature_delta` in a thermostat message. Values stay compact while preserving negative changes.
+
+```cpp
+int8_t temperature_delta = -2;
+```
+
+**U8.** Use `uint8_t channel_id` for a small non-negative identifier such as a radio channel, protocol version, or palette index.
+
+```cpp
+uint8_t channel_id = 11;
+```
+
+**S16.** A signed 16-bit value fits measurements such as `int16_t altitude_delta`, where the value may represent a climb or descent relative to a reference point.
+
+```cpp
+int16_t altitude_delta = -120;
+```
+
+**U16.** Use `uint16_t network_port` for a TCP or UDP port number. The unsigned range also works well for bounded counters and protocol fields.
+
+```cpp
+uint16_t network_port = 443;
+```
+
+**S32.** File offsets and signed coordinate deltas are common `int32_t` values. For example, `int32_t file_offset` can represent a position relative to the beginning of a mapped region.
+
+```cpp
+int32_t file_offset = 4096;
+```
+
+**U32.** Use `uint32_t message_length` for a byte length, record count, or other non-negative value whose range is larger than 16 bits.
+
+```cpp
+uint32_t message_length = 1024;
+```
+
+**S64.** Timestamps represented as signed 64-bit values can carry time values or differences across a wide range. A host might exchange `int64_t timestamp` in microseconds from an agreed epoch.
+
+```cpp
+int64_t timestamp = 1'725'000'000'000'000;
+```
+
+**U64.** Use `uint64_t byte_count` for large file sizes, monotonically increasing sequence numbers, or counters that must not become negative.
+
+```cpp
+uint64_t byte_count = 12'000'000'000ULL;
+```
+
+**F32.** `cmcpp::float32_t sensor_reading` is appropriate when a sensor or graphics pipeline prioritizes compact storage and single-precision range.
+
+```cpp
+cmcpp::float32_t sensor_reading = 21.5f;
+```
+
+**F64.** Use `cmcpp::float64_t exchange_rate` for calculations where accumulated rounding error matters, such as currency conversion or geographic coordinates.
+
+```cpp
+cmcpp::float64_t exchange_rate = 1.0842;
+```
+
+**Char.** `cmcpp::char_t initial` stores a Unicode scalar value, making it suitable for a user initial, a parsed code point, or a single internationalized label character.
+
+```cpp
+cmcpp::char_t initial = U'G';
+```
+
+**Strings.** Use `cmcpp::string_t user_name` for UTF-8 text, `cmcpp::u16string_t` for UTF-16-oriented APIs, or `cmcpp::latin1_u16string_t` when the canonical encoding may be Latin-1 or UTF-16.
+
+```cpp
+cmcpp::string_t user_name = "Grace";
+cmcpp::u16string_t display_name = u"Grace";
+```
+
+**List.** A `cmcpp::list_t<cmcpp::string_t> tags` models a variable-length collection such as search labels or capabilities. The list representation carries both its guest-memory pointer and its element count.
+
+```cpp
+cmcpp::list_t<cmcpp::string_t> tags = {"wasm", "cpp"};
+```
+
+**Fixed-length list.** `cmcpp::fixed_list_t<cmcpp::float32_t, 3> rgb` models exactly three color channels. The length is part of the C++ type, so a four-channel value cannot be passed accidentally where RGB is required.
+
+```cpp
+cmcpp::fixed_list_t<cmcpp::float32_t, 3> rgb = {0.2f, 0.4f, 0.8f};
+```
+
+**Map.** Use `cmcpp::map_t<cmcpp::string_t, uint32_t> inventory` for keyed data such as item names and quantities. The canonical representation treats the map as a list of key-value tuples.
+
+```cpp
+cmcpp::map_t<cmcpp::string_t, uint32_t> inventory{{"books", 4}};
+```
+
+**Record.** A user-defined aggregate such as `struct Account { uint32_t id; cmcpp::string_t email; };` can be wrapped as `cmcpp::record_t<Account>`. Its fields are lowered in declaration order with canonical alignment.
+
+```cpp
+struct Account {
+  uint32_t id;
+  cmcpp::string_t email;
+};
+
+cmcpp::record_t<Account> account{7, "user@example.com"};
+auto flat_account = cmcpp::lower_flat(cx, account);
+```
+
+**Tuple.** `cmcpp::tuple_t<cmcpp::string_t, uint32_t> user_id_and_age` is useful for a small unnamed pair returned by a helper. Use a record instead when the fields need stable, readable names.
+
+```cpp
+using UserIdAndAge = cmcpp::tuple_t<cmcpp::string_t, uint32_t>;
+UserIdAndAge user_id_and_age{"user-7", 42};
+auto user_id = std::get<0>(user_id_and_age);
+auto age = std::get<1>(user_id_and_age);
+```
+
+**Variant.** `cmcpp::variant_t<cmcpp::string_t, int32_t> setting` can represent a setting supplied either as text or as a numeric value. The active alternative becomes the canonical discriminant and payload.
+
+```cpp
+using Setting = cmcpp::variant_t<cmcpp::string_t, int32_t>;
+Setting text_setting{cmcpp::string_t{"dark"}};
+Setting numeric_setting{30};
+auto flat_setting = cmcpp::lower_flat(cx, text_setting);
+```
+
+**Enum.** `cmcpp::enum_t<OrderStatus> status` represents a closed set such as pending, shipped, and cancelled. The WIT enum supplies the labels while the C++ representation carries its numeric discriminant.
+
+```cpp
+enum class OrderStatus : uint32_t { pending, shipped, cancelled };
+cmcpp::enum_t<OrderStatus> status = static_cast<uint32_t>(OrderStatus::shipped);
+bool is_complete = status == static_cast<uint32_t>(OrderStatus::cancelled);
+```
+
+**Option.** `cmcpp::option_t<cmcpp::string_t> middle_name` distinguishes an absent middle name from an empty string. This corresponds to the canonical `none` and `some` cases rather than using a sentinel string.
+
+```cpp
+using MiddleName = cmcpp::option_t<cmcpp::string_t>;
+MiddleName present = cmcpp::string_t{"Ada"};
+MiddleName absent = std::nullopt;
+if (present) {
+  auto name = *present;
+}
+```
+
+**Result.** `cmcpp::result_t<Order, cmcpp::string_t> response` models an operation that either returns an order or an error message. The success and error alternatives remain distinct even though both travel through the same canonical result shape.
+
+```cpp
+struct Order {
+  uint32_t id;
+  cmcpp::string_t status;
+};
+using OrderResult = cmcpp::result_t<cmcpp::record_t<Order>, cmcpp::string_t>;
+OrderResult success{cmcpp::record_t<Order>{42, "shipped"}};
+OrderResult failure{cmcpp::string_t{"order not found"}};
+```
+
+**Flags.** `cmcpp::flags_t<"read", "write", "admin"> permissions` describes independent capabilities. Individual labels can be tested or changed with the flag helpers instead of manually managing a bit mask.
+
+```cpp
+cmcpp::flags_t<"read", "write", "admin"> permissions;
+permissions.set<"read">();
+permissions.set<"write">();
+if (permissions.test<"read">() && !permissions.test<"admin">()) {
+  // Read and write are allowed; administration is not.
+}
+```
+
+**Streams.** `cmcpp::make_stream_descriptor<LogEntry>()` describes a stream of log entries. Readable and writable ends can be created with the canonical stream operations, joined to a waitable set, and copied incrementally through guest memory.
+
+```cpp
+auto log_stream = cmcpp::make_stream_descriptor<LogEntry>();
+uint64_t ends = cmcpp::canon_stream_new(instance, log_stream, trap);
+uint32_t readable = static_cast<uint32_t>(ends);
+uint32_t writable = static_cast<uint32_t>(ends >> 32);
+cmcpp::canon_stream_drop_readable(instance, readable, trap);
+cmcpp::canon_stream_drop_writable(instance, writable, trap);
+```
+
+**Futures.** `cmcpp::make_future_descriptor<Response>()` describes one eventual response. A readable end can wait for one value while a writable end completes it, with cancellation and readiness reported through the canonical future operations.
+
+```cpp
+auto response_future = cmcpp::make_future_descriptor<Response>();
+uint64_t ends = cmcpp::canon_future_new(instance, response_future, trap);
+uint32_t readable = static_cast<uint32_t>(ends);
+uint32_t writable = static_cast<uint32_t>(ends >> 32);
+cmcpp::canon_future_drop_readable(instance, readable, trap);
+// Complete it with canon_future_write(instance, response_future, writable, ...).
+// Then drop the writable end with canon_future_drop_writable(...).
+```
+
+**Own.** An owned `ResourceType` handle can represent a file, socket, or database connection whose destructor is controlled by the resource implementation. Dropping the handle runs the destructor after outstanding borrows and lends have ended.
+
+```cpp
+cmcpp::ResourceType file_resource(instance);
+uint32_t file_rep = 17;
+uint32_t file_handle = cmcpp::canon_resource_new(instance, file_resource, file_rep, trap);
+uint32_t same_rep = cmcpp::canon_resource_rep(instance, file_resource, file_handle, trap);
+cmcpp::canon_resource_drop(instance, file_resource, file_handle, trap);
+```
+
+**Borrow.** A borrowed `ResourceType` handle lets a call use an existing file or socket without taking ownership. The lift/lower context tracks the borrow scope and prevents the resource from being dropped while the call still uses it.
+
+```cpp
+// The WIT function signature contains borrow<file-resource>.
+// The owning handle stays alive for the duration of the call.
+uint32_t borrowed_rep = cmcpp::canon_resource_rep(
+  instance, file_resource, file_handle, trap);
+```
 
 ### Host Functions
 - [x] lower_flat_values
@@ -58,8 +288,6 @@ This repository contains a C++ ABI implementation of the WebAssembly Component M
 - [ ] WasmTime
 - [x] Wamr
 - [ ] WasmEdge
-
-When expanding the canonical ABI surface, cross-check the Python reference tests in `ref/component-model/design/mvp/canonical-abi/run_tests.py`; new host features should mirror the behaviors exercised there.
 
 ## Build Instructions
 
@@ -93,7 +321,7 @@ brew install pkg-config autoconf autoconf-archive automake coreutils libtool cma
 cargo install wasm-tools wit-bindgen-cli
 ```
 
-### Basic Build (Header-only)
+### Basic Build (Header-only Library)
 
 For header-only usage without tests or samples:
 
@@ -283,7 +511,9 @@ See [docs/PACKAGING.md](docs/PACKAGING.md) for complete packaging documentation.
 
 ## Usage
 
-This library is a header only library. To use it in your project, you can:
+The core library has no compiled library dependency. To use it in your project,
+include `cmcpp.hpp` and either add the `include` directory to your include path
+or install the CMake interface target:
 - [x] Copy the contents of the `include` directory to your project.
 - [x] Install via `cmake --build build --target install` and use `find_package(cmcpp)`.
 - [ ] Use `vcpkg` to install the library and its dependencies (planned).

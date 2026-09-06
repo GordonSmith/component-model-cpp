@@ -5,6 +5,10 @@ on:
     tags:
       - "v*.*.*"
 
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
 env:
   CTEST_OUTPUT_ON_FAILURE: 1
 
@@ -93,9 +97,8 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Cache vcpkg registry
-        if: always()
-        uses: actions/cache@v4
+      - name: Restore vcpkg registry
+        uses: actions/cache/restore@v4
         with:
           path: |
             build/vcpkg_installed/
@@ -115,6 +118,15 @@ jobs:
       - name: Build
         run: |
           cmake --build --preset ${{ matrix.build-preset }}
+
+      - name: Save vcpkg registry
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            build/vcpkg_installed/
+            build/vcpkg_packages/
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('./vcpkg*.json') }}
 
       - name: Create Packages
         working-directory: build

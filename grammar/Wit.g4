@@ -57,6 +57,7 @@ importItem
 externType
   : funcType ';'
   | 'interface' '{' interfaceItems* '}'
+  | usePath ';'
   ;
 
 // Item: include ---
@@ -352,6 +353,9 @@ keyword
 Identifier: LETTER (LETTER | DIGIT | '-')*
   ;
 
+NUM_ID: '0' | POSITIVE_DIGIT | POSITIVE_DIGIT DIGITS
+  ;
+
 // Semver:  https://semver.org/
 VALID_SEMVER
   : VERSION_CORE
@@ -399,9 +403,6 @@ ALPHANUM_ID
   | NON_DIGIT ID_CHARS
   | ID_CHARS NON_DIGIT
   | ID_CHARS NON_DIGIT ID_CHARS
-  ;
-
-NUM_ID: '0' | POSITIVE_DIGIT | POSITIVE_DIGIT DIGITS
   ;
 
 ID_CHARS: ID_CHAR | ID_CHAR ID_CHARS

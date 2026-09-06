@@ -3555,6 +3555,25 @@ TEST_CASE("List")
     CHECK(strs[2] == "!");
 }
 
+TEST_CASE("Fixed-length list")
+{
+    Heap heap(1024 * 1024);
+    auto cx = createLiftLowerContext(&heap, Encoding::Utf8);
+
+    using Values = fixed_list_t<uint32_t, 4>;
+    static_assert(ValTrait<Values>::size == 16);
+    static_assert(ValTrait<Values>::alignment == 4);
+    static_assert(ValTrait<Values>::flat_types.size() == 4);
+
+    Values values = {1, 2, 3, 4};
+    auto flat = lower_flat(*cx, values);
+    CHECK(flat.size() == 4);
+    CHECK(lift_flat<Values>(*cx, flat) == values);
+
+    store(*cx, values, 128);
+    CHECK(load<Values>(*cx, 128) == values);
+}
+
 TEST_CASE("List-Latin1_Utf16")
 {
     Heap heap(1024 * 1024);
@@ -3594,8 +3613,8 @@ TEST_CASE("Map")
     auto roundtrip = lift_flat<NamesById>(*cx, flat);
     CHECK(roundtrip == names);
 
-    store(*cx, names, 100);
-    auto loaded = load<NamesById>(*cx, 100);
+    store(*cx, names, 4096);
+    auto loaded = load<NamesById>(*cx, 4096);
     CHECK(loaded == names);
 
     using NestedMap = map_t<string_t, NamesById>;

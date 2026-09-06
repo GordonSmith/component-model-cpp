@@ -649,8 +649,15 @@ std::string TypeMapper::mapType(const std::string &witType, const InterfaceInfo 
     // List types
     if (type.find("list<") == 0)
     {
-        std::string innerType = extract_template_content(type);
-        return "cmcpp::list_t<" + mapType(innerType, iface) + ">";
+        auto parts = split_respecting_brackets(extract_template_content(type));
+        if (parts.size() == 2)
+        {
+            return "cmcpp::fixed_list_t<" + mapType(parts[0], iface) + ", " + parts[1] + ">";
+        }
+        if (parts.size() == 1)
+        {
+            return "cmcpp::list_t<" + mapType(parts[0], iface) + ">";
+        }
     }
 
     // Map types despecialize to list<tuple<K, V>> in the canonical ABI.

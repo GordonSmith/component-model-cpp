@@ -289,11 +289,17 @@ if(DEFINED VCPKG_HOST_TRIPLET)
 endif()
 
 list(APPEND _wamr_hint_candidates
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../vcpkg_installed/arm64-osx/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../vcpkg_installed/x64-windows/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../vcpkg_installed/x64-windows-static/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../vcpkg_installed/x64-linux/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../vcpkg_installed/x64-osx/include"
 )
+
+file(GLOB _vcpkg_include_candidates
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../vcpkg_installed/*/include"
+)
+list(APPEND _wamr_hint_candidates ${_vcpkg_include_candidates})
 
 list(REMOVE_DUPLICATES _wamr_hint_candidates)
 

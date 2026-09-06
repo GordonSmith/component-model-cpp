@@ -166,6 +166,7 @@ namespace cmcpp
         Char,
         String,
         List,
+        FixedList,
         Map,
         Field,
         Record,
@@ -589,6 +590,36 @@ namespace cmcpp
     };
     template <typename T>
     concept List = ValTrait<T>::type == ValType::List;
+
+    template <typename T, size_t N>
+    using fixed_list_t = std::array<T, N>;
+
+    template <typename T, size_t N>
+    struct ValTrait<std::array<T, N>>
+    {
+        static_assert(ValTrait<T>::type != ValType::UNKNOWN, "fixed-length list elements must be component values");
+        static_assert(N > 0, "fixed-length lists must not be empty");
+
+        static constexpr ValType type = ValType::FixedList;
+        using inner_type = T;
+        static constexpr size_t length = N;
+        static constexpr uint32_t size = ValTrait<T>::size * N;
+        static constexpr uint32_t alignment = ValTrait<T>::alignment;
+        static constexpr size_t flat_types_len = ValTrait<T>::flat_types.size() * N;
+        static constexpr std::array<WasmValType, flat_types_len> flat_types = []
+        {
+            std::array<WasmValType, flat_types_len> types{};
+            for (size_t i = 0; i < N; ++i)
+            {
+                std::copy(ValTrait<T>::flat_types.begin(), ValTrait<T>::flat_types.end(),
+                          types.begin() + i * ValTrait<T>::flat_types.size());
+            }
+            return types;
+        }();
+    };
+
+    template <typename T>
+    concept FixedList = ValTrait<T>::type == ValType::FixedList;
 
     //  Flags  --------------------------------------------------------------------
     template <size_t N>

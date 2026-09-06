@@ -28,6 +28,9 @@ namespace cmcpp
     template <List T>
     inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi);
 
+    template <FixedList T>
+    inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi);
+
     template <Flags T>
     inline T lift_flat(const LiftLowerContext &cx, const CoreValueIter &vi);
 

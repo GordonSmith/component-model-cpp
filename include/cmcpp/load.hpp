@@ -26,6 +26,9 @@ namespace cmcpp
     template <List T>
     inline T load(const LiftLowerContext &cx, uint32_t ptr);
 
+    template <FixedList T>
+    inline T load(const LiftLowerContext &cx, uint32_t ptr);
+
     template <Tuple T>
     inline T load(const LiftLowerContext &cx, uint32_t ptr);
 

@@ -11,6 +11,10 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
 env:
   CTEST_OUTPUT_ON_FAILURE: 1
   CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
@@ -26,6 +30,7 @@ jobs:
       matrix:
         include:
           - os: "ubuntu-24.04"
+          - os: "ubuntu-26.04"
       fail-fast: false
 
     runs-on: ${{ matrix.os }}
@@ -44,18 +49,17 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ matrix.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Cache vcpkg registry
-        if: always()
-        uses: actions/cache@v4
+      - name: Restore vcpkg registry
+        uses: actions/cache/restore@v4
         with:
           path: |
             build/vcpkg_installed/
             build/vcpkg_packages/
-          key: ${{ runner.os }}-vcpkg-${{ hashFiles('./vcpkg*.json') }}
+          key: ${{ matrix.os }}-vcpkg-${{ hashFiles('./vcpkg*.json') }}
           restore-keys: |
-            ${{ runner.os }}-vcpkg-
+            ${{ matrix.os }}-vcpkg-
 
       - name: install dependencies
         run: |
@@ -88,6 +92,15 @@ jobs:
         uses: codecov/codecov-action@v5.4.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Save vcpkg registry
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            build/vcpkg_installed/
+            build/vcpkg_packages/
+          key: ${{ matrix.os }}-vcpkg-${{ hashFiles('./vcpkg*.json') }}
 
       - name: Upload error logs
         if: ${{ failure() || cancelled() }}

@@ -41,6 +41,9 @@ namespace cmcpp
     template <List T>
     inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v);
 
+    template <FixedList T>
+    inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v);
+
     template <Tuple T>
     inline WasmValVector lower_flat(LiftLowerContext &cx, const T &v);
 

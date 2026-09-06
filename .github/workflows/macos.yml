@@ -1,17 +1,19 @@
 name: MacOS
 
-# Disabled: Known to fail
-# To re-enable, uncomment the 'on:' section below
 on:
-  workflow_dispatch:  # Manual trigger only
-#  push:
-#    branches:
-#      - trunk
-#      - main
-#  pull_request:
-#    branches:
-#      - trunk
-#      - main
+  push:
+    branches:
+      - trunk
+      - main
+  pull_request:
+    branches:
+      - trunk
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
 
 env:
   CTEST_OUTPUT_ON_FAILURE: 1
@@ -22,7 +24,7 @@ jobs:
       matrix:
         include:
           # - os: "macos-13"
-          - os: "macos-14"
+          - os: "macos-latest"
       fail-fast: false
 
     runs-on: ${{ matrix.os }}
@@ -43,15 +45,13 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Cache vcpkg registry
-        uses: actions/cache@v4
+      - name: Restore vcpkg registry
+        uses: actions/cache/restore@v4
         with:
           path: |
             build/vcpkg_installed/
             build/vcpkg_packages/
-          key: ${{ runner.os }}-vcpkg-${{ hashFiles('./vcpkg*.json') }}
-          restore-keys: |
-            ${{ runner.os }}-vcpkg-
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('./vcpkg*.json', './vcpkg_overlays/**') }}
 
       - name: install dependencies
         run: |
@@ -65,6 +65,25 @@ jobs:
         run: |
           cmake --preset linux-ninja-Debug
 
+      - name: Fix WASI SDK macOS compiler
+        run: |
+          wasi_sdk="${GITHUB_WORKSPACE}/build/vcpkg_installed/arm64-osx/wasi-sdk"
+          if [[ -f "${wasi_sdk}/libexec/libclang-cpp.dylib" && ! -f "${wasi_sdk}/lib/libclang-cpp.dylib" ]]; then
+            cp "${wasi_sdk}/libexec/libclang-cpp.dylib" "${wasi_sdk}/lib/libclang-cpp.dylib"
+          fi
+          if [[ -f "${wasi_sdk}/libexec/libLLVM.dylib" && ! -f "${wasi_sdk}/lib/libLLVM.dylib" ]]; then
+            cp "${wasi_sdk}/libexec/libLLVM.dylib" "${wasi_sdk}/lib/libLLVM.dylib"
+          fi
+          while IFS= read -r -d '' binary; do
+            if file "${binary}" | grep -q 'Mach-O'; then
+              install_name_tool -delete_rpath "@loader_path/../../lib" "${binary}" || true
+              install_name_tool -add_rpath "@loader_path/../lib" "${binary}" || true
+            fi
+          done < <(find "${wasi_sdk}/bin" "${wasi_sdk}/lib" -type f -print0)
+          test -f "${wasi_sdk}/lib/libclang-cpp.dylib"
+          test -f "${wasi_sdk}/lib/libLLVM.dylib"
+          "${wasi_sdk}/bin/clang" --version
+
       - name: build
         run: |
           cmake --build --preset linux-ninja-Debug
@@ -72,14 +91,16 @@ jobs:
       - name: test
         working-directory: build
         run: |
-          ctest -VV -E "wit-stub-generation-test"
+          ctest -VV
 
-      - name: test-stubs-full (allowed to fail)
-        working-directory: build
-        continue-on-error: true
-        run: |
-          echo "Running wit-stub-generation-test (failures expected and will be reported)..."
-          ctest -VV -R "wit-stub-generation-test"
+      - name: Save vcpkg registry
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            build/vcpkg_installed/
+            build/vcpkg_packages/
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('./vcpkg*.json', './vcpkg_overlays/**') }}
 
       - name: Upload error logs
         if: ${{ failure() || cancelled() }}

@@ -11,6 +11,10 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
 env:
   CTEST_OUTPUT_ON_FAILURE: 1
 
@@ -48,8 +52,8 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Cache vcpkg registry
-        uses: actions/cache@v4
+      - name: Restore vcpkg registry
+        uses: actions/cache/restore@v4
         with:
           path: |
             build/vcpkg_installed/
@@ -88,6 +92,15 @@ jobs:
         run: |
           Set-Location "$env:SHORT_WORKSPACE/build"
           & ctest -C Debug -VV
+
+      - name: Save vcpkg registry
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            build/vcpkg_installed/
+            build/vcpkg_packages/
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('./vcpkg*.json') }}
 
       - name: Remove short workspace mapping
         if: always()

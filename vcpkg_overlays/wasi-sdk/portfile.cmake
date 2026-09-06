@@ -34,13 +34,32 @@ if(APPLE)
         file(COPY "${CURRENT_PACKAGES_DIR}/wasi-sdk/libexec/libclang-cpp.dylib"
              DESTINATION "${CURRENT_PACKAGES_DIR}/wasi-sdk/lib")
     endif()
-    # Also set up proper @rpath for the clang binary
-    if(EXISTS "${CURRENT_PACKAGES_DIR}/wasi-sdk/bin/clang-19")
+    if(EXISTS "${CURRENT_PACKAGES_DIR}/wasi-sdk/libexec/libLLVM.dylib")
+        file(COPY "${CURRENT_PACKAGES_DIR}/wasi-sdk/libexec/libLLVM.dylib"
+             DESTINATION "${CURRENT_PACKAGES_DIR}/wasi-sdk/lib")
+    endif()
+    # Rewrite the SDK executable and dylib rpaths to point within the package.
+    file(GLOB _wasi_macos_binaries
+        "${CURRENT_PACKAGES_DIR}/wasi-sdk/bin/*"
+        "${CURRENT_PACKAGES_DIR}/wasi-sdk/lib/*.dylib")
+    foreach(_binary IN LISTS _wasi_macos_binaries)
         execute_process(
-            COMMAND install_name_tool -add_rpath "@executable_path/../lib" "${CURRENT_PACKAGES_DIR}/wasi-sdk/bin/clang-19"
+            COMMAND file "${_binary}"
+            OUTPUT_VARIABLE _binary_type
+            OUTPUT_STRIP_TRAILING_WHITESPACE
             ERROR_QUIET
         )
-    endif()
+        if(_binary_type MATCHES "Mach-O")
+            execute_process(
+                COMMAND install_name_tool -delete_rpath "@loader_path/../../lib" "${_binary}"
+                ERROR_QUIET
+            )
+            execute_process(
+                COMMAND install_name_tool -add_rpath "@loader_path/../lib" "${_binary}"
+                ERROR_QUIET
+            )
+        endif()
+    endforeach()
 endif()
 
 file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/wasi-sdk/share/wasi-sysroot/include/net" "${CURRENT_PACKAGES_DIR}/wasi-sdk/share/wasi-sysroot/include/scsi")
